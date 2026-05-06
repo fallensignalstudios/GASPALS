@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -15,7 +17,7 @@ class USFQuestDefinition;
 UENUM(BlueprintType)
 enum class ESFQuestStepRole : uint8
 {
-    Neutral,        // Step is informational or optional; it doesnít directly gate completion.
+    Neutral,        // Step is informational or optional; it doesn‚Äôt directly gate completion.
     Required,       // Step must be completed for the quest (or owning state) to succeed.
     OptionalBonus,  // Step gives extra rewards, but is not required.
     FailureGate     // Failing or skipping this step may push the quest into failure.
@@ -41,7 +43,7 @@ struct FSFQuestStepOutcomeDefinition
 
     /**
      * Optional explicit outcome asset to apply on completion.
-     * If invalid, youíre expected to use tags/other systems instead.
+     * If invalid, you‚Äôre expected to use tags/other systems instead.
      */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest|Outcome")
     FPrimaryAssetId CompletionOutcomeAssetId;
@@ -83,7 +85,7 @@ struct FSFQuestStepDefinition
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest", meta = (MultiLine = "true"))
     FText Description;
 
-    /** Optional icon or style tag for UI theming (e.g. ìKillî, ìExploreî). */
+    /** Optional icon or style tag for UI theming (e.g. ‚ÄúKill‚Äù, ‚ÄúExplore‚Äù). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest")
     FGameplayTag StepTag;
 
@@ -104,7 +106,7 @@ struct FSFQuestStepDefinition
     FSFNarrativeConditionSet ActivationConditions;
 
     /**
-     * Conditions that must pass for this step to be considered successfully ìcompletedî
+     * Conditions that must pass for this step to be considered successfully ‚Äúcompleted‚Äù
      * beyond simple task counters (e.g. identity value, faction standing, or other quest states).
      * If empty, completion is purely task?driven.
      */
@@ -119,7 +121,7 @@ struct FSFQuestStepDefinition
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest")
     bool bHiddenUntilActive = false;
 
-    /** If true, this step remains visible as ìcompletedî after itís done; otherwise it may collapse from UI. */
+    /** If true, this step remains visible as ‚Äúcompleted‚Äù after it‚Äôs done; otherwise it may collapse from UI. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest")
     bool bShowAfterCompletion = true;
 

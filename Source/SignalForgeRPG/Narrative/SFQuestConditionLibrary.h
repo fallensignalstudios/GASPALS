@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -94,7 +96,7 @@ public:
     // Snapshots and views
     //
 
-    /** Build a quick ìis this state logically complete?î check from snapshot + state def. */
+    /** Build a quick ‚Äúis this state logically complete?‚Äù check from snapshot + state def. */
     UFUNCTION(BlueprintPure, Category = "Narrative|Quest|Conditions")
     static bool IsStateLogicallyComplete(
         const FSFQuestStateDefinition& StateDef,

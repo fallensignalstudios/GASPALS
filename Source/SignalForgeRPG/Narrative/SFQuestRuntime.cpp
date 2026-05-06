@@ -1,4 +1,6 @@
-﻿#include "SFQuestRuntime.h"
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
+#include "SFQuestRuntime.h"
 
 #include "Engine/AssetManager.h"
 #include "SFNarrativeComponent.h"

@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -107,7 +109,7 @@ struct FSFDialogueChoiceConsequences
     FGameplayTagContainer NarrativeTagsToApply;
 
     //
-    // Helper: simple ìis there anything to do?î query.
+    // Helper: simple ‚Äúis there anything to do?‚Äù query.
     //
 
     bool IsEmpty() const
@@ -127,7 +129,7 @@ struct FSFDialogueChoiceConsequences
 
 /**
  * Optional library asset for reusing choice consequences across multiple
- * dialogue assets (e.g. shared ìaccept questî choice, ìthreaten NPCî choice).
+ * dialogue assets (e.g. shared ‚Äúaccept quest‚Äù choice, ‚Äúthreaten NPC‚Äù choice).
  */
 UCLASS(BlueprintType)
 class SIGNALFORGERPG_API USFDialogueChoiceConsequencesLibrary : public UDataAsset

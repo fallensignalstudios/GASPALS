@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -107,7 +109,7 @@ struct FSFQuestStateExtendedDefinition
     TArray<FSFQuestObjectiveDefinition> Objectives;
 
     /**
-     * Fine-grained step definitions, if youíre using the Step layer.
+     * Fine-grained step definitions, if you‚Äôre using the Step layer.
      * Steps can be referenced from Objectives (by StepId) or just be
      * used for internal organization.
      */
@@ -123,7 +125,7 @@ struct FSFQuestStateExtendedDefinition
 
     /**
      * Optional conditions that must be satisfied before we consider the state
-     * ìcompleteî, beyond raw task/objective completion.
+     * ‚Äúcomplete‚Äù, beyond raw task/objective completion.
      */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest|State")
     FSFNarrativeConditionSet CompletionConditions;

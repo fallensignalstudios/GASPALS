@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFNarrativeFactSubsystem.h"
 #include "SFNarrativeStateSubsystem.h"
 

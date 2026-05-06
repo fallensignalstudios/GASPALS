@@ -1,8 +1,10 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "SFDialogueComponent.h"
+#include "Dialogue/Data/SFDialogueComponent.h"
 #include "SFNarrativeTypes.h"
 #include "SFNarrativeStructs.h"
 #include "SFNarrativeDelegates.h"
@@ -54,7 +56,7 @@ public:
     const FSFDialogueMoment& GetLastDialogueMoment() const { return LastDialogueMoment; }
 
     //
-    // Narrative?facing delegates – raised by the bridge after it adapts the raw dialogue events.
+    // Narrative?facing delegates â€“ raised by the bridge after it adapts the raw dialogue events.
     //
 
     /** High?level moment stream suitable for narrative?driven UIs. */
@@ -100,7 +102,7 @@ protected:
     // Runtime state
     //
 
-    /** Logical ID for the current conversation (usually the asset’s name). */
+    /** Logical ID for the current conversation (usually the assetâ€™s name). */
     UPROPERTY(Transient)
     FName CurrentDialogueId = NAME_None;
 
@@ -113,7 +115,7 @@ protected:
     FSFDialogueMoment LastDialogueMoment;
 
     //
-    // Handlers wired into USFDialogueComponent’s delegates
+    // Handlers wired into USFDialogueComponentâ€™s delegates
     //
 
     UFUNCTION()

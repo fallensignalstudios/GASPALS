@@ -1,93 +1,19 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameplayTagContainer.h"
 #include "SFNarrativeTypes.h"
+#include "SFNarrativeStructs.h" // Canonical FSFDialogueOptionView / FSFDialogueMoment
 #include "SFDialogueStateSnapshot.generated.h"
 
 class USFConversationDataAsset;
 
 /**
- * Lightweight, serializable representation of a single choice option at
- * the moment a snapshot was taken. This mirrors whatever you expose to UI
- * (text, tags, etc.) without storing runtime objects.
- */
-USTRUCT(BlueprintType)
-struct FSFDialogueOptionView
-{
-    GENERATED_BODY()
-
-    /** Local node ID for this choice (destination node if selected). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    FName TargetNodeId = NAME_None;
-
-    /** Local choice ID if your data distinguishes multiple choices on a node. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    FName ChoiceId = NAME_None;
-
-    /** Player-facing text for this choice. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot", meta = (MultiLine = "true"))
-    FText Text;
-
-    /** Optional tags describing this choice (used for gating, UI styling, analytics). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    FGameplayTagContainer Tags;
-
-    /** True if this choice was visible when the snapshot was taken. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    bool bWasVisible = true;
-
-    /** True if this choice was enabled/selectable when the snapshot was taken. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    bool bWasEnabled = true;
-};
-
-/**
- * View of the current dialogue line, suitable for UI and event broadcasting.
- * This does not store heavy runtime types; just IDs and display data.
- */
-USTRUCT(BlueprintType)
-struct FSFDialogueMoment
-{
-    GENERATED_BODY()
-
-    /** Owning conversation asset (soft pointer for save-friendliness). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    TSoftObjectPtr<USFConversationDataAsset> Conversation;
-
-    /** Logical dialogue identifier (usually the asset's primary name). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    FName DialogueId = NAME_None;
-
-    /** Current node identifier. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    FName NodeId = NAME_None;
-
-    /** Speaker ID used to resolve which actor/participant is talking. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    FName SpeakerId = NAME_None;
-
-    /** Localized line text for the current node. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot", meta = (MultiLine = "true"))
-    FText LineText;
-
-    /** Optional subtitle override (if different from LineText). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot", meta = (MultiLine = "true"))
-    FText SubtitleText;
-
-    /** Optional tags describing this moment (mood, channel, cinematic, etc.). */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    FGameplayTagContainer Tags;
-
-    /** All choices that were visible at this moment. */
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    TArray<FSFDialogueOptionView> Choices;
-};
-
-/**
- * Arbitrary key/value pair for dialogue-session-scoped variables,
- * serialized as strings for simplicity. You can interpret them as
- * ints/floats/enums as needed in your runtime.
+ * Arbitrary key/value pair for dialogue-session-scoped variables, serialized
+ * as strings for simplicity. You can interpret them as ints/floats/enums as
+ * needed in your runtime.
  */
 USTRUCT(BlueprintType)
 struct FSFDialogueVariableEntry
@@ -105,8 +31,12 @@ struct FSFDialogueVariableEntry
  * High-level snapshot of an in-progress dialogue session.
  *
  * This is intentionally runtime-agnostic; it does not store pointers to
- * participants, components, or the dialogue runtime – only IDs and data
+ * participants, components, or the dialogue runtime - only IDs and data
  * sufficient to restore/continue the conversation.
+ *
+ * NOTE: FSFDialogueOptionView and FSFDialogueMoment live in
+ * SFNarrativeStructs.h and are the canonical view/runtime types. This
+ * snapshot reuses them rather than redeclaring its own.
  */
 USTRUCT(BlueprintType)
 struct FSFDialogueStateSnapshot
@@ -133,7 +63,7 @@ struct FSFDialogueStateSnapshot
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
     FName OtherSpeakerId = NAME_None;
 
-    /** Current dialogue moment (speaker, line text, choices). */
+    /** Current dialogue moment (speaker, line, choices). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
     FSFDialogueMoment CurrentMoment;
 

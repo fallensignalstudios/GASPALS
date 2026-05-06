@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFNarrativeWorldState.h"
 #include "SFNarrativeStateSubsystem.h"
 
@@ -26,8 +28,8 @@ FSFNarrativeWorldState USFNarrativeWorldStateLibrary::BuildWorldState(
 
         Result.WorldFacts = SaveData.WorldFacts;
         Result.FactionSnapshots = SaveData.FactionSnapshots;
-        Result.IdentitySnapshots = SaveData.IdentitySnapshots;
-        Result.EndingSnapshots = SaveData.EndingSnapshots;
+        Result.IdentityAxes = SaveData.IdentityAxes;
+        Result.EndingStates = SaveData.EndingStates;
     }
 
     // Mirror flags/variables into the snapshot directly; caller decides
@@ -60,8 +62,8 @@ bool USFNarrativeWorldStateLibrary::ApplyWorldState(
         FSFNarrativeSaveData SaveData;
         SaveData.WorldFacts = WorldState.WorldFacts;
         SaveData.FactionSnapshots = WorldState.FactionSnapshots;
-        SaveData.IdentitySnapshots = WorldState.IdentitySnapshots;
-        SaveData.EndingSnapshots = WorldState.EndingSnapshots;
+        SaveData.IdentityAxes = WorldState.IdentityAxes;
+        SaveData.EndingStates = WorldState.EndingStates;
 
         StateSubsystem->LoadFromSaveData(SaveData);
     }

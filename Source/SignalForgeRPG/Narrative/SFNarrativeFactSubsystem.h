@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -10,7 +12,7 @@
 class USFNarrativeStateSubsystem;
 
 /**
- * Read?optimized façade over the world?level narrative state focused on
+ * Read?optimized faÃ§ade over the world?level narrative state focused on
  * *facts* and simple derived queries.
  *
  * Storage and mutation live in USFNarrativeStateSubsystem; this subsystem

@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -61,7 +63,7 @@ public:
     // Faction / identity / ending catalogues
     //
 
-    /** Faction catalog table describing each faction’s display name, icon, etc. */
+    /** Faction catalog table describing each factionâ€™s display name, icon, etc. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Factions")
     TSoftObjectPtr<UDataTable> FactionTable;
 
@@ -93,7 +95,7 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Curves")
     TSoftObjectPtr<UCurveFloat> FactionStandingCurve;
 
-    /** Curve mapping identity axis raw value ? normalized 0–1 for UI bars. */
+    /** Curve mapping identity axis raw value ? normalized 0â€“1 for UI bars. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Curves")
     TSoftObjectPtr<UCurveFloat> IdentityAxisNormalizationCurve;
 
@@ -144,3 +146,5 @@ public:
         return false;
     }
 };
+
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.

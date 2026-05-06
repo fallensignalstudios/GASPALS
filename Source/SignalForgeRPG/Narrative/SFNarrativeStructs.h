@@ -315,3 +315,5 @@ FORCEINLINE uint32 GetTypeHash(const FSFDialogueNodeAddress& Address)
 {
     return HashCombine(GetTypeHash(Address.DialogueId), GetTypeHash(Address.NodeId));
 }
+
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.

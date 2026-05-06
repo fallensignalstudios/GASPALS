@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -9,7 +11,7 @@
 #include "SFDialogueNarrativeMap.generated.h"
 
 /**
- * Identifies a specific dialogue ìaddressî that your dialogue system
+ * Identifies a specific dialogue ‚Äúaddress‚Äù that your dialogue system
  * can refer to when asking for narrative conditions/consequences.
  *
  * This should match whatever your dialogue tool exports:
@@ -56,11 +58,11 @@ FORCEINLINE uint32 GetTypeHash(const FSFDialogueKey& Key)
 }
 
 /**
- * Narrative integration for a single dialogue ìaddressî.
+ * Narrative integration for a single dialogue ‚Äúaddress‚Äù.
  *
  * - Conditions gate whether the line/choice is available.
  * - Deltas fire when the node/choice is taken/finished.
- * - Tags let you drive higher-level patterns (e.g. ìromance +1î).
+ * - Tags let you drive higher-level patterns (e.g. ‚Äúromance +1‚Äù).
  */
 USTRUCT(BlueprintType)
 struct FSFDialogueNarrativeEntry
@@ -87,15 +89,15 @@ struct FSFDialogueNarrativeEntry
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Dialogue")
     TArray<FSFNarrativeDelta> OnExitDeltas;
 
-    /** Optional explicit ìchoice consequenceî description for logs/UI. */
+    /** Optional explicit ‚Äúchoice consequence‚Äù description for logs/UI. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Dialogue")
     FText ConsequenceDescription;
 
-    /** If true, the first time this fires it sets a fact to ìseen onceî. */
+    /** If true, the first time this fires it sets a fact to ‚Äúseen once‚Äù. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Dialogue")
     bool bMarkAsSeenFact = true;
 
-    /** Fact key template for ìseen this line/choiceî. */
+    /** Fact key template for ‚Äúseen this line/choice‚Äù. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Dialogue", meta = (EditCondition = "bMarkAsSeenFact"))
     FSFWorldFactKey SeenFactKey;
 };

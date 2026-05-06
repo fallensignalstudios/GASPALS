@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -153,7 +155,7 @@ struct FSFNarrativeWorldFactEventPayload
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|World")
     FSFWorldFactValue OldValue;
 
-    /** New value (for ìremovedî events this may be empty). */
+    /** New value (for ‚Äúremoved‚Äù events this may be empty). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|World")
     FSFWorldFactValue NewValue;
 
@@ -288,7 +290,7 @@ struct FSFNarrativeSaveEventPayload
 };
 
 /**
- * Generic ìnarrative change setî payload ñ primarily for logging and analytics.
+ * Generic ‚Äúnarrative change set‚Äù payload ‚Äì primarily for logging and analytics.
  */
 USTRUCT(BlueprintType)
 struct FSFNarrativeChangeSetEventPayload

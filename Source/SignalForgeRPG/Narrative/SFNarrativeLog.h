@@ -154,3 +154,4 @@ namespace SFNarrativeLogHelpers
         (Delta).Float0, \
         (Delta).Float1, \
         (Delta).bBool0 ? TEXT("true") : TEXT("false"))
+

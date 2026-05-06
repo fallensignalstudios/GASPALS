@@ -1,32 +1,21 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFNarrativeSaveService.h"
 
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
-#include "SFEndingRuntime.h"
-#include "SFFactionRuntime.h"
-#include "SFIdentityRuntime.h"
 #include "SFNarrativeComponent.h"
 #include "SFNarrativeEventHub.h"
 #include "SFNarrativeSaveGame.h"
-#include "SFOutcomeRuntime.h"
+#include "SFNarrativeStateSubsystem.h"
 #include "SFQuestRuntime.h"
-#include "SFWorldStateRuntime.h"
 
 bool USFNarrativeSaveService::Initialize(
     USFNarrativeComponent* InOwner,
-    USFQuestRuntime* InQuestRuntime,
-    USFWorldStateRuntime* InWorldStateRuntime,
-    USFFactionRuntime* InFactionRuntime,
-    USFIdentityRuntime* InIdentityRuntime,
-    USFOutcomeRuntime* InOutcomeRuntime,
-    USFEndingRuntime* InEndingRuntime)
+    USFQuestRuntime* InQuestRuntime)
 {
     OwnerComponent = InOwner;
     QuestRuntime = InQuestRuntime;
-    WorldStateRuntime = InWorldStateRuntime;
-    FactionRuntime = InFactionRuntime;
-    IdentityRuntime = InIdentityRuntime;
-    OutcomeRuntime = InOutcomeRuntime;
-    EndingRuntime = InEndingRuntime;
 
     return ValidateDependencies();
 }
@@ -48,7 +37,11 @@ bool USFNarrativeSaveService::SaveToSlot(const FString& SlotName, int32 SlotInde
         return false;
     }
 
-    SaveObject->Data = BuildSaveData();
+    SaveObject->NarrativeData = BuildSaveData();
+    SaveObject->SlotName = SlotName;
+    SaveObject->UserIndex = SlotIndex;
+    SaveObject->NarrativeVersion = CurrentSchemaVersion;
+    SaveObject->SaveTimestamp = FDateTime::UtcNow();
 
     const bool bSaved = UGameplayStatics::SaveGameToSlot(SaveObject, SlotName, SlotIndex);
     if (bSaved)
@@ -76,7 +69,7 @@ bool USFNarrativeSaveService::LoadFromSlot(const FString& SlotName, int32 SlotIn
         return false;
     }
 
-    FSFNarrativeSaveData SaveData = SaveObject->Data;
+    FSFNarrativeSaveData SaveData = SaveObject->NarrativeData;
     if (!CanApplySchema(SaveData.SchemaVersion))
     {
         return false;
@@ -124,6 +117,7 @@ FSFNarrativeSaveData USFNarrativeSaveService::BuildSaveData() const
         return SaveData;
     }
 
+    // Per-owner quest data.
     if (QuestRuntime)
     {
         const FSFNarrativeSaveData QuestData = QuestRuntime->BuildSaveData();
@@ -131,29 +125,15 @@ FSFNarrativeSaveData USFNarrativeSaveService::BuildSaveData() const
         SaveData.LifetimeTaskCounters = QuestData.LifetimeTaskCounters;
     }
 
-    if (WorldStateRuntime)
+    // World-scoped data: facts, factions, identity, outcomes, endings.
+    if (USFNarrativeStateSubsystem* StateSubsystem = GetStateSubsystem())
     {
-        SaveData.WorldFacts = WorldStateRuntime->BuildWorldFactSnapshots();
-    }
-
-    if (FactionRuntime)
-    {
-        SaveData.FactionSnapshots = FactionRuntime->BuildFactionSnapshots();
-    }
-
-    if (IdentityRuntime)
-    {
-        SaveData.IdentityAxes = IdentityRuntime->BuildIdentitySnapshots();
-    }
-
-    if (OutcomeRuntime)
-    {
-        SaveData.AppliedOutcomes = OutcomeRuntime->BuildOutcomeSnapshots();
-    }
-
-    if (EndingRuntime)
-    {
-        SaveData.EndingStates = EndingRuntime->BuildEndingSnapshots();
+        const FSFNarrativeSaveData WorldData = StateSubsystem->BuildSaveData();
+        SaveData.WorldFacts = WorldData.WorldFacts;
+        SaveData.FactionSnapshots = WorldData.FactionSnapshots;
+        SaveData.IdentityAxes = WorldData.IdentityAxes;
+        SaveData.AppliedOutcomes = WorldData.AppliedOutcomes;
+        SaveData.EndingStates = WorldData.EndingStates;
     }
 
     return SaveData;
@@ -171,29 +151,9 @@ bool USFNarrativeSaveService::ApplySaveData(const FSFNarrativeSaveData& SaveData
         QuestRuntime->LoadFromSaveData(SaveData);
     }
 
-    if (WorldStateRuntime)
+    if (USFNarrativeStateSubsystem* StateSubsystem = GetStateSubsystem())
     {
-        WorldStateRuntime->LoadFromSnapshots(SaveData.WorldFacts);
-    }
-
-    if (FactionRuntime)
-    {
-        FactionRuntime->LoadFromSnapshots(SaveData.FactionSnapshots);
-    }
-
-    if (IdentityRuntime)
-    {
-        IdentityRuntime->LoadFromSnapshots(SaveData.IdentityAxes);
-    }
-
-    if (OutcomeRuntime)
-    {
-        OutcomeRuntime->LoadFromSnapshots(SaveData.AppliedOutcomes);
-    }
-
-    if (EndingRuntime)
-    {
-        EndingRuntime->LoadFromSnapshots(SaveData.EndingStates);
+        StateSubsystem->LoadFromSaveData(SaveData);
     }
 
     return true;
@@ -216,6 +176,8 @@ bool USFNarrativeSaveService::MigrateSaveData(FSFNarrativeSaveData& InOutSaveDat
         switch (InOutSaveData.SchemaVersion)
         {
         case 1:
+            // V1 -> V2: world-scoped state moved into the canonical model.
+            // Drop any legacy world data; gameplay code rebuilds at runtime.
             InOutSaveData.WorldFacts.Reset();
             InOutSaveData.FactionSnapshots.Reset();
             InOutSaveData.IdentityAxes.Reset();
@@ -318,10 +280,21 @@ bool USFNarrativeSaveService::CanApplySchema(int32 SchemaVersion) const
 bool USFNarrativeSaveService::ValidateDependencies() const
 {
     return OwnerComponent != nullptr
-        && QuestRuntime != nullptr
-        && WorldStateRuntime != nullptr
-        && FactionRuntime != nullptr
-        && IdentityRuntime != nullptr
-        && OutcomeRuntime != nullptr
-        && EndingRuntime != nullptr;
+        && QuestRuntime != nullptr;
+}
+
+USFNarrativeStateSubsystem* USFNarrativeSaveService::GetStateSubsystem() const
+{
+    if (!OwnerComponent)
+    {
+        return nullptr;
+    }
+
+    UWorld* World = OwnerComponent->GetWorld();
+    if (!World)
+    {
+        return nullptr;
+    }
+
+    return World->GetSubsystem<USFNarrativeStateSubsystem>();
 }

@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFDialogueComponentBridge.h"
 #include "SFNarrativeComponent.h"
 #include "SFNarrativeLog.h"
@@ -181,7 +183,7 @@ void USFDialogueComponentBridge::HandleConversationStarted(AActor* SourceActor)
 {
     DialogueDeltaSequence = 0;
 
-    // Derive a reasonable dialogue ID – by default from the conversation asset name.
+    // Derive a reasonable dialogue ID â€“ by default from the conversation asset name.
     CurrentDialogueId = NAME_None;
 
     if (DialogueComponent)
@@ -275,7 +277,7 @@ void USFDialogueComponentBridge::HandleDialogueEventTriggered(FGameplayTag Event
 void USFDialogueComponentBridge::HandleDialogueCameraShotChanged(const FSFDialogueCameraShot& CameraShot)
 {
     // Right now we only care about this for debugging/logging or future camera?driven tags.
-    // If you later pipe camera state into narrative/world facts, this is where you’d do it.
+    // If you later pipe camera state into narrative/world facts, this is where youâ€™d do it.
     NARR_VLOG(TEXT("Dialogue camera shot changed on %s (DialogueId=%s)"),
         *GetNameSafe(GetOwner()),
         *CurrentDialogueId.ToString());

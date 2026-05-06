@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFDialogueNarrativeHooks.h"
 #include "SFNarrativeComponent.h"
 #include "SFNarrativeLog.h"

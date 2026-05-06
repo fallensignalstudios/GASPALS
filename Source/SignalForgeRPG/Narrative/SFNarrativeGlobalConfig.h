@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -50,7 +52,7 @@ struct FSFNarrativeGlobalConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Config|Identity")
     float IdentityNeutralEpsilon = 5.0f;
 
-    /** Minimum absolute magnitude for an identity change to be considered ìmeaningfulî for UI. */
+    /** Minimum absolute magnitude for an identity change to be considered ‚Äúmeaningful‚Äù for UI. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Config|Identity")
     float IdentityDeltaVisualThreshold = 1.0f;
 
@@ -69,7 +71,7 @@ struct FSFNarrativeGlobalConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Config|Net", meta = (ClampMin = "1"))
     int32 MaxReplicatedDeltasPerTick = 16;
 
-    /** If true, world facts marked as ìdebug-onlyî are never replicated to clients. */
+    /** If true, world facts marked as ‚Äúdebug-only‚Äù are never replicated to clients. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Config|Net")
     bool bSkipDebugFactsForClients = true;
 
@@ -137,3 +139,5 @@ struct FSFNarrativeGlobalConfig
         return FMath::Clamp(Value, FactionScoreMin, FactionScoreMax);
     }
 };
+
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
