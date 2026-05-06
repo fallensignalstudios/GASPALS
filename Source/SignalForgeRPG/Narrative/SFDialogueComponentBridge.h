@@ -61,11 +61,11 @@ public:
 
     /** High?level moment stream suitable for narrative?driven UIs. */
     UPROPERTY(BlueprintAssignable, Category = "Narrative|Dialogue")
-    FSFFOnDialogueMomentUpdated OnNarrativeDialogueMomentUpdated;
+    FSFOnDialogueMomentUpdated OnNarrativeDialogueMomentUpdated;
 
     /** Emitted whenever we produce a FSFNarrativeDelta from a dialogue event. */
     UPROPERTY(BlueprintAssignable, Category = "Narrative|Dialogue")
-    FSFFOnNarrativeDeltaEmitted OnNarrativeDialogueDeltaEmitted;
+    FSFOnNarrativeDeltaEmitted OnNarrativeDialogueDeltaEmitted;
 
 protected:
     virtual void BeginPlay() override;
