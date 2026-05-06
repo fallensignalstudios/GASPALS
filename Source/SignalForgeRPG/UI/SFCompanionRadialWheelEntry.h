@@ -31,7 +31,7 @@ public:
 	void SetSlotData(const FSFRadialWheelSlot& InSlot);
 
 	UFUNCTION(BlueprintPure, Category = "Radial")
-	const FSFRadialWheelSlot& GetSlotData() const { return Slot; }
+	const FSFRadialWheelSlot& GetSlotData() const { return SlotData; }
 
 	/** Index this entry occupies on the wheel; the wheel sets it on layout. */
 	UFUNCTION(BlueprintCallable, Category = "Radial")
@@ -45,7 +45,7 @@ public:
 	void SetHovered(bool bInHovered);
 
 	UFUNCTION(BlueprintPure, Category = "Radial")
-	bool IsHovered() const { return bHovered; }
+	bool IsRadialHovered() const { return bRadialHovered; }
 
 protected:
 	virtual void NativePreConstruct() override;
@@ -65,13 +65,13 @@ protected:
 
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Radial")
-	FSFRadialWheelSlot Slot;
+	FSFRadialWheelSlot SlotData;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Radial")
 	int32 SlotIndex = INDEX_NONE;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Radial")
-	bool bHovered = false;
+	bool bRadialHovered = false;
 
 	// Optional default bindings — designers may use any of these or none.
 

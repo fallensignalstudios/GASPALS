@@ -21,50 +21,50 @@ void USFCompanionRadialWheelEntry::NativeConstruct()
 
 void USFCompanionRadialWheelEntry::SetSlotData(const FSFRadialWheelSlot& InSlot)
 {
-	Slot = InSlot;
+	SlotData = InSlot;
 	RefreshDefaultBindings();
 	BP_OnSlotRefreshed();
 }
 
 void USFCompanionRadialWheelEntry::SetHovered(bool bInHovered)
 {
-	if (bHovered == bInHovered)
+	if (bRadialHovered == bInHovered)
 	{
 		return;
 	}
-	bHovered = bInHovered;
+	bRadialHovered = bInHovered;
 
 	if (HoverHighlight)
 	{
-		HoverHighlight->SetVisibility(bHovered ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
+		HoverHighlight->SetVisibility(bRadialHovered ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
 	}
-	BP_OnHoverChanged(bHovered);
+	BP_OnHoverChanged(bRadialHovered);
 }
 
 void USFCompanionRadialWheelEntry::RefreshDefaultBindings()
 {
 	if (LabelText)
 	{
-		LabelText->SetText(Slot.Label);
+		LabelText->SetText(SlotData.Label);
 	}
 	if (DescriptionText)
 	{
-		DescriptionText->SetText(Slot.Description);
+		DescriptionText->SetText(SlotData.Description);
 	}
 	if (CurrentMarker)
 	{
-		CurrentMarker->SetVisibility(Slot.bIsCurrent ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
+		CurrentMarker->SetVisibility(SlotData.bIsCurrent ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
 	}
 	if (DisabledOverlay)
 	{
-		DisabledOverlay->SetVisibility(Slot.bEnabled ? ESlateVisibility::Hidden : ESlateVisibility::HitTestInvisible);
+		DisabledOverlay->SetVisibility(SlotData.bEnabled ? ESlateVisibility::Hidden : ESlateVisibility::HitTestInvisible);
 	}
 	if (IconImage)
 	{
 		// Async-resolve the soft icon if set, else clear.
-		if (!Slot.Icon.IsNull())
+		if (!SlotData.Icon.IsNull())
 		{
-			if (UTexture2D* Loaded = Slot.Icon.Get())
+			if (UTexture2D* Loaded = SlotData.Icon.Get())
 			{
 				IconImage->SetBrushFromTexture(Loaded);
 			}
@@ -72,7 +72,7 @@ void USFCompanionRadialWheelEntry::RefreshDefaultBindings()
 			{
 				FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
 				TWeakObjectPtr<USFCompanionRadialWheelEntry> WeakThis(this);
-				const FSoftObjectPath Path = Slot.Icon.ToSoftObjectPath();
+				const FSoftObjectPath Path = SlotData.Icon.ToSoftObjectPath();
 				Streamable.RequestAsyncLoad(Path, FStreamableDelegate::CreateLambda([WeakThis, Path]()
 				{
 					if (USFCompanionRadialWheelEntry* Strong = WeakThis.Get())
