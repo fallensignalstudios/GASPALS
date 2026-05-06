@@ -11,7 +11,12 @@ class USFConversationDataAsset;
 class USFDialogueComponent;
 class USFNarrativeComponent;
 
-UINTERFACE(BlueprintType, meta = (CannotImplementInterfaceInBlueprint = false))
+/**
+ * Marked Blueprintable so Blueprint classes can implement this interface
+ * (required for the BlueprintNativeEvent members below — UHT rejects
+ * Blueprint Event members on non-Blueprintable interfaces).
+ */
+UINTERFACE(BlueprintType, Blueprintable)
 class SIGNALFORGERPG_API USFDialogueParticipantInterface : public UInterface
 {
     GENERATED_BODY()
