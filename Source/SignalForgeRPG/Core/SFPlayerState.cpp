@@ -1,4 +1,5 @@
 #include "Core/SFPlayerState.h"
+#include "Companions/SFCompanionComponent.h"
 #include "Narrative/SFNarrativeComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -12,6 +13,9 @@ ASFPlayerState::ASFPlayerState()
 
 	NarrativeComponent = CreateDefaultSubobject<USFNarrativeComponent>(TEXT("NarrativeComponent"));
 	NarrativeComponent->SetIsReplicated(true);
+
+	CompanionComponent = CreateDefaultSubobject<USFCompanionComponent>(TEXT("CompanionComponent"));
+	CompanionComponent->SetIsReplicated(true);
 }
 
 void ASFPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
