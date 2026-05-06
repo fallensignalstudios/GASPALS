@@ -6,6 +6,7 @@
 #include "SFPlayerState.generated.h"
 
 class USFNarrativeComponent;
+class USFCompanionComponent;
 class UAbilitySystemComponent;
 
 /**
@@ -44,6 +45,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Narrative")
 	USFNarrativeComponent* GetNarrativeComponent() const { return NarrativeComponent; }
 
+	/** Accessor for the player's companion component (roster, active companion, orders, approval). */
+	UFUNCTION(BlueprintPure, Category = "Companion")
+	USFCompanionComponent* GetCompanionComponent() const { return CompanionComponent; }
+
 protected:
 	/**
 	 * Player's narrative component. Hosts quests, dialogue, world facts,
@@ -52,4 +57,12 @@ protected:
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Narrative")
 	TObjectPtr<USFNarrativeComponent> NarrativeComponent;
+
+	/**
+	 * Player's companion component. Owns the recruited roster, the active
+	 * companion, the per-companion approval map, and the radial-wheel
+	 * command surface (stance, orders, slow-mo).
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Companion")
+	TObjectPtr<USFCompanionComponent> CompanionComponent;
 };
