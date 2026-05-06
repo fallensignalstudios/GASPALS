@@ -89,25 +89,21 @@ public:
     // Core API
     //
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void Reset()
     {
         Variables.Reset();
     }
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void ClearVariable(FName Name)
     {
         Variables.Remove(Name);
     }
 
-    UFUNCTION(BlueprintPure, Category = "Narrative|Variables")
     bool HasVariable(FName Name) const
     {
         return Variables.Contains(Name);
     }
 
-    UFUNCTION(BlueprintPure, Category = "Narrative|Variables")
     ESFNarrativeVariableType GetVariableType(FName Name) const
     {
         if (const FSFNarrativeVariableValue* Found = Variables.Find(Name))
@@ -121,7 +117,6 @@ public:
     // Setters
     //
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void SetInt(FName Name, int32 Value)
     {
         if (Name.IsNone()) return;
@@ -131,7 +126,6 @@ public:
         Var.IntValue = Value;
     }
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void SetFloat(FName Name, float Value)
     {
         if (Name.IsNone()) return;
@@ -141,7 +135,6 @@ public:
         Var.FloatValue = Value;
     }
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void SetBool(FName Name, bool bValue)
     {
         if (Name.IsNone()) return;
@@ -151,7 +144,6 @@ public:
         Var.BoolValue = bValue;
     }
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void SetName(FName Name, FName Value)
     {
         if (Name.IsNone()) return;
@@ -161,7 +153,6 @@ public:
         Var.NameValue = Value;
     }
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void SetTag(FName Name, FGameplayTag Tag)
     {
         if (Name.IsNone()) return;
@@ -171,7 +162,6 @@ public:
         Var.TagValue = Tag;
     }
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void SetTagContainer(FName Name, const FGameplayTagContainer& Tags)
     {
         if (Name.IsNone()) return;
@@ -185,7 +175,6 @@ public:
     // Getters (return success + value)
     //
 
-    UFUNCTION(BlueprintPure, Category = "Narrative|Variables")
     bool GetInt(FName Name, int32& OutValue) const
     {
         if (const FSFNarrativeVariableValue* Var = Variables.Find(Name))
@@ -200,7 +189,6 @@ public:
         return false;
     }
 
-    UFUNCTION(BlueprintPure, Category = "Narrative|Variables")
     bool GetFloat(FName Name, float& OutValue) const
     {
         if (const FSFNarrativeVariableValue* Var = Variables.Find(Name))
@@ -215,7 +203,6 @@ public:
         return false;
     }
 
-    UFUNCTION(BlueprintPure, Category = "Narrative|Variables")
     bool GetBool(FName Name, bool& OutValue) const
     {
         if (const FSFNarrativeVariableValue* Var = Variables.Find(Name))
@@ -230,7 +217,6 @@ public:
         return false;
     }
 
-    UFUNCTION(BlueprintPure, Category = "Narrative|Variables")
     bool GetName(FName Name, FName& OutValue) const
     {
         if (const FSFNarrativeVariableValue* Var = Variables.Find(Name))
@@ -245,7 +231,6 @@ public:
         return false;
     }
 
-    UFUNCTION(BlueprintPure, Category = "Narrative|Variables")
     bool GetTag(FName Name, FGameplayTag& OutTag) const
     {
         if (const FSFNarrativeVariableValue* Var = Variables.Find(Name))
@@ -260,7 +245,6 @@ public:
         return false;
     }
 
-    UFUNCTION(BlueprintPure, Category = "Narrative|Variables")
     bool GetTagContainer(FName Name, FGameplayTagContainer& OutTags) const
     {
         OutTags.Reset();
@@ -279,7 +263,6 @@ public:
     // Arithmetic helpers
     //
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void AddInt(FName Name, int32 Delta)
     {
         if (Name.IsNone()) return;
@@ -297,7 +280,6 @@ public:
         }
     }
 
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Variables")
     void AddFloat(FName Name, float Delta)
     {
         if (Name.IsNone()) return;

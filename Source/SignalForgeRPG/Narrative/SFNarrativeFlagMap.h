@@ -36,7 +36,6 @@ public:
     //
 
     /** Set a flag to the given value (default true). */
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Flags")
     void SetFlag(FName FlagName, bool bValue = true)
     {
         if (FlagName.IsNone())
@@ -47,21 +46,18 @@ public:
     }
 
     /** Set a flag to true. */
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Flags")
     void MarkFlagTrue(FName FlagName)
     {
         SetFlag(FlagName, true);
     }
 
     /** Set a flag to false (explicitly cleared). */
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Flags")
     void MarkFlagFalse(FName FlagName)
     {
         SetFlag(FlagName, false);
     }
 
     /** Remove a flag entirely (as if never set). */
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Flags")
     void ClearFlag(FName FlagName)
     {
         Flags.Remove(FlagName);
@@ -69,7 +65,6 @@ public:
     }
 
     /** Remove all flags. */
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Flags")
     void Reset()
     {
         Flags.Reset();
@@ -77,7 +72,6 @@ public:
     }
 
     /** Query a flag. Returns false when missing unless bTreatMissingAsTrue is set. */
-    UFUNCTION(BlueprintPure, Category = "Narrative|Flags")
     bool GetFlag(FName FlagName, bool bTreatMissingAsTrue = false) const
     {
         if (FlagName.IsNone())
@@ -94,7 +88,6 @@ public:
     }
 
     /** True if the flag exists in the map (regardless of value). */
-    UFUNCTION(BlueprintPure, Category = "Narrative|Flags")
     bool HasFlag(FName FlagName) const
     {
         return Flags.Contains(FlagName);
@@ -105,7 +98,6 @@ public:
     //
 
     /** Attach classification tags to a flag (for tooling, filters, etc.). */
-    UFUNCTION(BlueprintCallable, Category = "Narrative|Flags")
     void AddFlagTags(FName FlagName, const FGameplayTagContainer& Tags)
     {
         if (FlagName.IsNone() || Tags.Num() == 0)
@@ -118,7 +110,6 @@ public:
     }
 
     /** Get classification tags for a given flag. */
-    UFUNCTION(BlueprintPure, Category = "Narrative|Flags")
     void GetFlagTags(FName FlagName, FGameplayTagContainer& OutTags) const
     {
         OutTags.Reset();
@@ -129,7 +120,6 @@ public:
     }
 
     /** Collect all flag names that have the given tag. */
-    UFUNCTION(BlueprintPure, Category = "Narrative|Flags")
     void GetFlagsWithTag(FGameplayTag Tag, TArray<FName>& OutFlagNames) const
     {
         OutFlagNames.Reset();
@@ -153,7 +143,6 @@ public:
     //
 
     /** Are ALL of these flags true (missing flags treated as `bTreatMissingAsTrue`)? */
-    UFUNCTION(BlueprintPure, Category = "Narrative|Flags")
     bool AreAllFlagsTrue(const TArray<FName>& FlagNames, bool bTreatMissingAsTrue = false) const
     {
         for (const FName& Name : FlagNames)
@@ -167,7 +156,6 @@ public:
     }
 
     /** Is AT LEAST ONE of these flags true (missing flags treated as `bTreatMissingAsTrue`)? */
-    UFUNCTION(BlueprintPure, Category = "Narrative|Flags")
     bool IsAnyFlagTrue(const TArray<FName>& FlagNames, bool bTreatMissingAsTrue = false) const
     {
         for (const FName& Name : FlagNames)
