@@ -1,19 +1,10 @@
 #include "AI/SFCompanionAIController.h"
 
+#include "AI/SFCompanionBlackboardKeys.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Companions/SFCompanionCharacter.h"
 #include "Companions/SFCompanionTacticsComponent.h"
 #include "Kismet/GameplayStatics.h"
-
-namespace SFCompanionBlackboardKeys
-{
-	static const FName PlayerActor      = TEXT("PlayerActor");
-	static const FName OrderType        = TEXT("OrderType");
-	static const FName OrderTargetActor = TEXT("OrderTargetActor");
-	static const FName OrderTargetLoc   = TEXT("OrderTargetLoc");
-	static const FName OrderAbilityTag  = TEXT("OrderAbilityTag");
-	static const FName StanceTag        = TEXT("StanceTag");
-}
 
 ASFCompanionAIController::ASFCompanionAIController()
 {
@@ -77,9 +68,13 @@ void ASFCompanionAIController::PushOrderToBlackboard(const FSFCompanionOrder& Or
 	}
 
 	BB->SetValueAsEnum(SFCompanionBlackboardKeys::OrderType, static_cast<uint8>(Order.Type));
+	BB->SetValueAsInt(SFCompanionBlackboardKeys::OrderSequence, Order.Sequence);
 	BB->SetValueAsObject(SFCompanionBlackboardKeys::OrderTargetActor, Order.TargetActor.Get());
+	// Write to both canonical and legacy vector keys so older BTs keep working.
+	BB->SetValueAsVector(SFCompanionBlackboardKeys::OrderTargetLocation, Order.TargetLocation);
 	BB->SetValueAsVector(SFCompanionBlackboardKeys::OrderTargetLoc, Order.TargetLocation);
 	BB->SetValueAsName(SFCompanionBlackboardKeys::OrderAbilityTag, Order.AbilityTag.GetTagName());
+	BB->SetValueAsBool(SFCompanionBlackboardKeys::bHasValidOrder, Order.IsValidOrder());
 }
 
 void ASFCompanionAIController::PushStanceToBlackboard()
