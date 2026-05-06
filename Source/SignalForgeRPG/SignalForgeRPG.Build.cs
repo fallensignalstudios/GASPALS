@@ -25,7 +25,8 @@ public class SignalForgeRPG : ModuleRules
             "AnimGraphRuntime",
             "LevelSequence",
             "MovieScene",
-            "DeveloperSettings"
+            "DeveloperSettings",
+            "NetCore"
         });
 
         PublicIncludePaths.AddRange(new string[]
