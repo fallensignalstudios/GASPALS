@@ -211,6 +211,7 @@ float USFNarrativeStateSubsystem::ApplyEndingScoreDelta(
         State = *Existing;
     }
 
+    State.EndingTag = EndingTag;
     OutOldScore = State.Score;
     State.Score += Delta;
     EndingStateByTag.Add(EndingTag, State);
@@ -231,6 +232,7 @@ bool USFNarrativeStateSubsystem::SetEndingAvailability(
         State = *Existing;
     }
 
+    State.EndingTag = EndingTag;
     OutOldAvailability = State.Availability;
     State.Availability = NewAvailability;
 
@@ -266,11 +268,17 @@ bool USFNarrativeStateSubsystem::ApplyDelta(
     {
         FSFWorldFactKey Key;
         Key.FactTag = Delta.Tag0;
-        Key.ContextId = Delta.Name0;
+        Key.ContextId = Delta.SubjectId;
 
-        FSFWorldFactValue NewValue = Delta.WorldFactValue;
+        FSFWorldFactValue NewValue;
+        NewValue.ValueType = static_cast<ESFNarrativeFactValueType>(Delta.Int0);
+        NewValue.BoolValue = Delta.bBool0;
+        NewValue.IntValue = Delta.Int1;
+        NewValue.FloatValue = Delta.Float0;
+        NewValue.NameValue = Delta.Arg0;
+        NewValue.TagValue = Delta.Tag1;
+
         FSFWorldFactValue OldValue;
-
         if (SetWorldFact(Key, NewValue, OldValue))
         {
             FSFWorldFactChange Change;
@@ -282,29 +290,11 @@ bool USFNarrativeStateSubsystem::ApplyDelta(
         break;
     }
 
-    case ESFNarrativeDeltaType::RemoveWorldFact:
-    {
-        FSFWorldFactKey Key;
-        Key.FactTag = Delta.Tag0;
-        Key.ContextId = Delta.Name0;
-
-        FSFWorldFactValue OldValue;
-        if (RemoveWorldFact(Key, OldValue))
-        {
-            FSFWorldFactChange Change;
-            Change.Key = Key;
-            Change.OldValue = OldValue;
-            Change.NewValue = FSFWorldFactValue();
-            OutChangeSet.WorldFactChanges.Add(MoveTemp(Change));
-        }
-        break;
-    }
-
     case ESFNarrativeDeltaType::ApplyFactionDelta:
     {
-        FSFFactionDelta FactionDelta = Delta.FactionDelta;
+        const FSFFactionDelta FactionDelta = FSFNarrativeDelta::UnpackFactionDelta(Delta);
         FSFFactionStandingValue OldValue;
-        FSFFactionStandingValue NewValue = ApplyFactionDelta(FactionDelta, OldValue);
+        const FSFFactionStandingValue NewValue = ApplyFactionDelta(FactionDelta, OldValue);
 
         FSFFactionChange Change;
         Change.FactionTag = FactionDelta.FactionTag;
@@ -321,46 +311,45 @@ bool USFNarrativeStateSubsystem::ApplyDelta(
         const float NewValue = ApplyIdentityDelta(Delta.Tag0, Delta.Float0, OldValue, DriftDir);
 
         FSFIdentityChange Change;
-        Change.AxisTag = Delta.Tag0;
-        Change.OldValue = OldValue;
-        Change.NewValue = NewValue;
+        Change.OldValue.AxisTag = Delta.Tag0;
+        Change.OldValue.Value = OldValue;
+        Change.NewValue.AxisTag = Delta.Tag0;
+        Change.NewValue.Value = NewValue;
         Change.DriftDirection = DriftDir;
         OutChangeSet.IdentityChanges.Add(MoveTemp(Change));
+        break;
+    }
+
+    case ESFNarrativeDeltaType::ApplyOutcome:
+    {
+        FSFOutcomeApplication Application;
+        Application.OutcomeAssetId = FSFNarrativeDelta::UnpackOutcomeAssetId(Delta);
+        Application.ContextId = Delta.Arg1;
+        OutChangeSet.AppliedOutcomes.Add(MoveTemp(Application));
         break;
     }
 
     case ESFNarrativeDeltaType::ApplyEndingScoreDelta:
     {
         float OldScore = 0.0f;
-        const float NewScore = ApplyEndingScoreDelta(Delta.Tag0, Delta.Float0, OldScore);
+        ApplyEndingScoreDelta(Delta.Tag0, Delta.Float0, OldScore);
 
-        FSFEndingChange Change;
-        Change.EndingTag = Delta.Tag0;
-        Change.OldState.Score = OldScore;
-        Change.NewState.Score = NewScore;
-        // Availability is left unchanged here; may be set by follow-up logic.
-        OutChangeSet.EndingChanges.Add(MoveTemp(Change));
+        FSFEndingState NewState;
+        GetEndingState(Delta.Tag0, NewState);
+        OutChangeSet.EndingStatesChanged.Add(MoveTemp(NewState));
         break;
     }
 
     case ESFNarrativeDeltaType::SetEndingAvailability:
     {
-        FSFEndingState OldState;
-        GetEndingState(Delta.Tag0, OldState);
-
-        ESFEndingAvailability OldAvailability = OldState.Availability;
-        ESFEndingAvailability NewAvailability = static_cast<ESFEndingAvailability>(Delta.Int0);
-
-        SetEndingAvailability(Delta.Tag0, NewAvailability, OldAvailability);
+        ESFEndingAvailability OldAvailability = ESFEndingAvailability::Hidden;
+        SetEndingAvailability(Delta.Tag0, static_cast<ESFEndingAvailability>(Delta.Int0), OldAvailability);
 
         FSFEndingState NewState;
         GetEndingState(Delta.Tag0, NewState);
-
-        FSFEndingChange Change;
-        Change.EndingTag = Delta.Tag0;
-        Change.OldState = OldState;
-        Change.NewState = NewState;
-        OutChangeSet.EndingChanges.Add(MoveTemp(Change));
+        NewState.Score = Delta.Float0;
+        EndingStateByTag.Add(Delta.Tag0, NewState);
+        OutChangeSet.EndingStatesChanged.Add(MoveTemp(NewState));
         break;
     }
 

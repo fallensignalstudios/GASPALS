@@ -7,6 +7,7 @@
 #include "GameplayTagContainer.h"
 #include "SFNarrativeTypes.h"
 #include "SFNarrativeStructs.h"
+#include "SFNarrativeTriggerTypes.h"
 #include "SFNarrativeFactSubsystem.generated.h"
 
 class USFNarrativeStateSubsystem;
@@ -71,7 +72,7 @@ public:
     UFUNCTION(BlueprintPure, Category = "Narrative|Facts")
     bool IsNameFactEqual(const FSFWorldFactKey& Key, FName ExpectedName) const;
 
-    /** Tag fact container has RequiredTag. Missing fact counts as false. */
+    /** Tag fact equals RequiredTag. Missing fact counts as false. */
     UFUNCTION(BlueprintPure, Category = "Narrative|Facts")
     bool DoesTagFactContain(const FSFWorldFactKey& Key, FGameplayTag RequiredTag) const;
 

@@ -8,6 +8,7 @@
 
 #include "SFNarrativeTypes.h"
 #include "SFNarrativeSaveTypes.h"
+#include "SFNarrativeTriggerTypes.h"
 #include "SFNarrativeEventTableRow.generated.h"
 
 /**

@@ -6,124 +6,110 @@ void USFNarrativeFunctionLibrary::MergeChangeSets(
     FSFNarrativeChangeSet& InOutA,
     const FSFNarrativeChangeSet& B)
 {
-    // World facts: B overwrites A for equal keys.
-    for (const auto& Pair : B.WorldFactChanges)
-    {
-        InOutA.WorldFactChanges.Add(Pair.Key, Pair.Value);
-    }
-
-    // Faction changes: same key ? last writer wins (B overwrites).
-    for (const auto& Pair : B.FactionChanges)
-    {
-        InOutA.FactionChanges.Add(Pair.Key, Pair.Value);
-    }
-
-    // Identity axes.
-    for (const auto& Pair : B.IdentityAxisChanges)
-    {
-        InOutA.IdentityAxisChanges.Add(Pair.Key, Pair.Value);
-    }
-
-    // Endings.
-    for (const auto& Pair : B.EndingChanges)
-    {
-        InOutA.EndingChanges.Add(Pair.Key, Pair.Value);
-    }
-
-    // Custom payloads (simply append, caller can dedupe if needed).
-    InOutA.CustomChanges.Append(B.CustomChanges);
+    InOutA.SourceTags.AppendTags(B.SourceTags);
+    InOutA.TaskResults.Append(B.TaskResults);
+    InOutA.WorldFactChanges.Append(B.WorldFactChanges);
+    InOutA.FactionChanges.Append(B.FactionChanges);
+    InOutA.IdentityChanges.Append(B.IdentityChanges);
+    InOutA.AppliedOutcomes.Append(B.AppliedOutcomes);
+    InOutA.EndingStatesChanged.Append(B.EndingStatesChanged);
 }
 
 bool USFNarrativeFunctionLibrary::IsChangeSetEmpty(
     const FSFNarrativeChangeSet& ChangeSet)
 {
-    return ChangeSet.WorldFactChanges.Num() == 0 &&
-        ChangeSet.FactionChanges.Num() == 0 &&
-        ChangeSet.IdentityAxisChanges.Num() == 0 &&
-        ChangeSet.EndingChanges.Num() == 0 &&
-        ChangeSet.CustomChanges.Num() == 0;
+    return ChangeSet.IsEmpty();
 }
 
 FSFNarrativeDelta USFNarrativeFunctionLibrary::MakeBoolFactDelta(
     const FSFWorldFactKey& FactKey,
     bool bNewValue)
 {
-    FSFNarrativeDelta D;
-    D.Domain = ESFNarrativeDeltaDomain::WorldFact;
-    D.WorldFact.Key = FactKey;
-    D.WorldFact.Operation = ESFWorldFactDeltaOp::Set;
-
-    D.WorldFact.NewValue.Type = ESFNarrativeFactValueType::Bool;
-    D.WorldFact.NewValue.BoolValue = bNewValue;
-
-    return D;
+    return FSFNarrativeDelta::MakeSetWorldFact(
+        0,
+        FactKey.FactTag,
+        FactKey.ContextId,
+        FSFWorldFactValue::MakeBool(bNewValue));
 }
 
 FSFNarrativeDelta USFNarrativeFunctionLibrary::MakeFloatFactDelta(
     const FSFWorldFactKey& FactKey,
     float NewValue)
 {
-    FSFNarrativeDelta D;
-    D.Domain = ESFNarrativeDeltaDomain::WorldFact;
-    D.WorldFact.Key = FactKey;
-    D.WorldFact.Operation = ESFWorldFactDeltaOp::Set;
-
-    D.WorldFact.NewValue.Type = ESFNarrativeFactValueType::Float;
-    D.WorldFact.NewValue.FloatValue = NewValue;
-
-    return D;
+    return FSFNarrativeDelta::MakeSetWorldFact(
+        0,
+        FactKey.FactTag,
+        FactKey.ContextId,
+        FSFWorldFactValue::MakeFloat(NewValue));
 }
 
 FSFNarrativeDelta USFNarrativeFunctionLibrary::MakeIdentityAxisAddDelta(
     FGameplayTag AxisTag,
     float DeltaAmount)
 {
-    FSFNarrativeDelta D;
-    D.Domain = ESFNarrativeDeltaDomain::IdentityAxis;
-    D.IdentityAxis.AxisTag = AxisTag;
-    D.IdentityAxis.Operation = ESFIdentityAxisDeltaOp::Add;
-    D.IdentityAxis.Amount = DeltaAmount;
-    return D;
+    return FSFNarrativeDelta::MakeApplyIdentityDelta(0, AxisTag, DeltaAmount);
 }
 
 FSFNarrativeDelta USFNarrativeFunctionLibrary::MakeFactionStandingAddDelta(
     FGameplayTag FactionTag,
     float DeltaAmount)
 {
-    FSFNarrativeDelta D;
-    D.Domain = ESFNarrativeDeltaDomain::Faction;
-    D.Faction.FactionTag = FactionTag;
-    D.Faction.Operation = ESFFactionDeltaOp::AddScore;
-    D.Faction.Amount = DeltaAmount;
-    return D;
+    FSFFactionDelta Delta;
+    Delta.FactionTag = FactionTag;
+    Delta.TrustDelta = DeltaAmount; // Proxy old single-score usage onto Trust in the canonical faction schema.
+    return FSFNarrativeDelta::MakeApplyFactionDelta(0, Delta);
 }
 
 bool USFNarrativeFunctionLibrary::IsDeltaNoOp(
     const FSFNarrativeDelta& Delta)
 {
-    if (Delta.Domain == ESFNarrativeDeltaDomain::None)
+    switch (Delta.Type)
     {
+    case ESFNarrativeDeltaType::None:
         return true;
-    }
 
-    switch (Delta.Domain)
-    {
-    case ESFNarrativeDeltaDomain::IdentityAxis:
-        return !Delta.IdentityAxis.AxisTag.IsValid() ||
-            FMath::IsNearlyZero(Delta.IdentityAxis.Amount);
+    case ESFNarrativeDeltaType::SetWorldFact:
+        return !Delta.Tag0.IsValid() || Delta.SubjectId.IsNone();
 
-    case ESFNarrativeDeltaDomain::Faction:
-        return !Delta.Faction.FactionTag.IsValid() ||
-            FMath::IsNearlyZero(Delta.Faction.Amount);
+    case ESFNarrativeDeltaType::AddWorldFactTag:
+    case ESFNarrativeDeltaType::RemoveWorldFactTag:
+        return !Delta.Tag0.IsValid() || Delta.SubjectId.IsNone() || !Delta.Tag1.IsValid();
 
-    case ESFNarrativeDeltaDomain::WorldFact:
-        return !Delta.WorldFact.Key.FactTag.IsValid();
+    case ESFNarrativeDeltaType::ApplyFactionDelta:
+        return !FSFNarrativeDelta::UnpackFactionDelta(Delta).FactionTag.IsValid()
+            || FSFNarrativeDelta::UnpackFactionDelta(Delta).IsZero();
 
+    case ESFNarrativeDeltaType::SetFactionStandingBand:
+        return !Delta.Tag0.IsValid();
+
+    case ESFNarrativeDeltaType::ApplyIdentityDelta:
+        return !Delta.Tag0.IsValid() || FMath::IsNearlyZero(Delta.Float0);
+
+    case ESFNarrativeDeltaType::ApplyOutcome:
+        return !FSFNarrativeDelta::UnpackOutcomeAssetId(Delta).IsValid();
+
+    case ESFNarrativeDeltaType::SetEndingAvailability:
+        return !Delta.Tag0.IsValid();
+
+    case ESFNarrativeDeltaType::ApplyEndingScoreDelta:
+        return !Delta.Tag0.IsValid() || FMath::IsNearlyZero(Delta.Float0);
+
+    case ESFNarrativeDeltaType::BeginDialogue:
+    case ESFNarrativeDeltaType::ExitDialogue:
+    case ESFNarrativeDeltaType::AdvanceDialogue:
+    case ESFNarrativeDeltaType::SelectDialogueOption:
+    case ESFNarrativeDeltaType::TriggerDialogueEvent:
+    case ESFNarrativeDeltaType::StartQuest:
+    case ESFNarrativeDeltaType::RestartQuest:
+    case ESFNarrativeDeltaType::AbandonQuest:
+    case ESFNarrativeDeltaType::EnterQuestState:
+    case ESFNarrativeDeltaType::CompleteQuestTask:
+    case ESFNarrativeDeltaType::TaskProgress:
+    case ESFNarrativeDeltaType::SaveCheckpointLoaded:
+    case ESFNarrativeDeltaType::FullStateResync:
     default:
-        break;
+        return false;
     }
-
-    return false;
 }
 
 float USFNarrativeFunctionLibrary::NormalizeClamped(

@@ -284,7 +284,7 @@ protected:
     void EnqueueClientSyncEvent(const FSFNarrativeClientSyncEvent& Event);
 
     UFUNCTION()
-    void HandleReplicatedDeltaApplied(const FSFNarrativeReplicatedDelta& Delta);
+    void HandleReplicatedDeltaApplied(const FSFNarrativeDelta& Delta);
 
     UFUNCTION()
     void HandleHubQuestStarted(USFQuestInstance* QuestInstance);

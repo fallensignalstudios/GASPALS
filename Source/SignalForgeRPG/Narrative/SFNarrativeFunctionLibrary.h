@@ -67,7 +67,7 @@ public:
     // Misc small helpers
     //
 
-    /** True if the delta is "no-op" (Domain=None or otherwise empty). */
+    /** True if the delta is effectively a no-op or carries no usable payload. */
     UFUNCTION(BlueprintPure, Category = "Narrative|Delta")
     static bool IsDeltaNoOp(const FSFNarrativeDelta& Delta);
 

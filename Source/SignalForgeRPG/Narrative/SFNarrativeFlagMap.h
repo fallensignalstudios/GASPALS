@@ -175,19 +175,30 @@ public:
     /** Serialize flags into a simple array of key/value pairs for save data. */
     void BuildSnapshot(TArray<FSFWorldFactSnapshot>& OutSnapshots, const FGameplayTag& FactTagBase, FName ContextIdBase = NAME_None) const
     {
+        auto MakeFlagContext = [ContextIdBase](FName FlagName)
+        {
+            if (FlagName.IsNone())
+            {
+                return ContextIdBase;
+            }
+
+            if (ContextIdBase.IsNone())
+            {
+                return FlagName;
+            }
+
+            return FName(*FString::Printf(TEXT("%s|%s"), *ContextIdBase.ToString(), *FlagName.ToString()));
+        };
+
         OutSnapshots.Reset();
         OutSnapshots.Reserve(Flags.Num());
 
         for (const TPair<FName, bool>& Pair : Flags)
         {
             FSFWorldFactSnapshot Snapshot;
-            Snapshot.Key.FactTag = FactTagBase;        // e.g. Narrative.Flag
-            Snapshot.Key.ContextId = ContextIdBase;    // e.g. owner / quest id
-            Snapshot.Key.KeyOverride = Pair.Key;       // if you have such a field; otherwise encode into ContextId/name as you prefer
-
-            Snapshot.Value.Type = ESFNarrativeFactValueType::Bool;
-            Snapshot.Value.BoolValue = Pair.Value;
-
+            Snapshot.Key.FactTag = FactTagBase;
+            Snapshot.Key.ContextId = MakeFlagContext(Pair.Key);
+            Snapshot.Value = FSFWorldFactValue::MakeBool(Pair.Value);
             OutSnapshots.Add(MoveTemp(Snapshot));
         }
     }
@@ -195,6 +206,38 @@ public:
     /** Restore flags from snapshots that share a base fact tag/context. */
     void RestoreFromSnapshots(const TArray<FSFWorldFactSnapshot>& Snapshots, const FGameplayTag& FactTagBase, FName ContextIdBase = NAME_None)
     {
+        auto ExtractFlagName = [ContextIdBase](FName EncodedContextId, FName& OutFlagName)
+        {
+            OutFlagName = NAME_None;
+
+            if (EncodedContextId.IsNone())
+            {
+                return false;
+            }
+
+            const FString Encoded = EncodedContextId.ToString();
+            if (ContextIdBase.IsNone())
+            {
+                OutFlagName = FName(*Encoded);
+                return !OutFlagName.IsNone();
+            }
+
+            const FString Prefix = ContextIdBase.ToString() + TEXT("|");
+            if (!Encoded.StartsWith(Prefix))
+            {
+                return false;
+            }
+
+            const FString Suffix = Encoded.RightChop(Prefix.Len());
+            if (Suffix.IsEmpty())
+            {
+                return false;
+            }
+
+            OutFlagName = FName(*Suffix);
+            return !OutFlagName.IsNone();
+        };
+
         Reset();
 
         for (const FSFWorldFactSnapshot& Snapshot : Snapshots)
@@ -204,24 +247,18 @@ public:
                 continue;
             }
 
-            if (!ContextIdBase.IsNone() && Snapshot.Key.ContextId != ContextIdBase)
+            if (Snapshot.Value.ValueType != ESFNarrativeFactValueType::Bool)
             {
                 continue;
             }
 
-            if (Snapshot.Value.Type != ESFNarrativeFactValueType::Bool)
+            FName FlagName = NAME_None;
+            if (!ExtractFlagName(Snapshot.Key.ContextId, FlagName))
             {
                 continue;
             }
 
-            const FName FlagName = Snapshot.Key.KeyOverride.IsNone()
-                ? Snapshot.Key.ContextId    // or however you encode
-                : Snapshot.Key.KeyOverride;
-
-            if (!FlagName.IsNone())
-            {
-                Flags.Add(FlagName, Snapshot.Value.BoolValue);
-            }
+            Flags.Add(FlagName, Snapshot.Value.BoolValue);
         }
     }
 };

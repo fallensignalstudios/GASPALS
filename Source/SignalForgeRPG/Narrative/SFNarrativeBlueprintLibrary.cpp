@@ -48,7 +48,7 @@ bool USFNarrativeBlueprintLibrary::ApplyNarrativeDelta(
     const FSFNarrativeDelta& Delta,
     FSFNarrativeChangeSet& OutChangeSet)
 {
-    OutChangeSet.Reset();
+    OutChangeSet = FSFNarrativeChangeSet{};
 
     USFNarrativeStateSubsystem* State = GetNarrativeState(WorldContextObject);
     if (!State)
@@ -64,7 +64,7 @@ bool USFNarrativeBlueprintLibrary::ApplyNarrativeDeltas(
     const TArray<FSFNarrativeDelta>& Deltas,
     FSFNarrativeChangeSet& OutCombinedChangeSet)
 {
-    OutCombinedChangeSet.Reset();
+    OutCombinedChangeSet = FSFNarrativeChangeSet{};
 
     USFNarrativeStateSubsystem* State = GetNarrativeState(WorldContextObject);
     if (!State)
@@ -82,11 +82,13 @@ bool USFNarrativeBlueprintLibrary::ApplyNarrativeDeltas(
             bAnyApplied = true;
 
             // Merge LocalChangeSet into OutCombinedChangeSet.
+            OutCombinedChangeSet.TaskResults.Append(LocalChangeSet.TaskResults);
             OutCombinedChangeSet.WorldFactChanges.Append(LocalChangeSet.WorldFactChanges);
             OutCombinedChangeSet.FactionChanges.Append(LocalChangeSet.FactionChanges);
-            OutCombinedChangeSet.IdentityAxisChanges.Append(LocalChangeSet.IdentityAxisChanges);
-            OutCombinedChangeSet.EndingChanges.Append(LocalChangeSet.EndingChanges);
-            OutCombinedChangeSet.CustomChanges.Append(LocalChangeSet.CustomChanges);
+            OutCombinedChangeSet.IdentityChanges.Append(LocalChangeSet.IdentityChanges);
+            OutCombinedChangeSet.AppliedOutcomes.Append(LocalChangeSet.AppliedOutcomes);
+            OutCombinedChangeSet.EndingStatesChanged.Append(LocalChangeSet.EndingStatesChanged);
+            OutCombinedChangeSet.SourceTags.AppendTags(LocalChangeSet.SourceTags);
         }
     }
 
@@ -104,9 +106,7 @@ void USFNarrativeBlueprintLibrary::SetBoolFact(
         return;
     }
 
-    FSFWorldFactValue NewValue;
-    NewValue.Type = ESFNarrativeFactValueType::Bool;
-    NewValue.BoolValue = bValue;
+    FSFWorldFactValue NewValue = FSFWorldFactValue::MakeBool(bValue);
 
     FSFWorldFactValue OldValue;
     State->SetWorldFact(Key, NewValue, OldValue);
@@ -126,7 +126,7 @@ bool USFNarrativeBlueprintLibrary::GetBoolFact(
     }
 
     FSFWorldFactValue Value;
-    if (!State->GetWorldFact(Key, Value) || Value.Type != ESFNarrativeFactValueType::Bool)
+    if (!State->GetWorldFact(Key, Value) || Value.ValueType != ESFNarrativeFactValueType::Bool)
     {
         return false;
     }

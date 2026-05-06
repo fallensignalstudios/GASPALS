@@ -110,9 +110,10 @@ void USFDialogueNarrativeHooks::EmitWorldFactDeltas(
         FSFNarrativeDelta Delta = FSFNarrativeDelta::MakeSetWorldFact(
             ++InOutSequence,
             Snapshot.Key.FactTag,
+            Snapshot.Key.ContextId,
             Snapshot.Value);
 
-        NarrativeComponent->HandleExternalNarrativeDelta(Delta);
+        NarrativeComponent->ApplyNarrativeDelta(Delta);
 
         FSFWorldFactChange Change;
         Change.Key = Snapshot.Key;
@@ -135,7 +136,7 @@ void USFDialogueNarrativeHooks::EmitFactionDeltas(
             ++InOutSequence,
             FactionDelta);
 
-        NarrativeComponent->HandleExternalNarrativeDelta(Delta);
+        NarrativeComponent->ApplyNarrativeDelta(Delta);
 
         // The actual FSFFactionChange (Old/New) should be built by your faction state subsystem
         // and then reported via a ChangeSet. Here we just record that something happened,
@@ -156,7 +157,7 @@ void USFDialogueNarrativeHooks::EmitIdentityDeltas(
             IdentityDelta.AxisTag,
             IdentityDelta.Delta);
 
-        NarrativeComponent->HandleExternalNarrativeDelta(Delta);
+        NarrativeComponent->ApplyNarrativeDelta(Delta);
 
         // Detailed FSFIdentityChange (Old/New/DriftDir) comes from identity subsystem later.
     }
@@ -173,10 +174,10 @@ void USFDialogueNarrativeHooks::EmitOutcomeDeltas(
     {
         FSFNarrativeDelta Delta = FSFNarrativeDelta::MakeApplyOutcome(
             ++InOutSequence,
-            Application.OutcomeAssetId.PrimaryAssetName,
+            Application.OutcomeAssetId,
             Application.ContextId);
 
-        NarrativeComponent->HandleExternalNarrativeDelta(Delta);
+        NarrativeComponent->ApplyNarrativeDelta(Delta);
         OutChangeSet.AppliedOutcomes.Add(Application);
     }
 }
@@ -192,15 +193,11 @@ void USFDialogueNarrativeHooks::EmitEndingDeltas(
         const FGameplayTag& EndingTag = Pair.Key;
         const float ScoreDelta = Pair.Value;
 
-        // For now we just emit an ApplyEndingScoreDelta-style delta; the subsystem
-        // is responsible for computing the new score / availability and then
-        // emitting SetEndingAvailability.
-        FSFNarrativeDelta Delta;
-        Delta.Type = ESFNarrativeDeltaType::ApplyEndingScoreDelta;
-        Delta.Sequence = ++InOutSequence;
-        Delta.Tag0 = EndingTag;
-        Delta.Float0 = ScoreDelta;
+        FSFNarrativeDelta Delta = FSFNarrativeDelta::MakeApplyEndingScoreDelta(
+            ++InOutSequence,
+            EndingTag,
+            ScoreDelta);
 
-        NarrativeComponent->HandleExternalNarrativeDelta(Delta);
+        NarrativeComponent->ApplyNarrativeDelta(Delta);
     }
 }

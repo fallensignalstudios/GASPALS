@@ -137,7 +137,7 @@ bool USFNarrativeFactSubsystem::IsBoolFactEqual(
     bool bExpected) const
 {
     FSFWorldFactValue Value;
-    if (!GetFact(Key, Value) || Value.Type != ESFNarrativeFactValueType::Bool)
+    if (!GetFact(Key, Value) || Value.ValueType != ESFNarrativeFactValueType::Bool)
     {
         return false;
     }
@@ -150,7 +150,7 @@ bool USFNarrativeFactSubsystem::IsNameFactEqual(
     FName ExpectedName) const
 {
     FSFWorldFactValue Value;
-    if (!GetFact(Key, Value) || Value.Type != ESFNarrativeFactValueType::Name)
+    if (!GetFact(Key, Value) || Value.ValueType != ESFNarrativeFactValueType::Name)
     {
         return false;
     }
@@ -163,12 +163,12 @@ bool USFNarrativeFactSubsystem::DoesTagFactContain(
     FGameplayTag RequiredTag) const
 {
     FSFWorldFactValue Value;
-    if (!GetFact(Key, Value) || Value.Type != ESFNarrativeFactValueType::Tag)
+    if (!GetFact(Key, Value) || Value.ValueType != ESFNarrativeFactValueType::Tag)
     {
         return false;
     }
 
-    return Value.TagContainer.HasTagExact(RequiredTag);
+    return Value.TagValue == RequiredTag;
 }
 
 bool USFNarrativeFactSubsystem::DoesNumericFactPassCondition(
@@ -183,7 +183,7 @@ bool USFNarrativeFactSubsystem::DoesNumericFactPassCondition(
 
     float Actual = 0.0f;
 
-    switch (Value.Type)
+    switch (Value.ValueType)
     {
     case ESFNarrativeFactValueType::Int:
         Actual = static_cast<float>(Value.IntValue);
@@ -244,7 +244,7 @@ bool USFNarrativeFactSubsystem::EvaluateWorldFactCondition(
     }
 
     if (Condition.ExpectedValueType != ESFNarrativeFactValueType::None &&
-        Value.Type != Condition.ExpectedValueType)
+        Value.ValueType != Condition.ExpectedValueType)
     {
         return false;
     }
@@ -272,9 +272,9 @@ bool USFNarrativeFactSubsystem::EvaluateWorldFactCondition(
     case ESFNarrativeFactValueType::Tag:
         if (!Condition.ExpectedTag.IsValid())
         {
-            return Value.TagContainer.Num() > 0;
+            return Value.TagValue.IsValid();
         }
-        return Value.TagContainer.HasTagExact(Condition.ExpectedTag);
+        return Value.TagValue == Condition.ExpectedTag;
 
     default:
         break;

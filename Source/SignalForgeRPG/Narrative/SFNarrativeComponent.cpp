@@ -468,9 +468,9 @@ bool USFNarrativeComponent::ApplyNarrativeDeltas(const TArray<FSFNarrativeDelta>
         return false;
     }
 
-    for (const auto& Pair : CombinedChangeSet.WorldFactChanges)
+    for (const FSFWorldFactChange& Change : CombinedChangeSet.WorldFactChanges)
     {
-        OnWorldFactChanged.Broadcast(Pair.Key.FactTag, Pair.Key.ContextId, Pair.Value);
+        OnWorldFactChanged.Broadcast(Change.Key.FactTag, Change.Key.ContextId, Change.NewValue);
 
         FSFNarrativeClientSyncEvent Event;
         Event.Category = ESFNarrativeClientChangeCategory::WorldFact;
@@ -479,39 +479,39 @@ bool USFNarrativeComponent::ApplyNarrativeDeltas(const TArray<FSFNarrativeDelta>
         EnqueueClientSyncEvent(Event);
     }
 
-    for (const auto& Pair : CombinedChangeSet.FactionChanges)
+    for (const FSFFactionChange& Change : CombinedChangeSet.FactionChanges)
     {
-        OnFactionStandingChanged.Broadcast(Pair.Key, Pair.Value.OldValue, Pair.Value.NewValue);
+        OnFactionStandingChanged.Broadcast(Change.FactionTag, Change.OldStanding.Trust, Change.NewStanding.Trust);
 
         FSFNarrativeClientSyncEvent Event;
         Event.Category = ESFNarrativeClientChangeCategory::Faction;
         Event.Title = FText::FromString(TEXT("Faction standing changed"));
-        Event.OldValue = Pair.Value.OldValue;
-        Event.NewValue = Pair.Value.NewValue;
+        Event.OldValue = Change.OldStanding.Trust;
+        Event.NewValue = Change.NewStanding.Trust;
         EnqueueClientSyncEvent(Event);
     }
 
-    for (const auto& Pair : CombinedChangeSet.IdentityAxisChanges)
+    for (const FSFIdentityChange& Change : CombinedChangeSet.IdentityChanges)
     {
-        OnIdentityAxisChanged.Broadcast(Pair.Key, Pair.Value.OldValue, Pair.Value.NewValue);
+        OnIdentityAxisChanged.Broadcast(Change.NewValue.AxisTag, Change.OldValue.Value, Change.NewValue.Value);
 
         FSFNarrativeClientSyncEvent Event;
         Event.Category = ESFNarrativeClientChangeCategory::IdentityAxis;
         Event.Title = FText::FromString(TEXT("Identity updated"));
-        Event.OldValue = Pair.Value.OldValue;
-        Event.NewValue = Pair.Value.NewValue;
+        Event.OldValue = Change.OldValue.Value;
+        Event.NewValue = Change.NewValue.Value;
         EnqueueClientSyncEvent(Event);
     }
 
-    for (const auto& Pair : CombinedChangeSet.EndingChanges)
+    for (const FSFEndingState& EndingState : CombinedChangeSet.EndingStatesChanged)
     {
-        OnEndingStateChanged.Broadcast(Pair.Key, Pair.Value.Availability, Pair.Value.Score);
+        OnEndingStateChanged.Broadcast(EndingState.EndingTag, static_cast<uint8>(EndingState.Availability), EndingState.Score);
 
         FSFNarrativeClientSyncEvent Event;
         Event.Category = ESFNarrativeClientChangeCategory::Ending;
         Event.Urgency = ESFNarrativeClientChangeUrgency::Important;
         Event.Title = FText::FromString(TEXT("Ending state updated"));
-        Event.NewValue = Pair.Value.Score;
+        Event.NewValue = EndingState.Score;
         EnqueueClientSyncEvent(Event);
     }
 
@@ -537,13 +537,7 @@ bool USFNarrativeComponent::CompleteNarrativeTask(FGameplayTag TaskTag, FName Co
 
 bool USFNarrativeComponent::SetWorldFact(const FSFWorldFactKey& Key, const FSFWorldFactValue& Value, bool bReplicate)
 {
-    FSFNarrativeDelta Delta = USFNarrativeFunctionLibrary::MakeBoolFactDelta(Key, Value.BoolValue);
-
-    if (Value.Type == ESFNarrativeFactValueType::Float)
-    {
-        Delta = USFNarrativeFunctionLibrary::MakeFloatFactDelta(Key, Value.FloatValue);
-    }
-
+    const FSFNarrativeDelta Delta = FSFNarrativeDelta::MakeSetWorldFact(0, Key.FactTag, Key.ContextId, Value);
     return ApplyNarrativeDelta(Delta, bReplicate);
 }
 
@@ -571,8 +565,18 @@ bool USFNarrativeComponent::GetFactionScore(FGameplayTag FactionTag, float& OutS
         return false;
     }
 
-    OutScore = USFNarrativeStateQueryLibrary::GetFactionScore(this, FactionTag);
-    return true;
+    if (USFNarrativeStateSubsystem* StateSubsystem = GetNarrativeStateSubsystem())
+    {
+        FSFFactionStandingValue Standing;
+        if (StateSubsystem->GetFactionStanding(FactionTag, Standing))
+        {
+            OutScore = Standing.Trust; // Proxy old single-score access onto Trust in the canonical faction schema.
+            return true;
+        }
+    }
+
+    OutScore = 0.0f;
+    return false;
 }
 
 bool USFNarrativeComponent::GetIdentityAxisValue(FGameplayTag AxisTag, float& OutValue) const
@@ -654,7 +658,9 @@ bool USFNarrativeComponent::ApplyDialogueNarrativeHooks(bool bOnEnter, int32 Cho
         ApplyNarrativeDeltas(DeltasToApply, true);
     }
 
-    if (Entry.bMarkAsSeenFact && Entry.SeenFactKey.IsValid())
+    if (Entry.bMarkAsSeenFact
+        && Entry.SeenFactKey.FactTag.IsValid()
+        && !Entry.SeenFactKey.ContextId.IsNone())
     {
         FSFNarrativeDelta SeenDelta = USFNarrativeFunctionLibrary::MakeBoolFactDelta(Entry.SeenFactKey, true);
         ApplyNarrativeDelta(SeenDelta, true);
@@ -688,14 +694,14 @@ void USFNarrativeComponent::FlushClientSyncBatch()
     }
 }
 
-void USFNarrativeComponent::HandleReplicatedDeltaApplied(const FSFNarrativeReplicatedDelta& Delta)
+void USFNarrativeComponent::HandleReplicatedDeltaApplied(const FSFNarrativeDelta& Delta)
 {
     FSFNarrativeClientSyncEvent Event;
     Event.Category = ESFNarrativeClientChangeCategory::Custom;
     Event.Title = FText::FromString(TEXT("Narrative state synchronized"));
     Event.Body = FText::FromString(TEXT("A replicated narrative update was applied."));
     Event.bLogInHistory = false;
-    Event.SourceDelta = Delta;
+    Event.ObjectiveOrStateId = Delta.SubjectId;
 
     EnqueueClientSyncEvent(Event);
     FlushClientSyncBatch();

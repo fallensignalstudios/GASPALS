@@ -3,6 +3,7 @@
 #include "SFDialogueComponentBridge.h"
 #include "SFNarrativeComponent.h"
 #include "SFNarrativeLog.h"
+#include "Dialogue/Data/SFConversationDataAsset.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/PlayerState.h"
 
@@ -147,11 +148,11 @@ FSFDialogueMoment USFDialogueComponentBridge::BuildDialogueMoment(const FSFDialo
             const FSFDialogueChoice& RawChoice = DisplayData.Choices[Index];
 
             FSFDialogueOptionView Option;
-            Option.NodeAddress = FSFDialogueNodeAddress(CurrentDialogueId, RawChoice.NodeId);
-            Option.Line = RawChoice.LineText;
-            Option.SpeakerId = RawChoice.SpeakerId;
+            Option.NodeAddress = FSFDialogueNodeAddress(CurrentDialogueId, RawChoice.NextNodeId);
+            Option.Line = RawChoice.ChoiceText;
+            Option.SpeakerId = DisplayData.SpeakerId;
             Option.bIsAvailable = true; // At this point DisplayData already filtered by tags.
-            Option.OutcomeTags.AppendTags(RawChoice.OutcomeTags);
+            // FSFDialogueChoice does not expose authored outcome-preview tags in the canonical dialogue schema.
 
             Moment.Options.Add(Option);
         }
@@ -168,7 +169,7 @@ void USFDialogueComponentBridge::EmitNarrativeDelta(const FSFNarrativeDelta& Del
     // Forward to the narrative component if present.
     if (NarrativeComponent)
     {
-        NarrativeComponent->HandleExternalNarrativeDelta(Delta);
+        NarrativeComponent->ApplyNarrativeDelta(Delta);
     }
 
     // Native logging helper.
@@ -246,11 +247,11 @@ void USFDialogueComponentBridge::HandleDialogueNodeUpdated(const FSFDialogueDisp
     case ESFDialogueNodeType::Line:
     case ESFDialogueNodeType::Choice:
     {
-        FSFNarrativeDelta Delta;
-        Delta.Type = ESFNarrativeDeltaType::AdvanceDialogue;
-        Delta.Sequence = DialogueDeltaSequence;
-        Delta.SubjectId = CurrentDialogueId;
-        Delta.Arg0 = DialogueComponent ? DialogueComponent->GetCurrentNodeId() : NAME_None;
+        FSFNarrativeDelta Delta = FSFNarrativeDelta::MakeAdvanceDialogue(
+            DialogueDeltaSequence,
+            CurrentDialogueId,
+            DialogueComponent ? DialogueComponent->GetCurrentNodeId() : NAME_None,
+            DisplayData.SpeakerId);
 
         EmitNarrativeDelta(Delta);
         break;
@@ -265,11 +266,11 @@ void USFDialogueComponentBridge::HandleDialogueNodeUpdated(const FSFDialogueDisp
 
 void USFDialogueComponentBridge::HandleDialogueEventTriggered(FGameplayTag EventTag)
 {
-    FSFNarrativeDelta Delta;
-    Delta.Type = ESFNarrativeDeltaType::TriggerDialogueEvent;
-    Delta.Sequence = ++DialogueDeltaSequence;
-    Delta.SubjectId = CurrentDialogueId;
-    Delta.Tag0 = EventTag;
+    FSFNarrativeDelta Delta = FSFNarrativeDelta::MakeTriggerDialogueEvent(
+        ++DialogueDeltaSequence,
+        CurrentDialogueId,
+        DialogueComponent ? DialogueComponent->GetCurrentNodeId() : NAME_None,
+        EventTag);
 
     EmitNarrativeDelta(Delta);
 }

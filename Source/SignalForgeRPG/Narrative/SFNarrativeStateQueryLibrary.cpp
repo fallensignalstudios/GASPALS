@@ -1,11 +1,179 @@
 // Copyright Fallen Signal Studios LLC. All Rights Reserved.
 
 #include "SFNarrativeStateQueryLibrary.h"
+
 #include "SFNarrativeFactSubsystem.h"
 #include "SFNarrativeStateSubsystem.h"
 #include "SFQuestConditionLibrary.h"
-#include "SFQuestInstance.h"
 #include "SFQuestDefinition.h"
+#include "SFQuestInstance.h"
+
+namespace
+{
+    static bool IsDefaultNumericCondition(const FSFNarrativeNumericCondition& Condition)
+    {
+        return Condition.Op == ESFNarrativeNumericCompareOp::GreaterOrEqual
+            && FMath::IsNearlyZero(Condition.ThresholdA)
+            && FMath::IsNearlyZero(Condition.ThresholdB)
+            && FMath::IsNearlyEqual(Condition.Epsilon, KINDA_SMALL_NUMBER);
+    }
+
+    static bool EvaluateNumericCondition(float Actual, const FSFNarrativeNumericCondition& Condition)
+    {
+        const float A = Condition.ThresholdA;
+        const float B = Condition.ThresholdB;
+        const float Eps = Condition.Epsilon;
+
+        switch (Condition.Op)
+        {
+        case ESFNarrativeNumericCompareOp::Equal:
+            return FMath::Abs(Actual - A) <= Eps;
+
+        case ESFNarrativeNumericCompareOp::NotEqual:
+            return FMath::Abs(Actual - A) > Eps;
+
+        case ESFNarrativeNumericCompareOp::Greater:
+            return Actual > A;
+
+        case ESFNarrativeNumericCompareOp::GreaterOrEqual:
+            return Actual >= A;
+
+        case ESFNarrativeNumericCompareOp::Less:
+            return Actual < A;
+
+        case ESFNarrativeNumericCompareOp::LessOrEqual:
+            return Actual <= A;
+
+        case ESFNarrativeNumericCompareOp::BetweenInclusive:
+            return Actual >= FMath::Min(A, B) && Actual <= FMath::Max(A, B);
+
+        case ESFNarrativeNumericCompareOp::OutsideExclusive:
+            return Actual < FMath::Min(A, B) || Actual > FMath::Max(A, B);
+
+        default:
+            return false;
+        }
+    }
+
+    static bool EvaluateFactionCondition(
+        const USFNarrativeStateSubsystem* State,
+        const FSFNarrativeFactionCondition& Condition)
+    {
+        if (!State)
+        {
+            return false;
+        }
+
+        FSFFactionStandingValue Standing;
+        if (!State->GetFactionStanding(Condition.FactionTag, Standing))
+        {
+            return false;
+        }
+
+        if (Condition.RequiredBand != ESFFactionStandingBand::Unknown
+            && Standing.StandingBand != Condition.RequiredBand)
+        {
+            return false;
+        }
+
+        if (!IsDefaultNumericCondition(Condition.AggregateCondition))
+        {
+            if (EvaluateNumericCondition(Standing.Trust, Condition.AggregateCondition))
+            {
+                return true;
+            }
+
+            if (Condition.bPassIfAnyMetricHigh)
+            {
+                return EvaluateNumericCondition(Standing.Fear, Condition.AggregateCondition)
+                    || EvaluateNumericCondition(Standing.Respect, Condition.AggregateCondition)
+                    || EvaluateNumericCondition(Standing.Dependency, Condition.AggregateCondition)
+                    || EvaluateNumericCondition(Standing.Alignment, Condition.AggregateCondition)
+                    || EvaluateNumericCondition(Standing.Betrayal, Condition.AggregateCondition);
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    static bool EvaluateIdentityCondition(
+        const USFNarrativeStateSubsystem* State,
+        const FSFNarrativeIdentityAxisCondition& Condition)
+    {
+        if (!State)
+        {
+            return false;
+        }
+
+        float ActualValue = 0.0f;
+        if (!State->GetIdentityAxisValue(Condition.AxisTag, ActualValue))
+        {
+            return false;
+        }
+
+        if (IsDefaultNumericCondition(Condition.ValueCondition))
+        {
+            return true;
+        }
+
+        return EvaluateNumericCondition(ActualValue, Condition.ValueCondition);
+    }
+
+    static bool TryEvaluateLocalCondition(
+        const USFNarrativeStateSubsystem* State,
+        const FSFNarrativeCondition& Condition,
+        bool& bOutRelevant,
+        bool& bOutPass)
+    {
+        bOutRelevant = true;
+        bOutPass = false;
+
+        switch (Condition.Domain)
+        {
+        case ESFNarrativeConditionDomain::Faction:
+            bOutPass = EvaluateFactionCondition(State, Condition.Faction);
+            return true;
+
+        case ESFNarrativeConditionDomain::IdentityAxis:
+            bOutPass = EvaluateIdentityCondition(State, Condition.IdentityAxis);
+            return true;
+
+        case ESFNarrativeConditionDomain::WorldFact:
+        case ESFNarrativeConditionDomain::QuestState:
+        case ESFNarrativeConditionDomain::TagSet:
+        case ESFNarrativeConditionDomain::Dialogue:
+        case ESFNarrativeConditionDomain::Time:
+        case ESFNarrativeConditionDomain::Custom:
+        default:
+            bOutRelevant = false;
+            bOutPass = true;
+            return false;
+        }
+    }
+
+    static bool HasLocalStateConditions(const FSFNarrativeConditionSet& ConditionSet)
+    {
+        auto HasRelevantCondition = [](const TArray<FSFNarrativeCondition>& Conditions)
+        {
+            for (const FSFNarrativeCondition& Condition : Conditions)
+            {
+                if (Condition.Domain == ESFNarrativeConditionDomain::Faction
+                    || Condition.Domain == ESFNarrativeConditionDomain::IdentityAxis)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        return HasRelevantCondition(ConditionSet.AllConditions)
+            || HasRelevantCondition(ConditionSet.AnyConditions)
+            || HasRelevantCondition(ConditionSet.NoneConditions);
+    }
+}
 
 USFNarrativeFactSubsystem* USFNarrativeStateQueryLibrary::GetFactSubsystem(const UObject* WorldContextObject)
 {
@@ -64,30 +232,30 @@ bool USFNarrativeStateQueryLibrary::EvaluateWorldFactConditionsInSet(
         return Facts->EvaluateWorldFactConditionsInSet(ConditionSet);
     }
 
-    // No facts = treat as failure if there are any fact conditions.
-    for (const FSFNarrativeCondition& Cond : ConditionSet.AllConditions)
+    for (const FSFNarrativeCondition& Condition : ConditionSet.AllConditions)
     {
-        if (Cond.Domain == ESFNarrativeConditionDomain::WorldFact)
-        {
-            return false;
-        }
-    }
-    for (const FSFNarrativeCondition& Cond : ConditionSet.AnyConditions)
-    {
-        if (Cond.Domain == ESFNarrativeConditionDomain::WorldFact)
-        {
-            return false;
-        }
-    }
-    for (const FSFNarrativeCondition& Cond : ConditionSet.NoneConditions)
-    {
-        if (Cond.Domain == ESFNarrativeConditionDomain::WorldFact)
+        if (Condition.Domain == ESFNarrativeConditionDomain::WorldFact)
         {
             return false;
         }
     }
 
-    // No world-fact conditions at all; trivially true.
+    for (const FSFNarrativeCondition& Condition : ConditionSet.AnyConditions)
+    {
+        if (Condition.Domain == ESFNarrativeConditionDomain::WorldFact)
+        {
+            return false;
+        }
+    }
+
+    for (const FSFNarrativeCondition& Condition : ConditionSet.NoneConditions)
+    {
+        if (Condition.Domain == ESFNarrativeConditionDomain::WorldFact)
+        {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -167,35 +335,28 @@ bool USFNarrativeStateQueryLibrary::EvaluateQuestStateConditionsForInstance(
 {
     if (!QuestDef || !QuestInstance)
     {
-        // If there are no quest-state conditions at all, trivially true.
-        bool bHasQuestConditions = false;
-        for (const FSFNarrativeCondition& C : ConditionSet.AllConditions)
+        auto HasQuestConditions = [](const TArray<FSFNarrativeCondition>& Conditions)
         {
-            if (C.Domain == ESFNarrativeConditionDomain::QuestState) { bHasQuestConditions = true; break; }
-        }
-        if (!bHasQuestConditions)
-        {
-            for (const FSFNarrativeCondition& C : ConditionSet.AnyConditions)
+            for (const FSFNarrativeCondition& Condition : Conditions)
             {
-                if (C.Domain == ESFNarrativeConditionDomain::QuestState) { bHasQuestConditions = true; break; }
+                if (Condition.Domain == ESFNarrativeConditionDomain::QuestState)
+                {
+                    return true;
+                }
             }
-        }
-        if (!bHasQuestConditions)
-        {
-            for (const FSFNarrativeCondition& C : ConditionSet.NoneConditions)
-            {
-                if (C.Domain == ESFNarrativeConditionDomain::QuestState) { bHasQuestConditions = true; break; }
-            }
-        }
 
-        return !bHasQuestConditions;
+            return false;
+        };
+
+        return !(HasQuestConditions(ConditionSet.AllConditions)
+            || HasQuestConditions(ConditionSet.AnyConditions)
+            || HasQuestConditions(ConditionSet.NoneConditions));
     }
 
-    const FSFQuestSnapshot Snapshot = QuestInstance->BuildSnapshot();
     return USFQuestConditionLibrary::EvaluateQuestStateConditionsInSet(
         ConditionSet,
         QuestDef,
-        Snapshot);
+        QuestInstance->BuildSnapshot());
 }
 
 bool USFNarrativeStateQueryLibrary::EvaluateConditionSet(
@@ -204,129 +365,71 @@ bool USFNarrativeStateQueryLibrary::EvaluateConditionSet(
     const USFQuestDefinition* QuestDef,
     const USFQuestInstance* QuestInstance)
 {
-    //
-    // 1) World facts
-    //
     if (!EvaluateWorldFactConditionsInSet(WorldContextObject, ConditionSet))
     {
         return false;
     }
 
-    //
-    // 2) Quest state
-    //
     if (!EvaluateQuestStateConditionsForInstance(ConditionSet, QuestDef, QuestInstance))
     {
         return false;
     }
 
-    //
-    // 3) Faction / Identity / Ending conditions
-    //
-    // These are represented inside FSFNarrativeCondition but evaluated locally.
-    if (USFNarrativeStateSubsystem* State = GetStateSubsystem(WorldContextObject))
+    USFNarrativeStateSubsystem* State = GetStateSubsystem(WorldContextObject);
+    if (!State && HasLocalStateConditions(ConditionSet))
     {
-        // AllConditions
-        for (const FSFNarrativeCondition& C : ConditionSet.AllConditions)
+        return false;
+    }
+
+    for (const FSFNarrativeCondition& Condition : ConditionSet.AllConditions)
+    {
+        bool bRelevant = false;
+        bool bPass = true;
+        TryEvaluateLocalCondition(State, Condition, bRelevant, bPass);
+
+        if (bRelevant && (Condition.bNegate ? bPass : !bPass))
         {
-            bool bRelevant = false;
-            bool bPass = true;
+            return false;
+        }
+    }
 
-            switch (C.Domain)
-            {
-            case ESFNarrativeConditionDomain::Faction:
-                bRelevant = true;
-                {
-                    const FSFNarrativeFactionCondition& F = C.Faction;
-                    FSFFactionStandingValue Standing;
-                    if (!State->GetFactionStanding(F.FactionTag, Standing))
-                    {
-                        bPass = false;
-                    }
-                    else
-                    {
-                        // Band requirement
-                        if (F.RequiredBand != ESFFactionStandingBand::Unknown &&
-                            Standing.StandingBand != F.RequiredBand)
-                        {
-                            bPass = false;
-                        }
+    bool bHasRelevantAnyConditions = false;
+    bool bAnyPassed = false;
+    for (const FSFNarrativeCondition& Condition : ConditionSet.AnyConditions)
+    {
+        bool bRelevant = false;
+        bool bPass = true;
+        TryEvaluateLocalCondition(State, Condition, bRelevant, bPass);
 
-                        // Aggregate numeric condition
-                        if (bPass && F.AggregateCondition.Op != ESFNarrativeNumericCompareOp::Equal) // heuristic: treat default as "unused"
-                        {
-                            FSFNarrativeNumericCondition Cond = F.AggregateCondition;
-                            float Actual = Standing.AggregateScore;
-                            const float A = Cond.ThresholdA;
-                            const float B = Cond.ThresholdB;
-                            const float Eps = Cond.Epsilon;
+        if (!bRelevant)
+        {
+            continue;
+        }
 
-                            switch (Cond.Op)
-                            {
-                            case ESFNarrativeNumericCompareOp::Equal:            bPass = FMath::Abs(Actual - A) <= Eps; break;
-                            case ESFNarrativeNumericCompareOp::NotEqual:         bPass = FMath::Abs(Actual - A) > Eps; break;
-                            case ESFNarrativeNumericCompareOp::Greater:          bPass = Actual > A; break;
-                            case ESFNarrativeNumericCompareOp::GreaterOrEqual:   bPass = Actual >= A; break;
-                            case ESFNarrativeNumericCompareOp::Less:             bPass = Actual < A; break;
-                            case ESFNarrativeNumericCompareOp::LessOrEqual:      bPass = Actual <= A; break;
-                            case ESFNarrativeNumericCompareOp::BetweenInclusive: bPass = Actual >= FMath::Min(A, B) && Actual <= FMath::Max(A, B); break;
-                            case ESFNarrativeNumericCompareOp::OutsideExclusive: bPass = Actual < FMath::Min(A, B) || Actual > FMath::Max(A, B); break;
-                            default: break;
-                            }
-                        }
-                    }
-                }
-                break;
+        bHasRelevantAnyConditions = true;
+        if (Condition.bNegate ? !bPass : bPass)
+        {
+            bAnyPassed = true;
+            break;
+        }
+    }
 
-            case ESFNarrativeConditionDomain::IdentityAxis:
-                bRelevant = true;
-                {
-                    const FSFNarrativeIdentityAxisCondition& I = C.IdentityAxis;
-                    float Actual = 0.0f;
-                    if (!State->GetIdentityAxisValue(I.AxisTag, Actual))
-                    {
-                        bPass = false;
-                    }
-                    else
-                    {
-                        const FSFNarrativeNumericCondition& Cond = I.ValueCondition;
-                        const float A = Cond.ThresholdA;
-                        const float B = Cond.ThresholdB;
-                        const float Eps = Cond.Epsilon;
+    if (bHasRelevantAnyConditions && !bAnyPassed)
+    {
+        return false;
+    }
 
-                        switch (Cond.Op)
-                        {
-                        case ESFNarrativeNumericCompareOp::Equal:            bPass = FMath::Abs(Actual - A) <= Eps; break;
-                        case ESFNarrativeNumericCompareOp::NotEqual:         bPass = FMath::Abs(Actual - A) > Eps; break;
-                        case ESFNarrativeNumericCompareOp::Greater:          bPass = Actual > A; break;
-                        case ESFNarrativeNumericCompareOp::GreaterOrEqual:   bPass = Actual >= A; break;
-                        case ESFNarrativeNumericCompareOp::Less:             bPass = Actual < A; break;
-                        case ESFNarrativeNumericCompareOp::LessOrEqual:      bPass = Actual <= A; break;
-                        case ESFNarrativeNumericCompareOp::BetweenInclusive: bPass = Actual >= FMath::Min(A, B) && Actual <= FMath::Max(A, B); break;
-                        case ESFNarrativeNumericCompareOp::OutsideExclusive: bPass = Actual < FMath::Min(A, B) || Actual > FMath::Max(A, B); break;
-                        default: break;
-                        }
-                    }
-                }
-                break;
+    for (const FSFNarrativeCondition& Condition : ConditionSet.NoneConditions)
+    {
+        bool bRelevant = false;
+        bool bPass = true;
+        TryEvaluateLocalCondition(State, Condition, bRelevant, bPass);
 
-            case ESFNarrativeConditionDomain::Time:
-                // Time conditions are game-specific; you can wire this to a clock/chapter system later.
-                // For now we treat them as "not evaluated" (bRelevant = false).
-                bRelevant = false;
-                break;
+        if (bRelevant && (Condition.bNegate ? !bPass : bPass))
+        {
+            return false;
+        }
+    }
 
-            case ESFNarrativeConditionDomain::Custom:
-                // Custom domain reserved for your own evaluators.
-                bRelevant = false;
-                break;
-
-            default:
-                break;
-            }
-
-            if (bRelevant)
-            {
-                if (C.bNegate ? bPass : !bPass)
-                {
-                    return false;
+    return true;
+}

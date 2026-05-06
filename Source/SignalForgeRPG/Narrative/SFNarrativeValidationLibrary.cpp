@@ -131,15 +131,6 @@ FSFNarrativeValidationResult USFNarrativeValidationLibrary::ValidateConditionSet
             {
                 const FSFNarrativeCondition& C = Conditions[Index];
 
-                if (C.Domain == ESFNarrativeConditionDomain::None)
-                {
-                    Result.AddWarning(
-                        FText::FromString(FString::Printf(
-                            TEXT("ConditionSet has condition with Domain=None in group '%s' at index %d."),
-                            GroupName, Index)));
-                    continue;
-                }
-
                 switch (C.Domain)
                 {
                 case ESFNarrativeConditionDomain::WorldFact:
@@ -173,12 +164,16 @@ FSFNarrativeValidationResult USFNarrativeValidationLibrary::ValidateConditionSet
                     break;
 
                 case ESFNarrativeConditionDomain::QuestState:
-                    if (C.QuestState.RequiredStateId.IsNone()
-                        && C.QuestState.RequiredCompletionState == ESFQuestCompletionState::NotStarted)
+                    if (!C.QuestState.QuestAssetId.IsValid()
+                        && C.QuestState.QuestId.IsNone()
+                        && C.QuestState.AllowedCompletionStates.Num() == 0
+                        && C.QuestState.RequiredCurrentStateId.IsNone()
+                        && C.QuestState.RequiredReachedStateId.IsNone()
+                        && !C.QuestState.RequiredOutcomeTag.IsValid())
                     {
                         Result.AddWarning(
                             FText::FromString(FString::Printf(
-                                TEXT("QuestState condition in group '%s' at index %d has neither RequiredStateId nor non-default CompletionState set."),
+                                TEXT("QuestState condition in group '%s' at index %d has no quest filter or state requirements set."),
                                 GroupName, Index)));
                     }
                     break;
@@ -254,10 +249,10 @@ FSFNarrativeValidationResult USFNarrativeValidationLibrary::ValidateNarrativeDel
         break;
 
     case ESFNarrativeDeltaType::ApplyOutcome:
-        if (Delta.SubjectId.IsNone())
+        if (!FSFNarrativeDelta::UnpackOutcomeAssetId(Delta).IsValid())
         {
             Result.AddWarning(
-                FText::FromString(TEXT("ApplyOutcome delta has no SubjectId; expected an outcome identifier.")));
+                FText::FromString(TEXT("ApplyOutcome delta does not unpack to a valid outcome asset id.")));
         }
         break;
 
@@ -537,45 +532,40 @@ FSFNarrativeValidationResult USFNarrativeValidationLibrary::ValidateNarrativeSav
     // These checks are intentionally conservative because your exact save struct
     // may still evolve. Rename fields below to match your concrete struct.
 
-    if (SaveData.SaveVersion <= 0)
+    if (SaveData.SchemaVersion <= 0)
     {
-        Result.AddWarning(FText::FromString(TEXT("SaveData has a non-positive SaveVersion.")));
+        Result.AddWarning(FText::FromString(TEXT("SaveData has a non-positive SchemaVersion.")));
     }
 
-    if (SaveData.ActiveQuestIds.Num() == 0
-        && SaveData.CompletedQuestIds.Num() == 0
-        && SaveData.WorldFacts.Num() == 0)
+    if (SaveData.QuestSnapshots.Num() == 0
+        && SaveData.WorldFacts.Num() == 0
+        && SaveData.FactionSnapshots.Num() == 0
+        && SaveData.IdentityAxes.Num() == 0
+        && SaveData.AppliedOutcomes.Num() == 0
+        && SaveData.EndingStates.Num() == 0)
     {
-        Result.AddInfo(FText::FromString(TEXT("SaveData appears empty (no quests or world facts captured).")));
+        Result.AddInfo(FText::FromString(TEXT("SaveData appears empty (no quests, world facts, factions, identity axes, outcomes, or ending states captured).")));
     }
 
-    TSet<FName> SeenQuestIds;
-    for (const FName& QuestId : SaveData.ActiveQuestIds)
+    TSet<FPrimaryAssetId> SeenQuestIds;
+    for (const FSFQuestSnapshot& QuestSnapshot : SaveData.QuestSnapshots)
     {
-        if (QuestId.IsNone())
+        if (!QuestSnapshot.QuestAssetId.IsValid())
         {
-            Result.AddError(FText::FromString(TEXT("SaveData.ActiveQuestIds contains NAME_None.")));
+            Result.AddError(FText::FromString(TEXT("SaveData.QuestSnapshots contains an entry with an invalid QuestAssetId.")));
             continue;
         }
 
-        if (SeenQuestIds.Contains(QuestId))
+        if (SeenQuestIds.Contains(QuestSnapshot.QuestAssetId))
         {
             Result.AddWarning(
-                FText::FromString(FString::Printf(TEXT("SaveData.ActiveQuestIds contains duplicate quest id '%s'."), *QuestId.ToString())),
+                FText::FromString(FString::Printf(TEXT("SaveData.QuestSnapshots contains duplicate quest asset id '%s'."), *QuestSnapshot.QuestAssetId.ToString())),
                 nullptr,
-                QuestId);
+                QuestSnapshot.QuestAssetId.PrimaryAssetName);
         }
         else
         {
-            SeenQuestIds.Add(QuestId);
-        }
-    }
-
-    for (const FName& QuestId : SaveData.CompletedQuestIds)
-    {
-        if (QuestId.IsNone())
-        {
-            Result.AddError(FText::FromString(TEXT("SaveData.CompletedQuestIds contains NAME_None.")));
+            SeenQuestIds.Add(QuestSnapshot.QuestAssetId);
         }
     }
 
