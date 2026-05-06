@@ -47,8 +47,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI")
 	UBehaviorTreeComponent* GetBehaviorTreeComponent() const { return BehaviorTreeComponent; }
 
+	/** Renamed accessor to avoid hiding AAIController::GetPerceptionComponent() (non-const virtual). */
 	UFUNCTION(BlueprintPure, Category = "AI")
-	UAIPerceptionComponent* GetPerceptionComponent() const { return Perception; }
+	UAIPerceptionComponent* GetNPCPerceptionComponent() const { return Perception; }
 
 protected:
 	UPROPERTY(Transient)

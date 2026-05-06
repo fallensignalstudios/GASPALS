@@ -53,7 +53,10 @@ void ASFNPCAIController::OnPossess(APawn* InPawn)
 	{
 		if (UBlackboardData* BlackboardAsset = DefaultBehaviorTree->BlackboardAsset)
 		{
-			UseBlackboard(BlackboardAsset, BlackboardComponent);
+			// AAIController::UseBlackboard takes UBlackboardComponent*& (non-const ref)
+			// so we can't pass the TObjectPtr member directly.
+			UBlackboardComponent* BlackboardCompPtr = BlackboardComponent;
+			UseBlackboard(BlackboardAsset, BlackboardCompPtr);
 		}
 		BehaviorTreeComponent->StartTree(*DefaultBehaviorTree);
 	}

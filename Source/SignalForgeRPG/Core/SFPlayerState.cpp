@@ -7,8 +7,8 @@ ASFPlayerState::ASFPlayerState()
 	// PlayerState already replicates by default; bumping update frequency
 	// modestly so narrative deltas reach the owning client promptly without
 	// flooding the channel for non-owning observers.
-	NetUpdateFrequency = 10.0f;
-	MinNetUpdateFrequency = 2.0f;
+	SetNetUpdateFrequency(10.0f);
+	SetMinNetUpdateFrequency(2.0f);
 
 	NarrativeComponent = CreateDefaultSubobject<USFNarrativeComponent>(TEXT("NarrativeComponent"));
 	NarrativeComponent->SetIsReplicated(true);
