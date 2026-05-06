@@ -1,0 +1,292 @@
+#include "Core/SignalForgeGameplayTags.h"
+#include "GameplayTagsManager.h"
+
+FSignalForgeGameplayTags FSignalForgeGameplayTags::GameplayTags;
+bool FSignalForgeGameplayTags::bIsInitialized = false;
+
+const FSignalForgeGameplayTags& FSignalForgeGameplayTags::Get()
+{
+	return GameplayTags;
+}
+
+void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
+{
+	if (bIsInitialized)
+	{
+		return;
+	}
+
+	bIsInitialized = true;
+
+	UGameplayTagsManager& TagManager = UGameplayTagsManager::Get();
+
+	/** Attributes */
+	GameplayTags.Attribute_Health = TagManager.AddNativeGameplayTag(
+		FName("Attributes.Health"),
+		TEXT("Current health value"));
+
+	GameplayTags.Attribute_MaxHealth = TagManager.AddNativeGameplayTag(
+		FName("Attributes.MaxHealth"),
+		TEXT("Maximum health value"));
+
+	GameplayTags.Attribute_Echo = TagManager.AddNativeGameplayTag(
+		FName("Attributes.Echo"),
+		TEXT("Current echo resource value"));
+
+	GameplayTags.Attribute_MaxEcho = TagManager.AddNativeGameplayTag(
+		FName("Attributes.MaxEcho"),
+		TEXT("Maximum echo resource value"));
+
+	GameplayTags.Attribute_Stamina = TagManager.AddNativeGameplayTag(
+		FName("Attributes.Stamina"),
+		TEXT("Current stamina value"));
+
+	GameplayTags.Attribute_MaxStamina = TagManager.AddNativeGameplayTag(
+		FName("Attributes.MaxStamina"),
+		TEXT("Maximum stamina value"));
+
+	GameplayTags.Attribute_Shields = TagManager.AddNativeGameplayTag(
+		FName("Attributes.Shields"),
+		TEXT("Current shields value"));
+
+	GameplayTags.Attribute_MaxShields = TagManager.AddNativeGameplayTag(
+		FName("Attributes.MaxShields"),
+		TEXT("Maximum shields value"));
+
+	GameplayTags.Attribute_Damage = TagManager.AddNativeGameplayTag(
+		FName("Attributes.Damage"),
+		TEXT("Meta damage attribute used by damage executions"));
+
+	GameplayTags.Attribute_AttackPower = TagManager.AddNativeGameplayTag(
+		FName("Attributes.AttackPower"),
+		TEXT("General offensive power for physical and weapon-based damage"));
+
+	GameplayTags.Attribute_AbilityPower = TagManager.AddNativeGameplayTag(
+		FName("Attributes.AbilityPower"),
+		TEXT("Offensive power for abilities and special techniques"));
+
+	GameplayTags.Attribute_CritChance = TagManager.AddNativeGameplayTag(
+		FName("Attributes.CritChance"),
+		TEXT("Chance to critically hit, normalized from 0 to 1"));
+
+	GameplayTags.Attribute_CritMultiplier = TagManager.AddNativeGameplayTag(
+		FName("Attributes.CritMultiplier"),
+		TEXT("Critical damage multiplier, e.g. 1.5 for 150 percent damage"));
+
+	GameplayTags.Attribute_WeakpointBonus = TagManager.AddNativeGameplayTag(
+		FName("Attributes.WeakpointBonus"),
+		TEXT("Additional bonus damage applied on weakpoint hits"));
+
+	GameplayTags.Attribute_Armor = TagManager.AddNativeGameplayTag(
+		FName("Attributes.Armor"),
+		TEXT("Flat damage mitigation value"));
+
+	GameplayTags.Attribute_DamageReduction = TagManager.AddNativeGameplayTag(
+		FName("Attributes.DamageReduction"),
+		TEXT("Percent damage reduction, normalized from 0 to 1"));
+
+	GameplayTags.Attribute_DodgeChance = TagManager.AddNativeGameplayTag(
+		FName("Attributes.DodgeChance"),
+		TEXT("Chance to fully avoid a hit, normalized from 0 to 1"));
+
+	GameplayTags.Attribute_MoveSpeedMultiplier = TagManager.AddNativeGameplayTag(
+		FName("Attributes.MoveSpeedMultiplier"),
+		TEXT("Multiplier applied to character movement speed"));
+
+	GameplayTags.Attribute_AttackSpeedMultiplier = TagManager.AddNativeGameplayTag(
+		FName("Attributes.AttackSpeedMultiplier"),
+		TEXT("Multiplier applied to attack speed or animation rate"));
+
+	GameplayTags.Attribute_CooldownReduction = TagManager.AddNativeGameplayTag(
+		FName("Attributes.CooldownReduction"),
+		TEXT("Reduction to ability cooldowns, normalized from 0 to 1"));
+
+	GameplayTags.Attribute_Guard = TagManager.AddNativeGameplayTag(
+		FName("Attributes.Guard"),
+		TEXT("Guard meter used when blocking to absorb damage"));
+
+	GameplayTags.Attribute_MaxGuard = TagManager.AddNativeGameplayTag(
+		FName("Attributes.MaxGuard"),
+		TEXT("Maximum guard value"));
+
+	GameplayTags.Attribute_Poise = TagManager.AddNativeGameplayTag(
+		FName("Attributes.Poise"),
+		TEXT("Poise / posture meter used for stagger / break"));
+
+	GameplayTags.Attribute_PoiseDamage = TagManager.AddNativeGameplayTag(
+		FName("Attributes.PoiseDamage"),
+		TEXT("How much poise damage this character's attacks deal"));
+
+	/** Damage / execution / regen data */
+	GameplayTags.Data_BaseDamage = TagManager.AddNativeGameplayTag(
+		FName("Data.BaseDamage"),
+		TEXT("SetByCaller base damage for a damage effect"));
+
+	GameplayTags.Data_AttackPowerScale = TagManager.AddNativeGameplayTag(
+		FName("Data.AttackPowerScale"),
+		TEXT("SetByCaller scaling coefficient for AttackPower"));
+
+	GameplayTags.Data_AbilityPowerScale = TagManager.AddNativeGameplayTag(
+		FName("Data.AbilityPowerScale"),
+		TEXT("SetByCaller scaling coefficient for AbilityPower"));
+
+	GameplayTags.Data_IsWeakpointHit = TagManager.AddNativeGameplayTag(
+		FName("Data.IsWeakpointHit"),
+		TEXT("SetByCaller flag indicating whether the hit struck a weakpoint"));
+
+	GameplayTags.Data_BonusCritChance = TagManager.AddNativeGameplayTag(
+		FName("Data.BonusCritChance"),
+		TEXT("SetByCaller bonus critical hit chance"));
+
+	GameplayTags.Data_BonusCritMultiplier = TagManager.AddNativeGameplayTag(
+		FName("Data.BonusCritMultiplier"),
+		TEXT("SetByCaller bonus critical damage multiplier"));
+
+	GameplayTags.Data_IgnoreArmor = TagManager.AddNativeGameplayTag(
+		FName("Data.IgnoreArmor"),
+		TEXT("SetByCaller flag causing the hit to ignore armor"));
+
+	GameplayTags.Data_IgnoreDamageReduction = TagManager.AddNativeGameplayTag(
+		FName("Data.IgnoreDamageReduction"),
+		TEXT("SetByCaller flag causing the hit to ignore percent damage reduction"));
+
+	GameplayTags.Data_PoiseDamageScale = TagManager.AddNativeGameplayTag(
+		FName("Data.PoiseDamageScale"),
+		TEXT("SetByCaller scale applied to PoiseDamage for a hit"));
+
+	GameplayTags.Data_IsBlockable = TagManager.AddNativeGameplayTag(
+		FName("Data.IsBlockable"),
+		TEXT("SetByCaller flag indicating whether this hit can be blocked"));
+
+	GameplayTags.Data_IgnoreGuard = TagManager.AddNativeGameplayTag(
+		FName("Data.IgnoreGuard"),
+		TEXT("SetByCaller flag causing the hit to ignore guard"));
+
+	GameplayTags.Data_BreakGuardBonus = TagManager.AddNativeGameplayTag(
+		FName("Data.BreakGuardBonus"),
+		TEXT("SetByCaller bonus poise damage against guard"));
+
+	GameplayTags.Data_RegenAmount = TagManager.AddNativeGameplayTag(
+		FName("Data.RegenAmount"),
+		TEXT("SetByCaller regen magnitude used by simple regen effects"));
+
+	/** Ability identity */
+	GameplayTags.Ability_Attack_Light = TagManager.AddNativeGameplayTag(
+		FName("Ability.Attack.Light"),
+		TEXT("Light attack ability tag"));
+
+	GameplayTags.Ability_Attack_Heavy = TagManager.AddNativeGameplayTag(
+		FName("Ability.Attack.Heavy"),
+		TEXT("Heavy attack ability tag"));
+
+	GameplayTags.Ability_Movement_Dash = TagManager.AddNativeGameplayTag(
+		FName("Ability.Movement.Dash"),
+		TEXT("Dash ability tag"));
+
+	GameplayTags.Ability_Movement_Sprint = TagManager.AddNativeGameplayTag(
+		FName("Ability.Movement.Sprint"),
+		TEXT("Sprint ability tag"));
+
+	GameplayTags.Ability_Ranged_Projectile = TagManager.AddNativeGameplayTag(
+		FName("Ability.Ranged.Projectile"),
+		TEXT("Projectile-based ranged ability tag"));
+
+	/** State */
+	GameplayTags.State_Attacking = TagManager.AddNativeGameplayTag(
+		FName("State.Attacking"),
+		TEXT("Character is currently attacking"));
+
+	GameplayTags.State_Movement_Sprinting = TagManager.AddNativeGameplayTag(
+		FName("State.Movement.Sprinting"),
+		TEXT("Character is currently sprinting"));
+
+	GameplayTags.State_Blocking = TagManager.AddNativeGameplayTag(
+		FName("State.Blocking"),
+		TEXT("Character is currently blocking"));
+
+	GameplayTags.State_Broken = TagManager.AddNativeGameplayTag(
+		FName("State.Broken"),
+		TEXT("Character is guard-broken or staggered"));
+
+	/** Input */
+	GameplayTags.Input_Ability_Sprint = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.Sprint"),
+		TEXT("Input tag for sprint ability"));
+
+	GameplayTags.Input_Ability_1 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.1"),
+		TEXT("Input tag for ability slot 1"));
+
+	GameplayTags.Input_Ability_2 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.2"),
+		TEXT("Input tag for ability slot 2"));
+
+	GameplayTags.Input_Ability_3 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.3"),
+		TEXT("Input tag for ability slot 3"));
+
+	GameplayTags.Input_Ability_4 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.4"),
+		TEXT("Input tag for ability slot 4"));
+
+	GameplayTags.Input_Ability_5 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.5"),
+		TEXT("Input tag for ability slot 5"));
+
+	GameplayTags.Input_Ability_6 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.6"),
+		TEXT("Input tag for ability slot 6"));
+
+	GameplayTags.Input_Ability_7 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.7"),
+		TEXT("Input tag for ability slot 7"));
+
+	GameplayTags.Input_Ability_8 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.8"),
+		TEXT("Input tag for ability slot 8"));
+
+	GameplayTags.Input_Ability_9 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.9"),
+		TEXT("Input tag for ability slot 9"));
+
+	GameplayTags.Input_Ability_10 = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.10"),
+		TEXT("Input tag for ability slot 10"));
+
+	GameplayTags.Input_Ability_Block = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Ability.Block"),
+		TEXT("Input tag for block ability"));
+
+	/** Equipment slots */
+	GameplayTags.Equipment_Slot_Head = TagManager.AddNativeGameplayTag(
+		FName("Equipment.Slot.Head"),
+		TEXT("Head armor slot"));
+
+	GameplayTags.Equipment_Slot_Chest = TagManager.AddNativeGameplayTag(
+		FName("Equipment.Slot.Chest"),
+		TEXT("Chest armor slot"));
+
+	GameplayTags.Equipment_Slot_Arms = TagManager.AddNativeGameplayTag(
+		FName("Equipment.Slot.Arms"),
+		TEXT("Arms armor slot"));
+
+	GameplayTags.Equipment_Slot_Legs = TagManager.AddNativeGameplayTag(
+		FName("Equipment.Slot.Legs"),
+		TEXT("Legs armor slot"));
+
+	GameplayTags.Equipment_Slot_Boots = TagManager.AddNativeGameplayTag(
+		FName("Equipment.Slot.Boots"),
+		TEXT("Boots armor slot"));
+
+	GameplayTags.Equipment_Slot_PrimaryWeapon = TagManager.AddNativeGameplayTag(
+		FName("Equipment.Slot.PrimaryWeapon"),
+		TEXT("Primary weapon slot"));
+
+	GameplayTags.Equipment_Slot_SecondaryWeapon = TagManager.AddNativeGameplayTag(
+		FName("Equipment.Slot.SecondaryWeapon"),
+		TEXT("Secondary weapon slot"));
+
+	GameplayTags.Equipment_Slot_HeavyWeapon = TagManager.AddNativeGameplayTag(
+		FName("Equipment.Slot.HeavyWeapon"),
+		TEXT("Heavy weapon slot"));
+}
