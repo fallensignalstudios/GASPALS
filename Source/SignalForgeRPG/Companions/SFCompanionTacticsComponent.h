@@ -15,6 +15,11 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	FSFCompanionOrderIssued,
 	const FSFCompanionOrder&, Order);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FSFCompanionThresholdCrossed,
+	FGameplayTag, ThresholdTag,   // Companion.Threat.PlayerLowHealth, .SelfLowHealth, .AllyLowHealth
+	bool, bNowActive);
+
 /**
  * USFCompanionTacticsComponent
  *
@@ -83,6 +88,38 @@ public:
 	void ClearOrder();
 
 	// -------------------------------------------------------------------------
+	// Priority thresholds (HealthLow, AbilityCooldown gating, Taunt range)
+	// -------------------------------------------------------------------------
+
+	/** Designer-tunable; the tactics layer evaluates these and broadcasts on cross. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion|Tactics")
+	FSFCompanionTacticsThresholds Thresholds;
+
+	UFUNCTION(BlueprintPure, Category = "Companion|Tactics")
+	const FSFCompanionTacticsThresholds& GetThresholds() const { return Thresholds; }
+
+	UFUNCTION(BlueprintPure, Category = "Companion|Tactics")
+	bool IsPlayerLowHealth() const { return bPlayerLowHealth; }
+
+	UFUNCTION(BlueprintPure, Category = "Companion|Tactics")
+	bool IsSelfLowHealth() const { return bSelfLowHealth; }
+
+	/** Returns true if the commanded-ability cooldown has elapsed since the last use. */
+	UFUNCTION(BlueprintPure, Category = "Companion|Tactics")
+	bool CanCommandAbility() const;
+
+	/** Authority-only. Stamps the last-ability time so CanCommandAbility() begins gating. */
+	UFUNCTION(BlueprintAuthorityOnly, BlueprintCallable, Category = "Companion|Tactics")
+	void NotifyAbilityCommanded();
+
+	/**
+	 * Authority-only. Tactics layer calls this from a health-change hook on
+	 * the owning pawn (and from the player's health hook if bound) to update
+	 * derived flags and fire OnThresholdCrossed.
+	 */
+	void EvaluateHealthThresholds(float SelfPct, float PlayerPct);
+
+	// -------------------------------------------------------------------------
 	// Delegates
 	// -------------------------------------------------------------------------
 
@@ -91,6 +128,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Companion|Order")
 	FSFCompanionOrderIssued OnOrderIssued;
+
+	UPROPERTY(BlueprintAssignable, Category = "Companion|Tactics")
+	FSFCompanionThresholdCrossed OnThresholdCrossed;
 
 protected:
 	// -------------------------------------------------------------------------
@@ -141,4 +181,12 @@ protected:
 
 	int32 NextOrderSequence = 1;
 	int32 LastObservedOrderSequence = 0;
+
+	// Derived threshold flags (server-driven; not replicated — each peer
+	// recomputes locally from health attributes).
+	bool bPlayerLowHealth = false;
+	bool bSelfLowHealth = false;
+
+	/** Game-time of the last commanded-ability fire, for cooldown gating. */
+	double LastCommandedAbilityTime = -BIG_NUMBER;
 };

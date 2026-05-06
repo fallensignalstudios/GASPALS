@@ -5,6 +5,7 @@
 #include "SFCompanionCharacter.generated.h"
 
 class USFCompanionTacticsComponent;
+class USFCompanionBarkComponent;
 
 /**
  * ASFCompanionCharacter
@@ -26,12 +27,20 @@ class SIGNALFORGERPG_API ASFCompanionCharacter : public ASFNPCBase
 public:
 	ASFCompanionCharacter();
 
+	//~ AActor
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	//~ End AActor
+
 	//~ ASFCharacterBase
 	virtual void HandleDeath() override;
 	//~ End
 
 	UFUNCTION(BlueprintPure, Category = "Companion")
 	USFCompanionTacticsComponent* GetTactics() const { return Tactics; }
+
+	UFUNCTION(BlueprintPure, Category = "Companion")
+	USFCompanionBarkComponent* GetBarkComponent() const { return Barks; }
 
 	UFUNCTION(BlueprintPure, Category = "Companion")
 	FName GetCompanionId() const { return CompanionId; }
@@ -54,6 +63,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Companion")
 	TObjectPtr<USFCompanionTacticsComponent> Tactics;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Companion")
+	TObjectPtr<USFCompanionBarkComponent> Barks;
+
 	/** Personal quest unlocked at high approval. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion|Narrative")
 	FPrimaryAssetId PersonalQuestAssetId;
@@ -62,10 +74,23 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion|Narrative")
 	int32 PersonalQuestApprovalThreshold = 50;
 
+	/** If true, crossing the approval threshold auto-starts the personal quest in addition to setting the loyalty fact. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Companion|Narrative")
+	bool bAutoStartPersonalQuest = false;
+
 public:
 	UFUNCTION(BlueprintPure, Category = "Companion|Narrative")
 	const FPrimaryAssetId& GetPersonalQuestAssetId() const { return PersonalQuestAssetId; }
 
 	UFUNCTION(BlueprintPure, Category = "Companion|Narrative")
 	int32 GetPersonalQuestApprovalThreshold() const { return PersonalQuestApprovalThreshold; }
+
+	UFUNCTION(BlueprintPure, Category = "Companion|Narrative")
+	bool ShouldAutoStartPersonalQuest() const { return bAutoStartPersonalQuest; }
+
+protected:
+	UFUNCTION()
+	void HandleSelfHealthChanged(float NewValue, float MaxValue);
+
+	void PushHealthThresholdsToTactics();
 };

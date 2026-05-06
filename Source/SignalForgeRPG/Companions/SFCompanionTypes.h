@@ -84,3 +84,36 @@ struct SIGNALFORGERPG_API FSFCompanionOrder
 
 	bool IsValidOrder() const { return Type != ESFCompanionOrderType::None; }
 };
+
+/**
+ * Designer-tunable thresholds the tactics layer evaluates each tick / on
+ * health change and exposes as blackboard booleans. Lets BT subtrees
+ * (heal, taunt, retreat) read "is this true right now" instead of doing
+ * their own math, and lets per-companion archetypes differ without
+ * editing trees.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFCompanionTacticsThresholds
+{
+	GENERATED_BODY()
+
+	/** 0..1 fraction of MaxHealth at which the player counts as "low" — fires heal/peel barks and BT branches. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tactics|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float PlayerLowHealthPct = 0.35f;
+
+	/** 0..1 fraction of MaxHealth at which the companion itself should retreat. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tactics|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float SelfLowHealthPct = 0.25f;
+
+	/** 0..1 fraction of MaxHealth at which an allied target counts as "low" — Healer-stance support trigger. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tactics|Thresholds", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float AllyLowHealthPct = 0.40f;
+
+	/** Distance at which Tank stance should taunt / interpose between player and threat. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tactics|Thresholds", meta = (ClampMin = "50.0"))
+	float TauntInterposeRange = 800.f;
+
+	/** Min seconds between commanded ability uses (per companion) — softens spam. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Tactics|Thresholds", meta = (ClampMin = "0.0"))
+	float AbilityCommandCooldown = 1.5f;
+};

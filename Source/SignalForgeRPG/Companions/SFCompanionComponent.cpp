@@ -1,13 +1,49 @@
 #include "Companions/SFCompanionComponent.h"
 #include "Companions/SFCompanionCharacter.h"
 #include "Companions/SFCompanionTacticsComponent.h"
+#include "Core/SFPlayerState.h"
+#include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
+#include "Narrative/SFNarrativeComponent.h"
+#include "Narrative/SFNarrativeTypes.h"
 #include "Net/UnrealNetwork.h"
 
 USFCompanionComponent::USFCompanionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+}
+
+void USFCompanionComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		if (USFNarrativeComponent* Narrative = GetPlayerNarrative())
+		{
+			Narrative->OnLoadComplete.AddDynamic(this, &USFCompanionComponent::HandleNarrativeLoadComplete);
+		}
+	}
+}
+
+void USFCompanionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (USFNarrativeComponent* Narrative = GetPlayerNarrative())
+	{
+		Narrative->OnLoadComplete.RemoveDynamic(this, &USFCompanionComponent::HandleNarrativeLoadComplete);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+USFNarrativeComponent* USFCompanionComponent::GetPlayerNarrative() const
+{
+	if (const ASFPlayerState* PS = Cast<ASFPlayerState>(GetOwner()))
+	{
+		return PS->GetNarrativeComponent();
+	}
+	return nullptr;
 }
 
 void USFCompanionComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -47,26 +83,48 @@ void USFCompanionComponent::RecruitCompanion(FName CompanionId)
 		return;
 	}
 
-	if (FSFCompanionRosterEntry* Existing = FindRosterEntry(CompanionId))
+	FSFCompanionRosterEntry* Entry = FindRosterEntry(CompanionId);
+	if (Entry)
 	{
-		if (Existing->bRecruited)
+		if (Entry->bRecruited)
 		{
 			return; // already in roster
 		}
-		Existing->bRecruited = true;
-		Existing->bAvailable = true;
+		Entry->bRecruited = true;
+		Entry->bAvailable = true;
 	}
 	else
 	{
-		FSFCompanionRosterEntry Entry;
-		Entry.CompanionId = CompanionId;
-		Entry.Approval = 0;
-		Entry.bRecruited = true;
-		Entry.bAvailable = true;
-		Roster.Add(Entry);
+		FSFCompanionRosterEntry NewEntry;
+		NewEntry.CompanionId = CompanionId;
+		NewEntry.Approval = 0;
+		NewEntry.bRecruited = true;
+		NewEntry.bAvailable = true;
+		Roster.Add(NewEntry);
+		Entry = &Roster.Last();
 	}
 
+	WriteEntryFacts(*Entry);
 	OnRosterChanged.Broadcast();
+}
+
+void USFCompanionComponent::RecruitCompanionFromPawn(ASFCompanionCharacter* CompanionPawn)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !CompanionPawn) return;
+	const FName Id = CompanionPawn->GetCompanionId();
+	if (Id.IsNone()) return;
+
+	RecruitCompanion(Id);
+
+	if (FSFCompanionRosterEntry* Entry = FindRosterEntry(Id))
+	{
+		Entry->PersonalQuestAssetId = CompanionPawn->GetPersonalQuestAssetId();
+		Entry->PersonalQuestApprovalThreshold = CompanionPawn->GetPersonalQuestApprovalThreshold();
+		Entry->bAutoStartPersonalQuest = CompanionPawn->ShouldAutoStartPersonalQuest();
+
+		WriteEntryFacts(*Entry);
+		OnRosterChanged.Broadcast();
+	}
 }
 
 void USFCompanionComponent::DismissCompanion(FName CompanionId)
@@ -236,15 +294,22 @@ void USFCompanionComponent::CommandUseAbility(FGameplayTag AbilityTag, AActor* O
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority() || !AbilityTag.IsValid()) return;
 
-	if (ASFCompanionCharacter* Active = ActiveCompanion.Get())
+	if (ASFCompanionCharacter* Active = ActiveCompanion)
 	{
 		if (USFCompanionTacticsComponent* Tactics = Active->GetTactics())
 		{
+			// Cooldown gate — silently drops spam without surprising the player.
+			if (!Tactics->CanCommandAbility())
+			{
+				return;
+			}
+
 			FSFCompanionOrder Order;
 			Order.Type = ESFCompanionOrderType::UseAbility;
 			Order.AbilityTag = AbilityTag;
 			Order.TargetActor = OptionalTarget;
 			Tactics->IssueOrder(Order);
+			Tactics->NotifyAbilityCommanded();
 		}
 	}
 }
@@ -322,6 +387,10 @@ void USFCompanionComponent::ChangeApproval(FName CompanionId, int32 Delta)
 	Entry->Approval = OldApproval + Delta;
 
 	OnApprovalChanged.Broadcast(CompanionId, OldApproval, Entry->Approval);
+
+	CheckLoyaltyUnlock(*Entry);
+	WriteEntryFacts(*Entry);
+
 	OnRosterChanged.Broadcast();
 }
 
@@ -329,6 +398,141 @@ int32 USFCompanionComponent::GetApproval(FName CompanionId) const
 {
 	const int32 Index = FindRosterIndex(CompanionId);
 	return Index != INDEX_NONE ? Roster[Index].Approval : 0;
+}
+
+bool USFCompanionComponent::IsLoyaltyUnlocked(FName CompanionId) const
+{
+	const int32 Index = FindRosterIndex(CompanionId);
+	return Index != INDEX_NONE && Roster[Index].bLoyaltyUnlocked;
+}
+
+// -----------------------------------------------------------------------------
+// Loyalty unlock + fact persistence
+// -----------------------------------------------------------------------------
+
+void USFCompanionComponent::CheckLoyaltyUnlock(FSFCompanionRosterEntry& Entry)
+{
+	if (Entry.bLoyaltyUnlocked) return;
+	if (Entry.Approval < Entry.PersonalQuestApprovalThreshold) return;
+
+	Entry.bLoyaltyUnlocked = true;
+
+	USFNarrativeComponent* Narrative = GetPlayerNarrative();
+	if (!Narrative) return;
+
+	// Set the loyalty-unlocked fact (ContextId = CompanionId).
+	static const FGameplayTag LoyaltyTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("Fact.Companion.LoyaltyUnlocked")), /*ErrorIfNotFound*/ false);
+	if (LoyaltyTag.IsValid())
+	{
+		FSFWorldFactKey Key;
+		Key.FactTag = LoyaltyTag;
+		Key.ContextId = Entry.CompanionId;
+		Narrative->SetWorldFact(Key, FSFWorldFactValue::MakeBool(true));
+	}
+
+	// Optional auto-start of the personal quest.
+	if (Entry.bAutoStartPersonalQuest && Entry.PersonalQuestAssetId.IsValid())
+	{
+		Narrative->StartQuestByAssetId(Entry.PersonalQuestAssetId);
+	}
+}
+
+void USFCompanionComponent::WriteEntryFacts(const FSFCompanionRosterEntry& Entry)
+{
+	USFNarrativeComponent* Narrative = GetPlayerNarrative();
+	if (!Narrative) return;
+
+	static const FGameplayTag RecruitedTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("Fact.Companion.Recruited")), /*ErrorIfNotFound*/ false);
+	static const FGameplayTag ApprovalTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("Fact.Companion.Approval")), /*ErrorIfNotFound*/ false);
+	static const FGameplayTag LoyaltyTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("Fact.Companion.LoyaltyUnlocked")), /*ErrorIfNotFound*/ false);
+
+	if (RecruitedTag.IsValid())
+	{
+		FSFWorldFactKey Key; Key.FactTag = RecruitedTag; Key.ContextId = Entry.CompanionId;
+		Narrative->SetWorldFact(Key, FSFWorldFactValue::MakeBool(Entry.bRecruited));
+	}
+	if (ApprovalTag.IsValid())
+	{
+		FSFWorldFactKey Key; Key.FactTag = ApprovalTag; Key.ContextId = Entry.CompanionId;
+		Narrative->SetWorldFact(Key, FSFWorldFactValue::MakeInt(Entry.Approval));
+	}
+	if (LoyaltyTag.IsValid())
+	{
+		FSFWorldFactKey Key; Key.FactTag = LoyaltyTag; Key.ContextId = Entry.CompanionId;
+		Narrative->SetWorldFact(Key, FSFWorldFactValue::MakeBool(Entry.bLoyaltyUnlocked));
+	}
+}
+
+void USFCompanionComponent::PersistRosterToNarrative()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	for (const FSFCompanionRosterEntry& Entry : Roster)
+	{
+		WriteEntryFacts(Entry);
+	}
+}
+
+void USFCompanionComponent::RestoreRosterFromNarrative()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	USFNarrativeComponent* Narrative = GetPlayerNarrative();
+	if (!Narrative) return;
+
+	// We don't enumerate facts from outside the subsystem here; instead we
+	// walk the roster we already have (recruits create entries up-front via
+	// RecruitCompanion at narrative trigger time) and pull each entry's
+	// values back out of the fact store. If the save loaded BEFORE any
+	// roster was constructed in memory, designers should drive recruitment
+	// from the same narrative deltas the save replays.
+	static const FGameplayTag RecruitedTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("Fact.Companion.Recruited")), /*ErrorIfNotFound*/ false);
+	static const FGameplayTag ApprovalTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("Fact.Companion.Approval")), /*ErrorIfNotFound*/ false);
+	static const FGameplayTag LoyaltyTag = FGameplayTag::RequestGameplayTag(
+		FName(TEXT("Fact.Companion.LoyaltyUnlocked")), /*ErrorIfNotFound*/ false);
+
+	for (FSFCompanionRosterEntry& Entry : Roster)
+	{
+		FSFWorldFactValue OutValue;
+
+		if (RecruitedTag.IsValid())
+		{
+			FSFWorldFactKey Key; Key.FactTag = RecruitedTag; Key.ContextId = Entry.CompanionId;
+			if (Narrative->GetWorldFactValue(Key, OutValue))
+			{
+				Entry.bRecruited = OutValue.BoolValue;
+			}
+		}
+		if (ApprovalTag.IsValid())
+		{
+			FSFWorldFactKey Key; Key.FactTag = ApprovalTag; Key.ContextId = Entry.CompanionId;
+			if (Narrative->GetWorldFactValue(Key, OutValue))
+			{
+				Entry.Approval = OutValue.IntValue;
+			}
+		}
+		if (LoyaltyTag.IsValid())
+		{
+			FSFWorldFactKey Key; Key.FactTag = LoyaltyTag; Key.ContextId = Entry.CompanionId;
+			if (Narrative->GetWorldFactValue(Key, OutValue))
+			{
+				Entry.bLoyaltyUnlocked = OutValue.BoolValue;
+			}
+		}
+	}
+
+	OnRosterChanged.Broadcast();
+}
+
+void USFCompanionComponent::HandleNarrativeLoadComplete(const FString& /*SlotName*/)
+{
+	RestoreRosterFromNarrative();
 }
 
 // -------------------------------------------------------------------------

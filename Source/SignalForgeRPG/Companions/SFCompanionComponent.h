@@ -29,6 +29,22 @@ struct SIGNALFORGERPG_API FSFCompanionRosterEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Companion")
 	bool bAvailable = true; // false when wounded/locked out
 
+	/** Personal-quest asset to unlock at threshold. Mirrored from the pawn at recruit time. */
+	UPROPERTY(BlueprintReadOnly, Category = "Companion")
+	FPrimaryAssetId PersonalQuestAssetId;
+
+	/** Approval threshold for the loyalty unlock. Mirrored from the pawn at recruit time. */
+	UPROPERTY(BlueprintReadOnly, Category = "Companion")
+	int32 PersonalQuestApprovalThreshold = 50;
+
+	/** Whether to auto-start the personal quest on threshold cross. Mirrored from the pawn at recruit time. */
+	UPROPERTY(BlueprintReadOnly, Category = "Companion")
+	bool bAutoStartPersonalQuest = false;
+
+	/** True once the loyalty fact has been latched so we don't re-fire on minor approval wobble. */
+	UPROPERTY(BlueprintReadOnly, Category = "Companion")
+	bool bLoyaltyUnlocked = false;
+
 	bool operator==(const FSFCompanionRosterEntry& Other) const
 	{
 		return CompanionId == Other.CompanionId;
@@ -74,6 +90,8 @@ public:
 	USFCompanionComponent();
 
 	//~ Begin UActorComponent
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	//~ End
 
@@ -83,6 +101,15 @@ public:
 
 	UFUNCTION(BlueprintAuthorityOnly, BlueprintCallable, Category = "Companion|Roster")
 	void RecruitCompanion(FName CompanionId);
+
+	/**
+	 * Authority-only. Recruits and mirrors narrative metadata
+	 * (PersonalQuestAssetId, threshold, auto-start) from the pawn so the
+	 * roster entry can drive loyalty unlocks even when the pawn is not
+	 * spawned later.
+	 */
+	UFUNCTION(BlueprintAuthorityOnly, BlueprintCallable, Category = "Companion|Roster")
+	void RecruitCompanionFromPawn(ASFCompanionCharacter* CompanionPawn);
 
 	UFUNCTION(BlueprintAuthorityOnly, BlueprintCallable, Category = "Companion|Roster")
 	void DismissCompanion(FName CompanionId);
@@ -160,6 +187,28 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Companion|Approval")
 	int32 GetApproval(FName CompanionId) const;
 
+	UFUNCTION(BlueprintPure, Category = "Companion|Approval")
+	bool IsLoyaltyUnlocked(FName CompanionId) const;
+
+	// -------------------------------------------------------------------------
+	// Save / load via narrative facts
+	//
+	// Roster + approval state piggybacks on the narrative system's existing
+	// fact pipeline so save/load works without adding a new SaveGame type.
+	// Facts written per companion (ContextId = CompanionId):
+	//   Fact.Companion.Recruited        (Bool)
+	//   Fact.Companion.Approval         (Int)
+	//   Fact.Companion.LoyaltyUnlocked  (Bool)
+	// -------------------------------------------------------------------------
+
+	/** Authority-only. Writes every roster entry to the player's narrative facts. */
+	UFUNCTION(BlueprintAuthorityOnly, BlueprintCallable, Category = "Companion|Save")
+	void PersistRosterToNarrative();
+
+	/** Authority-only. Restores roster entries from the player's narrative facts. Called from OnLoadComplete. */
+	UFUNCTION(BlueprintAuthorityOnly, BlueprintCallable, Category = "Companion|Save")
+	void RestoreRosterFromNarrative();
+
 	// -------------------------------------------------------------------------
 	// Delegates
 	// -------------------------------------------------------------------------
@@ -198,4 +247,16 @@ protected:
 
 	int32 FindRosterIndex(FName CompanionId) const;
 	FSFCompanionRosterEntry* FindRosterEntry(FName CompanionId);
+
+	/** Resolves the player's narrative component (owner = PlayerState). */
+	class USFNarrativeComponent* GetPlayerNarrative() const;
+
+	/** Checks the entry's approval against its threshold and unlocks the loyalty fact / starts the quest if crossed. */
+	void CheckLoyaltyUnlock(FSFCompanionRosterEntry& Entry);
+
+	/** Writes Fact.Companion.{Recruited,Approval,LoyaltyUnlocked} for one entry. */
+	void WriteEntryFacts(const FSFCompanionRosterEntry& Entry);
+
+	UFUNCTION()
+	void HandleNarrativeLoadComplete(const FString& SlotName);
 };

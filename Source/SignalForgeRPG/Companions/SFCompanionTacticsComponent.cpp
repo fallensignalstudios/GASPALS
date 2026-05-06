@@ -2,6 +2,7 @@
 
 #include "AbilitySystem/SFAbilitySystemComponent.h"
 #include "AbilitySystemInterface.h"
+#include "Engine/World.h"
 #include "Net/UnrealNetwork.h"
 
 USFCompanionTacticsComponent::USFCompanionTacticsComponent()
@@ -86,6 +87,66 @@ void USFCompanionTacticsComponent::ClearOrder()
 	FSFCompanionOrder Cleared;
 	Cleared.Type = ESFCompanionOrderType::None;
 	IssueOrder(Cleared);
+}
+
+// -----------------------------------------------------------------------------
+// Threshold gating
+// -----------------------------------------------------------------------------
+
+bool USFCompanionTacticsComponent::CanCommandAbility() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return true;
+	}
+	const double Now = World->GetTimeSeconds();
+	return (Now - LastCommandedAbilityTime) >= Thresholds.AbilityCommandCooldown;
+}
+
+void USFCompanionTacticsComponent::NotifyAbilityCommanded()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		LastCommandedAbilityTime = World->GetTimeSeconds();
+	}
+}
+
+void USFCompanionTacticsComponent::EvaluateHealthThresholds(float SelfPct, float PlayerPct)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	const bool bNewSelfLow = SelfPct >= 0.f && SelfPct <= Thresholds.SelfLowHealthPct;
+	const bool bNewPlayerLow = PlayerPct >= 0.f && PlayerPct <= Thresholds.PlayerLowHealthPct;
+
+	if (bNewSelfLow != bSelfLowHealth)
+	{
+		bSelfLowHealth = bNewSelfLow;
+		static const FGameplayTag SelfTag = FGameplayTag::RequestGameplayTag(
+			FName(TEXT("Companion.Threat.SelfLowHealth")), /*ErrorIfNotFound*/ false);
+		if (SelfTag.IsValid())
+		{
+			OnThresholdCrossed.Broadcast(SelfTag, bSelfLowHealth);
+		}
+	}
+
+	if (bNewPlayerLow != bPlayerLowHealth)
+	{
+		bPlayerLowHealth = bNewPlayerLow;
+		static const FGameplayTag PlayerTag = FGameplayTag::RequestGameplayTag(
+			FName(TEXT("Companion.Threat.PlayerLowHealth")), /*ErrorIfNotFound*/ false);
+		if (PlayerTag.IsValid())
+		{
+			OnThresholdCrossed.Broadcast(PlayerTag, bPlayerLowHealth);
+		}
+	}
 }
 
 // -----------------------------------------------------------------------------
