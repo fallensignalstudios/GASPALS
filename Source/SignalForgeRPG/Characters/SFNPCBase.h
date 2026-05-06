@@ -1,44 +1,40 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Character.h"
-#include "GameplayTagContainer.h"
+#include "Characters/SFCharacterBase.h"
 #include "Components/SFInteractableInterface.h"
 #include "Dialogue/Data/SFConversationSourceInterface.h"
+#include "GameplayTagContainer.h"
 #include "SFNPCBase.generated.h"
 
 class USFConversationDataAsset;
-class USFNPCStateComponent;
-class USFNPCGoalComponent;
-class USFNPCNarrativeComponent;
+class USFNPCNarrativeIdentityComponent;
+class USFNarrativeComponent;
 
-USTRUCT(BlueprintType)
-struct FSFNarrativeEventPayload
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative")
-	FGameplayTag EventTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative")
-	FGameplayTagContainer EventContextTags;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative")
-	TObjectPtr<AActor> Instigator = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative")
-	TObjectPtr<AActor> Subject = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative")
-	FVector WorldLocation = FVector::ZeroVector;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative")
-	float Intensity = 1.0f;
-};
-
+/**
+ * ASFNPCBase
+ *
+ * Canonical non-combat / dialogue-capable character. Inherits the full
+ * SFCharacterBase stack (GAS, attributes, equipment, inventory, hit
+ * resolution) so any NPC can be wounded, healed, killed, or scripted
+ * exactly the same way the player and enemies are.
+ *
+ * Layered on top:
+ *   - USFNPCNarrativeIdentityComponent: faction, narrative tags,
+ *     disposition, essential flag, stable per-NPC ContextId.
+ *   - Quest/fact-aware interaction gating: optional RequiredFactTags /
+ *     BlockedFactTags container that is checked against the asking
+ *     player's narrative component before the "Talk" prompt appears.
+ *   - Auto-fires `Fact.NPC.<ContextId>.Met` on the first conversation,
+ *     so dialogue authors can branch on it without scripting.
+ *   - Death broadcasts an FSFNarrativeDelta (ApplyOutcome) so kills
+ *     can drive faction shifts and quest progress automatically.
+ *
+ * Default AI controller is ASFNPCAIController.
+ */
 UCLASS()
 class SIGNALFORGERPG_API ASFNPCBase
-	: public ACharacter
+	: public ASFCharacterBase
 	, public ISFInteractableInterface
 	, public ISFConversationSourceInterface
 {
@@ -47,107 +43,104 @@ class SIGNALFORGERPG_API ASFNPCBase
 public:
 	ASFNPCBase();
 
+	//~ Begin AActor / ACharacter
+	virtual void BeginPlay() override;
+	//~ End AActor / ACharacter
+
+	//~ ASFCharacterBase
+	virtual void HandleDeath() override;
+	//~ End ASFCharacterBase
+
+	UFUNCTION(BlueprintPure, Category = "NPC")
+	USFNPCNarrativeIdentityComponent* GetNarrativeIdentity() const { return NarrativeIdentity; }
+
+	UFUNCTION(BlueprintPure, Category = "NPC")
+	FText GetNPCName() const { return NPCName; }
+
 protected:
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Identity")
+	// -------------------------------------------------------------------------
+	// Identity / display
+	// -------------------------------------------------------------------------
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC")
 	FText NPCName;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Identity")
-	FGameplayTagContainer IdentityTags;
+	/** Narrative identity (faction, context id, disposition, narrative tags). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "NPC")
+	TObjectPtr<USFNPCNarrativeIdentityComponent> NarrativeIdentity;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
+	// -------------------------------------------------------------------------
+	// Interaction config
+	// -------------------------------------------------------------------------
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	FText InteractionPromptText = FText::FromString(TEXT("Talk"));
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	FText InteractionSubPromptText;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
-	float BaseInteractionRange = 200.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	bool bCanInteract = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	float InteractionRange = 200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	bool bShowPromptWhenUnavailable = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	ESFInteractionTriggerType InteractionTriggerType = ESFInteractionTriggerType::Press;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction", meta = (ClampMin = "0.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction", meta = (ClampMin = "0.0"))
 	float InteractionHoldDuration = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	FName PrimaryInteractionOptionId = TEXT("Talk");
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
-	FGameplayTagContainer RequiredInteractionTags;
+	// -------------------------------------------------------------------------
+	// Narrative gating
+	// -------------------------------------------------------------------------
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
-	FGameplayTagContainer BlockedInteractionTags;
+	/** All of these tags must be present in the asking player's faction/world tag context for the interaction to be available. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Gating", meta = (Categories = "Fact"))
+	FGameplayTagContainer RequiredFactTags;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Interaction")
-	FGameplayTagContainer AutoDisableInteractionTags;
+	/** Any of these tags being present in the asking player's faction/world tag context blocks the interaction. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Gating", meta = (Categories = "Fact"))
+	FGameplayTagContainer BlockedFactTags;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Dialogue")
+	/** If set, NPC refuses to talk while disposition matches one of these. Hostile NPCs default to refusing. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Gating")
+	bool bRefuseDialogueWhenHostile = true;
+
+	// -------------------------------------------------------------------------
+	// Dialogue
+	// -------------------------------------------------------------------------
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dialogue")
 	FName DialogueSpeakerId = NAME_None;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC|Dialogue")
-	TObjectPtr<USFConversationDataAsset> DefaultConversationAsset = nullptr;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dialogue")
+	TObjectPtr<USFConversationDataAsset> ConversationAsset = nullptr;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "NPC|Components")
-	TObjectPtr<USFNPCStateComponent> StateComponent;
+	/**
+	 * When the player triggers their first conversation with this NPC,
+	 * a bool world fact `Fact.NPC.<ContextId>.Met = true` is set on the
+	 * player's narrative component. Designers can then branch on it.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dialogue")
+	bool bAutoSetMetFactOnFirstConversation = true;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "NPC|Components")
-	TObjectPtr<USFNPCGoalComponent> GoalComponent;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "NPC|Components")
-	TObjectPtr<USFNPCNarrativeComponent> NarrativeComponent;
-
-protected:
-	virtual void BeginPlay() override;
-
-	UFUNCTION(BlueprintNativeEvent, Category = "NPC|Dialogue")
-	USFConversationDataAsset* ResolveConversationAsset(
-		const FSFInteractionContext& InteractionContext) const;
-	virtual USFConversationDataAsset* ResolveConversationAsset_Implementation(
-		const FSFInteractionContext& InteractionContext) const;
-
-	UFUNCTION(BlueprintNativeEvent, Category = "NPC|Interaction")
-	bool CanInteractByState(const FSFInteractionContext& InteractionContext) const;
-	virtual bool CanInteractByState_Implementation(
-		const FSFInteractionContext& InteractionContext) const;
-
-	UFUNCTION(BlueprintNativeEvent, Category = "NPC|Interaction")
-	TArray<FSFInteractionOption> BuildInteractionOptions(
-		const FSFInteractionContext& InteractionContext) const;
-	virtual TArray<FSFInteractionOption> BuildInteractionOptions_Implementation(
-		const FSFInteractionContext& InteractionContext) const;
-
-	UFUNCTION(BlueprintImplementableEvent, Category = "NPC|Interaction")
-	void OnInteractionSucceeded(
-		const FSFInteractionContext& InteractionContext,
-		FName OptionId);
-
-	UFUNCTION(BlueprintImplementableEvent, Category = "NPC|Narrative")
-	void OnNarrativeEventApplied(const FSFNarrativeEventPayload& Payload);
+	// Death automatically writes `Fact.NPC.Killed` (bool) keyed by this NPC's
+	// ContextId on every connected player's narrative component, so quests
+	// and faction reactions can branch on it. For richer reactions
+	// (asset-based outcomes, faction deltas, etc.) override HandleDeath in
+	// a subclass or react to OnDispositionChanged via the identity component.
 
 public:
-	UFUNCTION(BlueprintCallable, Category = "NPC")
-	const USFNPCStateComponent* GetStateComponent() const { return StateComponent; }
-
-	UFUNCTION(BlueprintCallable, Category = "NPC")
-	const USFNPCGoalComponent* GetGoalComponent() const { return GoalComponent; }
-
-	UFUNCTION(BlueprintCallable, Category = "NPC")
-	const USFNPCNarrativeComponent* GetNarrativeComponent() const { return NarrativeComponent; }
-
-	UFUNCTION(BlueprintCallable, Category = "NPC")
-	bool HasStateTag(FGameplayTag Tag) const;
-
-	UFUNCTION(BlueprintCallable, Category = "NPC")
-	bool HasAnyStateTags(const FGameplayTagContainer& Tags) const;
-
-	UFUNCTION(BlueprintCallable, Category = "NPC")
-	bool HasAllStateTags(const FGameplayTagContainer& Tags) const;
-
-	UFUNCTION(BlueprintCallable, Category = "NPC")
-	void ApplyNarrativeEvent(const FSFNarrativeEventPayload& Payload);
+	// -------------------------------------------------------------------------
+	// ISFInteractableInterface
+	// -------------------------------------------------------------------------
 
 	virtual ESFInteractionAvailability GetInteractionAvailability_Implementation(
 		const FSFInteractionContext& InteractionContext) const override;
@@ -183,6 +176,17 @@ public:
 	virtual FText GetInteractionPromptText_Implementation(
 		const FSFInteractionContext& InteractionContext) const override;
 
+	// -------------------------------------------------------------------------
+	// ISFConversationSourceInterface
+	// -------------------------------------------------------------------------
+
 	virtual USFConversationDataAsset* GetConversationAsset_Implementation() const override;
 	virtual FName GetDialogueSpeakerId_Implementation() const override;
+
+protected:
+	/** Locates the asking player's narrative component. May return nullptr (interactor isn't a player). */
+	USFNarrativeComponent* ResolveInstigatorNarrative(const FSFInteractionContext& InteractionContext) const;
+
+	/** Returns true if the player's narrative tag context satisfies RequiredFactTags / BlockedFactTags. */
+	bool PassesFactGate(USFNarrativeComponent* InstigatorNarrative) const;
 };
