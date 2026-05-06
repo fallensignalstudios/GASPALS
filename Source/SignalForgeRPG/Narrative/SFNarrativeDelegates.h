@@ -17,6 +17,26 @@
  *   FSFOnQuestSnapshotChanged OnQuestSnapshotChanged;
  */
 
+/**
+ * UHT manifest anchor.
+ *
+ * Unreal Header Tool only adds a header to its parse manifest (and only emits a
+ * companion .generated.h) if the header contains at least one reflected type
+ * marker (UCLASS / USTRUCT / UENUM / UINTERFACE). A header that declares only
+ * DECLARE_DYNAMIC_*_DELEGATE_* macros is otherwise skipped, which causes
+ * downstream reflected files (UCLASS components that bind these delegates as
+ * UPROPERTYs) to fail with "Unable to find class, delegate, enum, or struct".
+ *
+ * This empty USTRUCT exists solely to anchor the file on UHT's manifest so the
+ * delegates below are visible to other reflected translation units. It carries
+ * no runtime data and should not be used by gameplay code.
+ */
+USTRUCT()
+struct FSFNarrativeDelegatesModuleAnchor
+{
+    GENERATED_BODY()
+};
+
  //
  // Quest delegates
  //
