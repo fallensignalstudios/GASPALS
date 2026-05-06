@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "SFNarrativeTypes.h"
 #include "SFNarrativeStructs.h"
+#include "SFNarrativeDelegates.generated.h"
 
 /**
  * Delegate signatures for the narrative system, grouped by domain.
