@@ -298,15 +298,30 @@ public:
     }
 
     //
-    // Serialization helpers: mirror to/from world?fact style snapshots
+    // Serialization helpers: mirror to/from world-fact style snapshots
     //
 
-    /** Export all variables into world?fact snapshots using a shared base tag/context. */
+    /** Export all variables into world-fact snapshots using a shared base tag/context. */
     void BuildSnapshots(
         TArray<FSFWorldFactSnapshot>& OutSnapshots,
         const FGameplayTag& FactTagBase,
         FName ContextIdBase = NAME_None) const
     {
+        auto MakeVariableContext = [ContextIdBase](FName VarName)
+        {
+            if (VarName.IsNone())
+            {
+                return ContextIdBase;
+            }
+
+            if (ContextIdBase.IsNone())
+            {
+                return VarName;
+            }
+
+            return FName(*FString::Printf(TEXT("%s|%s"), *ContextIdBase.ToString(), *VarName.ToString()));
+        };
+
         OutSnapshots.Reset();
         OutSnapshots.Reserve(Variables.Num());
 
@@ -314,59 +329,97 @@ public:
         {
             const FName VarName = Pair.Key;
             const FSFNarrativeVariableValue& Var = Pair.Value;
+            const FName EncodedContextId = MakeVariableContext(VarName);
 
-            FSFWorldFactSnapshot Snapshot;
-            Snapshot.Key.FactTag = FactTagBase;
-            Snapshot.Key.ContextId = ContextIdBase;
-            Snapshot.Key.KeyOverride = VarName;
+            auto AddSnapshot = [&](const FSFWorldFactValue& Value)
+            {
+                FSFWorldFactSnapshot Snapshot;
+                Snapshot.Key.FactTag = FactTagBase;
+                Snapshot.Key.ContextId = EncodedContextId;
+                Snapshot.Value = Value;
+                OutSnapshots.Add(MoveTemp(Snapshot));
+            };
 
             switch (Var.Type)
             {
             case ESFNarrativeVariableType::Int:
-                Snapshot.Value.Type = ESFNarrativeFactValueType::Int;
-                Snapshot.Value.IntValue = Var.IntValue;
+                AddSnapshot(FSFWorldFactValue::MakeInt(Var.IntValue));
                 break;
 
             case ESFNarrativeVariableType::Float:
-                Snapshot.Value.Type = ESFNarrativeFactValueType::Float;
-                Snapshot.Value.FloatValue = Var.FloatValue;
+                AddSnapshot(FSFWorldFactValue::MakeFloat(Var.FloatValue));
                 break;
 
             case ESFNarrativeVariableType::Bool:
-                Snapshot.Value.Type = ESFNarrativeFactValueType::Bool;
-                Snapshot.Value.BoolValue = Var.BoolValue;
+                AddSnapshot(FSFWorldFactValue::MakeBool(Var.BoolValue));
                 break;
 
             case ESFNarrativeVariableType::Name:
-                Snapshot.Value.Type = ESFNarrativeFactValueType::Name;
-                Snapshot.Value.NameValue = Var.NameValue;
+                AddSnapshot(FSFWorldFactValue::MakeName(Var.NameValue));
                 break;
 
             case ESFNarrativeVariableType::Tag:
-                Snapshot.Value.Type = ESFNarrativeFactValueType::Tag;
-                Snapshot.Value.TagContainer.Reset();
-                Snapshot.Value.TagContainer.AddTag(Var.TagValue);
+                if (Var.TagValue.IsValid())
+                {
+                    AddSnapshot(FSFWorldFactValue::MakeTag(Var.TagValue));
+                }
                 break;
 
             case ESFNarrativeVariableType::TagContainer:
-                Snapshot.Value.Type = ESFNarrativeFactValueType::Tag;
-                Snapshot.Value.TagContainer = Var.TagContainerValue;
+                // TODO(narrative): tag containers flatten to one snapshot per tag; revisit if true multi-tag values are needed.
+                for (const FGameplayTag Tag : Var.TagContainerValue)
+                {
+                    if (Tag.IsValid())
+                    {
+                        AddSnapshot(FSFWorldFactValue::MakeTag(Tag));
+                    }
+                }
                 break;
 
             default:
-                continue; // Skip None.
+                break;
             }
-
-            OutSnapshots.Add(MoveTemp(Snapshot));
         }
     }
 
-    /** Import variables from world?fact snapshots with a shared base tag/context. */
+    /** Import variables from world-fact snapshots with a shared base tag/context. */
     void RestoreFromSnapshots(
         const TArray<FSFWorldFactSnapshot>& Snapshots,
         const FGameplayTag& FactTagBase,
         FName ContextIdBase = NAME_None)
     {
+        auto ExtractVariableName = [ContextIdBase](FName EncodedContextId, FName& OutVarName)
+        {
+            OutVarName = NAME_None;
+
+            if (EncodedContextId.IsNone())
+            {
+                return false;
+            }
+
+            const FString Encoded = EncodedContextId.ToString();
+            if (ContextIdBase.IsNone())
+            {
+                OutVarName = FName(*Encoded);
+                return !OutVarName.IsNone();
+            }
+
+            const FString Prefix = ContextIdBase.ToString() + TEXT("|");
+            if (!Encoded.StartsWith(Prefix))
+            {
+                return false;
+            }
+
+            const FString Suffix = Encoded.RightChop(Prefix.Len());
+            if (Suffix.IsEmpty())
+            {
+                return false;
+            }
+
+            OutVarName = FName(*Suffix);
+            return !OutVarName.IsNone();
+        };
+
         Reset();
 
         for (const FSFWorldFactSnapshot& Snapshot : Snapshots)
@@ -376,54 +429,64 @@ public:
                 continue;
             }
 
-            if (!ContextIdBase.IsNone() && Snapshot.Key.ContextId != ContextIdBase)
+            FName VarName = NAME_None;
+            if (!ExtractVariableName(Snapshot.Key.ContextId, VarName))
             {
                 continue;
             }
 
-            const FName VarName = Snapshot.Key.KeyOverride.IsNone()
-                ? Snapshot.Key.ContextId
-                : Snapshot.Key.KeyOverride;
+            FSFNarrativeVariableValue* ExistingVar = Variables.Find(VarName);
+            FSFNarrativeVariableValue Var = ExistingVar ? *ExistingVar : FSFNarrativeVariableValue{};
 
-            if (VarName.IsNone())
-            {
-                continue;
-            }
-
-            FSFNarrativeVariableValue Var;
-
-            switch (Snapshot.Value.Type)
+            switch (Snapshot.Value.ValueType)
             {
             case ESFNarrativeFactValueType::Int:
+                Var.Reset();
                 Var.Type = ESFNarrativeVariableType::Int;
                 Var.IntValue = Snapshot.Value.IntValue;
                 break;
 
             case ESFNarrativeFactValueType::Float:
+                Var.Reset();
                 Var.Type = ESFNarrativeVariableType::Float;
                 Var.FloatValue = Snapshot.Value.FloatValue;
                 break;
 
             case ESFNarrativeFactValueType::Bool:
+                Var.Reset();
                 Var.Type = ESFNarrativeVariableType::Bool;
                 Var.BoolValue = Snapshot.Value.BoolValue;
                 break;
 
             case ESFNarrativeFactValueType::Name:
+                Var.Reset();
                 Var.Type = ESFNarrativeVariableType::Name;
                 Var.NameValue = Snapshot.Value.NameValue;
                 break;
 
             case ESFNarrativeFactValueType::Tag:
-                if (Snapshot.Value.TagContainer.Num() == 1)
+                if (!Snapshot.Value.TagValue.IsValid())
                 {
-                    Var.Type = ESFNarrativeVariableType::Tag;
-                    Var.TagValue = *Snapshot.Value.TagContainer.CreateConstIterator();
+                    continue;
+                }
+
+                if (Var.Type == ESFNarrativeVariableType::TagContainer)
+                {
+                    Var.TagContainerValue.AddTag(Snapshot.Value.TagValue);
+                }
+                else if (Var.Type == ESFNarrativeVariableType::Tag && Var.TagValue.IsValid() && Var.TagValue != Snapshot.Value.TagValue)
+                {
+                    const FGameplayTag ExistingTag = Var.TagValue;
+                    Var.Reset();
+                    Var.Type = ESFNarrativeVariableType::TagContainer;
+                    Var.TagContainerValue.AddTag(ExistingTag);
+                    Var.TagContainerValue.AddTag(Snapshot.Value.TagValue);
                 }
                 else
                 {
-                    Var.Type = ESFNarrativeVariableType::TagContainer;
-                    Var.TagContainerValue = Snapshot.Value.TagContainer;
+                    Var.Reset();
+                    Var.Type = ESFNarrativeVariableType::Tag;
+                    Var.TagValue = Snapshot.Value.TagValue;
                 }
                 break;
 

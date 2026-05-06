@@ -85,7 +85,7 @@ struct FSFDialogueStateSnapshot
 
     /** Exit reason if completed (mirrors ESFDialogueExitReason). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
-    ESFDialogueExitReason ExitReason = ESFDialogueExitReason::None;
+    ESFDialogueExitReason ExitReason = ESFDialogueExitReason::Cancelled;
 
     /** Utility: returns true if the snapshot has a valid conversation and node id. */
     bool IsValidActive() const

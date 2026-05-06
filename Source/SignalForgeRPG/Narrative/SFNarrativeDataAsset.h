@@ -6,6 +6,7 @@
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
 #include "SFNarrativeTypes.h"
+#include "SFQuestDefinition.h"
 #include "SFNarrativeDataAsset.generated.h"
 
 class UDataTable;
@@ -14,7 +15,6 @@ class UCurveFloat;
 class USoundBase;
 class UTexture2D;
 class UMaterialInterface;
-class USFQuestDefinition;
 
 /**
  * Global configuration and content references for the narrative system.
@@ -136,7 +136,7 @@ public:
                     return true;
                 }
             }
-            else if (QuestPtr.ToSoftObjectPath().GetAssetPathName() == QuestAssetId.PrimaryAssetName)
+            else if (FName(*QuestPtr.ToSoftObjectPath().GetAssetPath().ToString()) == QuestAssetId.PrimaryAssetName)
             {
                 // Fallback comparison if asset not loaded yet.
                 return true;
