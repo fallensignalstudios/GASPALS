@@ -15,8 +15,10 @@ USFQuestDefinition* USFQuestDatabase::GetQuestById(const FPrimaryAssetId& QuestI
         if (!SoftQuest.IsValid())
         {
             // Compare by asset id using the soft path if not loaded yet.
+            // FSoftObjectPath::GetAssetPathName() was removed in UE5.7; use
+            // GetAssetFName() (returns the FName component of the asset path).
             const FSoftObjectPath& Path = SoftQuest.ToSoftObjectPath();
-            if (Path.GetAssetPathName() == QuestId.PrimaryAssetName)
+            if (Path.GetAssetFName() == QuestId.PrimaryAssetName)
             {
                 return SoftQuest.LoadSynchronous();
             }
@@ -45,7 +47,7 @@ USFQuestDefinition* USFQuestDatabase::GetQuestByName(const FName QuestName) cons
         if (!SoftQuest.IsValid())
         {
             const FSoftObjectPath& Path = SoftQuest.ToSoftObjectPath();
-            if (Path.GetAssetPathName() == QuestName)
+            if (Path.GetAssetFName() == QuestName)
             {
                 return SoftQuest.LoadSynchronous();
             }

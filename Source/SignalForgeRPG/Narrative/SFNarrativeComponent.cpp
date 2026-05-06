@@ -32,6 +32,26 @@ USFNarrativeComponent::USFNarrativeComponent()
     SetIsReplicatedByDefault(true);
 }
 
+//
+// Soft-pointer accessors (defined out-of-line because TSoftObjectPtr<T>::LoadSynchronous
+// instantiates Cast<T> at the use site, which requires the full T definition).
+//
+
+USFNarrativeDataAsset* USFNarrativeComponent::GetNarrativeData() const
+{
+    return NarrativeData.LoadSynchronous();
+}
+
+USFQuestDatabase* USFNarrativeComponent::GetQuestDatabase() const
+{
+    return QuestDatabase.LoadSynchronous();
+}
+
+USFDialogueNarrativeMap* USFNarrativeComponent::GetDialogueNarrativeMap() const
+{
+    return DialogueNarrativeMap.LoadSynchronous();
+}
+
 void USFNarrativeComponent::BeginPlay()
 {
     Super::BeginPlay();

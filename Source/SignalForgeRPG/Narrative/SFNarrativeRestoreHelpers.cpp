@@ -2,6 +2,11 @@
 
 #include "SFNarrativeRestoreHelpers.h"
 
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
+#include "UObject/UnrealType.h" // UScriptStruct::SerializeItem
+
+#include "SFNarrativeComponent.h"
 #include "SFNarrativeStateSubsystem.h"
 #include "SFNarrativeWorldState.h"
 #include "SFQuestInstance.h"
@@ -50,9 +55,10 @@ bool USFNarrativeRestoreHelpers::RestoreQuestInstanceFromSnapshot(
         return false;
     }
 
-    // Assuming USFQuestInstance exposes RestoreFromSnapshot.
-    QuestInstance->RestoreFromSnapshot(Snapshot);
-    return true;
+    // USFQuestInstance::RestoreFromSnapshot expects (Owner, Definition, Snapshot).
+    // Pass the QuestInstance's outer NarrativeComponent if available.
+    USFNarrativeComponent* Owner = QuestInstance->GetTypedOuter<USFNarrativeComponent>();
+    return QuestInstance->RestoreFromSnapshot(Owner, QuestDef, Snapshot);
 }
 
 void USFNarrativeRestoreHelpers::RestoreQuestRuntimeFromSaveData(
@@ -64,30 +70,19 @@ void USFNarrativeRestoreHelpers::RestoreQuestRuntimeFromSaveData(
         return;
     }
 
-    // Clear any existing runtime state.
-    QuestRuntime->ResetRuntime();
-
-    // Let the runtime rehydrate its quest instances from snapshots.
-    for (const FSFQuestSnapshot& Snapshot : SaveData.QuestSnapshots)
-    {
-        QuestRuntime->RestoreQuestFromSnapshot(Snapshot);
-    }
-
-    // Lifetime task counters.
-    QuestRuntime->ClearLifetimeTaskCounters();
-    for (const FSFTaskCounterSnapshot& CounterSnapshot : SaveData.LifetimeTaskCounters)
-    {
-        QuestRuntime->AddLifetimeTaskCount(
-            CounterSnapshot.Key,
-            CounterSnapshot.Count);
-    }
+    // USFQuestRuntime exposes LoadFromSaveData as the single canonical entry
+    // point that handles quest snapshots, lifetime task counters, and any
+    // other save-time state in one transactional call.
+    QuestRuntime->LoadFromSaveData(SaveData);
 }
 
 bool USFNarrativeRestoreHelpers::DecodeNarrativeSnapshotFromOwnerPayload(
     const FSFNarrativeOwnerSnapshot& OwnerSnapshot,
     FSFNarrativeSnapshot& OutSnapshot)
 {
-    OutSnapshot.Reset();
+    // FSFNarrativeSnapshot has no Reset() method; assignment to a default
+    // instance is the canonical way to clear it.
+    OutSnapshot = FSFNarrativeSnapshot{};
     OutSnapshot.OwnerId = OwnerSnapshot.OwnerId;
     OutSnapshot.OwnerTags = OwnerSnapshot.PayloadTags;
 
@@ -110,10 +105,16 @@ bool USFNarrativeRestoreHelpers::DecodeNarrativeSnapshotFromOwnerPayload(
         return false;
     }
 
-    // Let Unreal handle struct serialization.
-    OutSnapshot.StructSerializeFromMismatchedTag(FStructuredArchiveFromArchive(Reader).GetSlot(), nullptr);
+    // Use UScriptStruct::SerializeItem to (de)serialize the FSFNarrativeSnapshot.
+    // FSFNarrativeSnapshot itself doesn't expose a struct serializer hook, so
+    // we drive it via its UScriptStruct.
+    if (UScriptStruct* SnapshotStruct = FSFNarrativeSnapshot::StaticStruct())
+    {
+        SnapshotStruct->SerializeItem(Reader, &OutSnapshot, /*Defaults=*/ nullptr);
+        return true;
+    }
 
-    return true;
+    return false;
 }
 
 void USFNarrativeRestoreHelpers::EncodeNarrativeSnapshotToOwnerPayload(
@@ -131,8 +132,15 @@ void USFNarrativeRestoreHelpers::EncodeNarrativeSnapshotToOwnerPayload(
     const uint32 Version = 1;
     Writer << const_cast<uint32&>(Version);
 
-    // Serialize the struct.
-    const_cast<FSFNarrativeSnapshot&>(Snapshot).StructSerialize(FStructuredArchiveFromArchive(Writer).GetSlot());
+    // Serialize the struct via its UScriptStruct so we don't depend on a
+    // member-level serializer hook on FSFNarrativeSnapshot.
+    if (UScriptStruct* SnapshotStruct = FSFNarrativeSnapshot::StaticStruct())
+    {
+        SnapshotStruct->SerializeItem(
+            Writer,
+            const_cast<FSFNarrativeSnapshot*>(&Snapshot),
+            /*Defaults=*/ nullptr);
+    }
 }
 
 void USFNarrativeRestoreHelpers::RestoreFlagsAndVariablesFromSnapshot(

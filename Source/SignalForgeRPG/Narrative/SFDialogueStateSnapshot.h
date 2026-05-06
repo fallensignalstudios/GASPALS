@@ -87,10 +87,18 @@ struct FSFDialogueStateSnapshot
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Dialogue|Snapshot")
     ESFDialogueExitReason ExitReason = ESFDialogueExitReason::Cancelled;
 
-    /** Utility: returns true if the snapshot has a valid conversation and node id. */
+    /**
+     * Utility: returns true if the snapshot has a valid conversation reference
+     * or a valid node id.
+     *
+     * Uses ToSoftObjectPath().IsValid() (path-only) instead of Conversation.IsValid()
+     * because the latter instantiates Cast<USFConversationDataAsset> inline,
+     * which would require the full USFConversationDataAsset definition in this
+     * header (we only forward-declare it).
+     */
     bool IsValidActive() const
     {
-        return Conversation.IsValid() || !DialogueId.IsNone();
+        return Conversation.ToSoftObjectPath().IsValid() || !DialogueId.IsNone();
     }
 
     /** Utility: get a variable by key; returns empty string if not found. */
