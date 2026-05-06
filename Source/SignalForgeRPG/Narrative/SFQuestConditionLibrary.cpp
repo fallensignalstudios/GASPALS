@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFQuestConditionLibrary.h"
 #include "SFQuestDefinition.h"
 
@@ -272,8 +274,8 @@ ESFQuestStateViewStatus USFQuestConditionLibrary::ComputeStateViewStatus(
         return ESFQuestStateViewStatus::Completed;
     }
 
-    // Simple heuristic: if the snapshot’s current state is earlier in the
-    // States array, the next few states are “Available”; farther ones are “Locked”.
+    // Simple heuristic: if the snapshotâ€™s current state is earlier in the
+    // States array, the next few states are â€œAvailableâ€; farther ones are â€œLockedâ€.
     // For now we default to Locked/Available based purely on whether the quest
     // has started and we have any current state.
     if (Snapshot.CurrentStateId != NAME_None)

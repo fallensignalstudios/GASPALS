@@ -605,6 +605,31 @@ struct SIGNALFORGERPG_API FSFNarrativeRedirectTable
 };
 
 /**
+ * Generic per-owner snapshot for narrative components or subsystems
+ * that want to store additional serialized data alongside the canonical
+ * narrative save payload. The concrete meaning of OwnerId / PayloadTags /
+ * PayloadData is up to your game; this struct just gives you a standard
+ * container.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFNarrativeOwnerSnapshot
+{
+    GENERATED_BODY()
+
+    /** Identifier for the owner (player, character, subsystem, etc.). */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Narrative|Save|Owner")
+    FName OwnerId = NAME_None;
+
+    /** Tags describing what this payload contains (for routing / migration). */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Narrative|Save|Owner")
+    FGameplayTagContainer PayloadTags;
+
+    /** Opaque, versioned binary blob. Use your own serialization into this array. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Narrative|Save|Owner")
+    TArray<uint8> PayloadData;
+};
+
+/**
  * Full serialized payload for the narrative subsystem. Bump SchemaVersion
  * (and update FSFNarrativeConstants) whenever you change the layout.
  */
@@ -636,6 +661,14 @@ struct SIGNALFORGERPG_API FSFNarrativeSaveData
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Narrative|Save")
     TArray<FSFEndingState> EndingStates;
+
+    /**
+     * Optional opaque per-owner payloads. Lets game-specific systems persist
+     * additional data alongside the canonical narrative payload without
+     * expanding this struct.
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Narrative|Save")
+    TArray<FSFNarrativeOwnerSnapshot> CustomOwnerSnapshots;
 };
 
 /**

@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFNarrativeStateSubsystem.h"
 #include "SFNarrativeLog.h"
 
@@ -363,7 +365,7 @@ bool USFNarrativeStateSubsystem::ApplyDelta(
     }
 
     default:
-        NARR_LOG_WARNING(TEXT("USFNarrativeStateSubsystem::ApplyDelta – unsupported delta type %d"), static_cast<int32>(Delta.Type));
+        NARR_LOG_WARNING(TEXT("USFNarrativeStateSubsystem::ApplyDelta â€“ unsupported delta type %d"), static_cast<int32>(Delta.Type));
         return false;
     }
 
@@ -390,7 +392,7 @@ FSFNarrativeSaveData USFNarrativeStateSubsystem::BuildSaveData() const
     // Factions.
     for (const TPair<FGameplayTag, FSFFactionStandingValue>& Pair : FactionStandingByTag)
     {
-        FSFFactionStandingSnapshot Snapshot;
+        FSFFactionSnapshot Snapshot;
         Snapshot.FactionTag = Pair.Key;
         Snapshot.Standing = Pair.Value;
         SaveData.FactionSnapshots.Add(MoveTemp(Snapshot));
@@ -399,19 +401,18 @@ FSFNarrativeSaveData USFNarrativeStateSubsystem::BuildSaveData() const
     // Identity.
     for (const TPair<FGameplayTag, float>& Pair : IdentityAxisValues)
     {
-        FSFIdentityAxisSnapshot Snapshot;
+        FSFIdentityAxisValue Snapshot;
         Snapshot.AxisTag = Pair.Key;
         Snapshot.Value = Pair.Value;
-        SaveData.IdentitySnapshots.Add(MoveTemp(Snapshot));
+        SaveData.IdentityAxes.Add(MoveTemp(Snapshot));
     }
 
     // Endings.
     for (const TPair<FGameplayTag, FSFEndingState>& Pair : EndingStateByTag)
     {
-        FSFEndingSnapshot Snapshot;
+        FSFEndingState Snapshot = Pair.Value;
         Snapshot.EndingTag = Pair.Key;
-        Snapshot.State = Pair.Value;
-        SaveData.EndingSnapshots.Add(MoveTemp(Snapshot));
+        SaveData.EndingStates.Add(MoveTemp(Snapshot));
     }
 
     return SaveData;
@@ -429,20 +430,22 @@ bool USFNarrativeStateSubsystem::LoadFromSaveData(const FSFNarrativeSaveData& Sa
         WorldFacts.Add(Snapshot.Key, Snapshot.Value);
     }
 
-    for (const FSFFactionStandingSnapshot& Snapshot : SaveData.FactionSnapshots)
+    for (const FSFFactionSnapshot& Snapshot : SaveData.FactionSnapshots)
     {
         FactionStandingByTag.Add(Snapshot.FactionTag, Snapshot.Standing);
     }
 
-    for (const FSFIdentityAxisSnapshot& Snapshot : SaveData.IdentitySnapshots)
+    for (const FSFIdentityAxisValue& Snapshot : SaveData.IdentityAxes)
     {
         IdentityAxisValues.Add(Snapshot.AxisTag, Snapshot.Value);
     }
 
-    for (const FSFEndingSnapshot& Snapshot : SaveData.EndingSnapshots)
+    for (const FSFEndingState& Snapshot : SaveData.EndingStates)
     {
-        EndingStateByTag.Add(Snapshot.EndingTag, Snapshot.State);
+        EndingStateByTag.Add(Snapshot.EndingTag, Snapshot);
     }
 
     return true;
 }
+
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.

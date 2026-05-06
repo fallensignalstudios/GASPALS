@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFNarrativeEventRouter.h"
 #include "SFNarrativeEventHub.h"
 #include "SFNarrativeLog.h"
@@ -157,9 +159,9 @@ void USFNarrativeEventRouter::RouteDialogueDelta(const FSFNarrativeDelta& Delta)
     }
 
     // In your current hub, dialogue events are driven by USFConversationDataAsset*.
-    // At the router level we only know FName IDs; typically you’ll keep the hub wiring
+    // At the router level we only know FName IDs; typically youâ€™ll keep the hub wiring
     // nearer to the dialogue component. Here we only reflect tag?style events that
-    // don’t require the data asset.
+    // donâ€™t require the data asset.
 
     switch (Delta.Type)
     {
@@ -371,7 +373,7 @@ void USFNarrativeEventRouter::RouteSystemDelta(const FSFNarrativeDelta& Delta)
 }
 
 //
-// ChangeSet routing – richer, stateful events
+// ChangeSet routing â€“ richer, stateful events
 //
 
 void USFNarrativeEventRouter::RouteTaskResults(const TArray<FSFTaskProgressResult>& TaskResults)
@@ -486,7 +488,7 @@ void USFNarrativeEventRouter::RouteEndingStates(const TArray<FSFEndingState>& En
 }
 
 //
-// Quest instance resolution – placeholder
+// Quest instance resolution â€“ placeholder
 //
 
 USFQuestInstance* USFNarrativeEventRouter::ResolveQuestInstance(FName QuestId) const

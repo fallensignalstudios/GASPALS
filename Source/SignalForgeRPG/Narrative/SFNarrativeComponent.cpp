@@ -1,4 +1,6 @@
-﻿#include "SFNarrativeComponent.h"
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
+#include "SFNarrativeComponent.h"
 
 #include "Dialogue/Data/SFConversationDataAsset.h"
 #include "Dialogue/Data/SFDialogueComponent.h"
@@ -184,7 +186,7 @@ void USFNarrativeComponent::ResolveRuntimeDependencies()
 
     if (SaveService)
     {
-        SaveService->Initialize(this, QuestRuntime, GetNarrativeStateSubsystem(), GetNarrativeFactSubsystem());
+        SaveService->Initialize(this, QuestRuntime);
     }
 
     if (AActor* OwnerActor = GetOwner())
@@ -816,3 +818,5 @@ void USFNarrativeComponent::HandleDialogueEventTriggered(FGameplayTag EventTag)
         CompleteNarrativeTask(EventTag, GetCurrentConversationNodeId(), 1);
     }
 }
+
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.

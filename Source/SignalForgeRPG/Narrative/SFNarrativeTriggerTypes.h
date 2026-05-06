@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -101,7 +103,7 @@ struct FSFNarrativeWorldFactCondition
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|World")
     FSFNarrativeNumericCondition NumericCondition;
 
-    /** Required name when ExpectedValueType == Name. None means ìany non?None nameî. */
+    /** Required name when ExpectedValueType == Name. None means ‚Äúany non?None name‚Äù. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|World")
     FName ExpectedName = NAME_None;
 
@@ -143,7 +145,7 @@ struct FSFNarrativeFactionCondition
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Factions")
     FGameplayTag FactionTag;
 
-    /** Optional band requirement; Unknown means ìdonít careî. */
+    /** Optional band requirement; Unknown means ‚Äúdon‚Äôt care‚Äù. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Factions")
     ESFFactionStandingBand RequiredBand = ESFFactionStandingBand::Unknown;
 
@@ -193,7 +195,7 @@ struct FSFNarrativeQuestStateCondition
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Quest")
     TArray<ESFQuestCompletionState> AllowedCompletionStates;
 
-    /** Optional requirement on being in a specific current state. None means ìanyî. */
+    /** Optional requirement on being in a specific current state. None means ‚Äúany‚Äù. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Quest")
     FName RequiredCurrentStateId = NAME_None;
 
@@ -215,7 +217,7 @@ struct FSFNarrativeTimeCondition
 {
     GENERATED_BODY()
 
-    /** Arbitrary ìphaseî tag (e.g. Narrative.Time.Day, Narrative.Time.Night, Chapter tags, etc.). */
+    /** Arbitrary ‚Äúphase‚Äù tag (e.g. Narrative.Time.Day, Narrative.Time.Night, Chapter tags, etc.). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Time")
     FGameplayTag RequiredPhaseTag;
 
@@ -271,7 +273,7 @@ struct FSFNarrativeCondition
 };
 
 /**
- * Logical grouping of conditions. This forms the basis of most ìrequirementsî
+ * Logical grouping of conditions. This forms the basis of most ‚Äúrequirements‚Äù
  * on quests, dialogue nodes, outcomes, etc.
  *
  * Evaluation semantics:
@@ -342,3 +344,5 @@ struct FSFNarrativeTriggerSpec
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Trigger", meta = (ClampMin = "0.0"))
     float CooldownSeconds = 0.0f;
 };
+
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.

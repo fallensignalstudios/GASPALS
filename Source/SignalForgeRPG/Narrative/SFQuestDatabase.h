@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -25,15 +27,15 @@ public:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Quests")
     TArray<TSoftObjectPtr<USFQuestDefinition>> AllQuests;
 
-    /** Optional tag that marks ìmain storylineî quests. */
+    /** Optional tag that marks ‚Äúmain storyline‚Äù quests. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Quests|Tags")
     FGameplayTag MainQuestTag;
 
-    /** Optional tag that marks ìside questsî. */
+    /** Optional tag that marks ‚Äúside quests‚Äù. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Quests|Tags")
     FGameplayTag SideQuestTag;
 
-    /** Optional tag that marks ìrepeatableî content. */
+    /** Optional tag that marks ‚Äúrepeatable‚Äù content. */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Quests|Tags")
     FGameplayTag RepeatableQuestTag;
 
@@ -61,11 +63,11 @@ public:
     UFUNCTION(BlueprintPure, Category = "Quests")
     void GetQuestsWithAllTags(const FGameplayTagContainer& Tags, TArray<USFQuestDefinition*>& OutQuests) const;
 
-    /** Convenience: return all quests classified as ìmainî. */
+    /** Convenience: return all quests classified as ‚Äúmain‚Äù. */
     UFUNCTION(BlueprintPure, Category = "Quests")
     void GetMainStoryQuests(TArray<USFQuestDefinition*>& OutQuests) const;
 
-    /** Convenience: return all quests classified as ìsideî. */
+    /** Convenience: return all quests classified as ‚Äúside‚Äù. */
     UFUNCTION(BlueprintPure, Category = "Quests")
     void GetSideQuests(TArray<USFQuestDefinition*>& OutQuests) const;
 

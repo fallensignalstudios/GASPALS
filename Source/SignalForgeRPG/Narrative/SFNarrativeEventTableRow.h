@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -79,7 +81,7 @@ struct FSFNarrativeEventTableRow : public FTableRowBase
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Event")
     TArray<FSFNarrativeDelta> OnFireDeltas;
 
-    /** Optional world fact set when the event first fires (e.g. ìEvent.X.Firedî). */
+    /** Optional world fact set when the event first fires (e.g. ‚ÄúEvent.X.Fired‚Äù). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Event")
     FSFWorldFactKey FiredFactKey;
 

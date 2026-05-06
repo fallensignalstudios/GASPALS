@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -42,7 +44,7 @@ struct FSFDialogueNarrativeEffect
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Dialogue")
     TMap<FGameplayTag, float> EndingScoreDeltas;
 
-    /** Arbitrary narrative tags to apply (e.g. ìPlayer.BrokePromiseî). */
+    /** Arbitrary narrative tags to apply (e.g. ‚ÄúPlayer.BrokePromise‚Äù). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|Dialogue")
     FGameplayTagContainer NarrativeTagsToApply;
 };

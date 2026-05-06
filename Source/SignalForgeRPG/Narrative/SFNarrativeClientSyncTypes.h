@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -162,11 +164,11 @@ struct FSFNarrativeClientHudState
 
     /** Factions that should show in the HUD / reputation screen. */
     UPROPERTY(BlueprintReadOnly, Category = "Narrative|Client|HUD")
-    TArray<FSFFactionStandingSnapshot> FactionSnapshots;
+    TArray<FSFFactionSnapshot> FactionSnapshots;
 
     /** Identity axes visible in the HUD (bars, graphs). */
     UPROPERTY(BlueprintReadOnly, Category = "Narrative|Client|HUD")
-    TArray<FSFIdentityAxisSnapshot> IdentitySnapshots;
+    TArray<FSFIdentityAxisValue> IdentityAxes;
 
     /** Optional currently active ending candidate, if any. */
     UPROPERTY(BlueprintReadOnly, Category = "Narrative|Client|HUD")

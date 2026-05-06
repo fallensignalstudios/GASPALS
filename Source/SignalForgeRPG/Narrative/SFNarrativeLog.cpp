@@ -1,5 +1,5 @@
 // Copyright Fallen Signal Studios LLC. All Rights Reserved.
 
-#include "SFNarrativeLogg.h"
+#include "SFNarrativeLog.h"
 
 DEFINE_LOG_CATEGORY(LogSFNarrative);

@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFNarrativeReplicatorComponent.h"
 
 #include "Net/UnrealNetwork.h"

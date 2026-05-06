@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "UObject/Interface.h"
@@ -19,7 +21,7 @@ class SIGNALFORGERPG_API USFDialogueParticipantInterface : public UInterface
  * Interface implemented by actors that can participate in dialogue.
  *
  * This keeps USFDialogueComponent and the narrative system decoupled from
- * specific character classes – any pawn/actor can become a participant by
+ * specific character classes â€“ any pawn/actor can become a participant by
  * implementing this interface.
  */
 class SIGNALFORGERPG_API ISFDialogueParticipantInterface

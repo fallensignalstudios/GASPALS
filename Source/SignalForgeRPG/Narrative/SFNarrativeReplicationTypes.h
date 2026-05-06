@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -177,28 +179,28 @@ struct FSFNarrativeReplicatedWorldSnapshot
     TArray<FSFWorldFactSnapshot> WorldFacts;
 
     UPROPERTY()
-    TArray<FSFFactionStandingSnapshot> FactionSnapshots;
+    TArray<FSFFactionSnapshot> FactionSnapshots;
 
     UPROPERTY()
-    TArray<FSFIdentityAxisSnapshot> IdentitySnapshots;
+    TArray<FSFIdentityAxisValue> IdentityAxes;
 
     UPROPERTY()
-    TArray<FSFEndingSnapshot> EndingSnapshots;
+    TArray<FSFEndingState> EndingStates;
 
     bool IsEmpty() const
     {
         return WorldFacts.Num() == 0
             && FactionSnapshots.Num() == 0
-            && IdentitySnapshots.Num() == 0
-            && EndingSnapshots.Num() == 0;
+            && IdentityAxes.Num() == 0
+            && EndingStates.Num() == 0;
     }
 
     void Reset()
     {
         WorldFacts.Reset();
         FactionSnapshots.Reset();
-        IdentitySnapshots.Reset();
-        EndingSnapshots.Reset();
+        IdentityAxes.Reset();
+        EndingStates.Reset();
     }
 };
 

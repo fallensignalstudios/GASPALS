@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -64,7 +66,7 @@ protected:
 
 protected:
     //
-    // Internal helpers – one per domain.
+    // Internal helpers â€“ one per domain.
     //
 
     void RouteQuestDelta(const FSFNarrativeDelta& Delta);

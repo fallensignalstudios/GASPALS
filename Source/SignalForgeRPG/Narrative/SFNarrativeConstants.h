@@ -136,3 +136,5 @@ public:
     /** Classify drift direction given a recent delta. */
     static ESFIdentityDriftDirection ClassifyIdentityDrift(float Delta);
 };
+
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.

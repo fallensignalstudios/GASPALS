@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -19,14 +21,14 @@ enum class ESFQuestRewardSelectionMode : uint8
 };
 
 /**
- * Non-item, non-asset ìsimpleî rewards that are very common.
+ * Non-item, non-asset ‚Äúsimple‚Äù rewards that are very common.
  */
 USTRUCT(BlueprintType)
 struct FSFSimpleReward
 {
     GENERATED_BODY()
 
-    /** Experience points to grant (player, class, weapon, etc. ñ up to your game to route). */
+    /** Experience points to grant (player, class, weapon, etc. ‚Äì up to your game to route). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Reward")
     int32 Experience = 0;
 
@@ -44,7 +46,7 @@ struct FSFSimpleReward
 };
 
 /**
- * A single ìitem-likeî reward entry ñ could be an inventory item, recipe, ability, etc.
+ * A single ‚Äúitem-like‚Äù reward entry ‚Äì could be an inventory item, recipe, ability, etc.
  * Actual handling is up to your inventory/ability systems; this just carries identifiers.
  */
 USTRUCT(BlueprintType)
@@ -56,7 +58,7 @@ struct FSFRewardItemDefinition
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Reward")
     TSoftObjectPtr<UObject> ItemAsset;
 
-    /** Fallback / alternate identifier if you donít want to use soft refs (e.g. row name). */
+    /** Fallback / alternate identifier if you don‚Äôt want to use soft refs (e.g. row name). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Reward")
     FName ItemId = NAME_None;
 
@@ -191,7 +193,7 @@ struct FSFQuestRewardSet
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Reward", meta = (ClampMin = "0"))
     int32 MaxRandomlySelectedEntries = 0;
 
-    /** Optional tags that categorize this reward set (e.g. ìSuccessî, ìFailureî, ìBonusî). */
+    /** Optional tags that categorize this reward set (e.g. ‚ÄúSuccess‚Äù, ‚ÄúFailure‚Äù, ‚ÄúBonus‚Äù). */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Reward")
     FGameplayTagContainer RewardTags;
 

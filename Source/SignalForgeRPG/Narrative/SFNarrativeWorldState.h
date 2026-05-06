@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #pragma once
 
 #include "CoreMinimal.h"
@@ -29,15 +31,15 @@ struct FSFNarrativeWorldState
 
     /** Global faction standings. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|WorldState")
-    TArray<FSFFactionStandingSnapshot> FactionSnapshots;
+    TArray<FSFFactionSnapshot> FactionSnapshots;
 
     /** Global identity axis values. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|WorldState")
-    TArray<FSFIdentityAxisSnapshot> IdentitySnapshots;
+    TArray<FSFIdentityAxisValue> IdentityAxes;
 
     /** Global ending scores + availability. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|WorldState")
-    TArray<FSFEndingSnapshot> EndingSnapshots;
+    TArray<FSFEndingState> EndingStates;
 
     /** Optional global boolean flags (lightweight structural state). */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Narrative|WorldState")
@@ -56,8 +58,8 @@ struct FSFNarrativeWorldState
     {
         return WorldFacts.Num() == 0
             && FactionSnapshots.Num() == 0
-            && IdentitySnapshots.Num() == 0
-            && EndingSnapshots.Num() == 0
+            && IdentityAxes.Num() == 0
+            && EndingStates.Num() == 0
             && GlobalFlags.Flags.Num() == 0
             && GlobalVariables.Variables.Num() == 0;
     }
@@ -67,8 +69,8 @@ struct FSFNarrativeWorldState
     {
         WorldFacts.Reset();
         FactionSnapshots.Reset();
-        IdentitySnapshots.Reset();
-        EndingSnapshots.Reset();
+        IdentityAxes.Reset();
+        EndingStates.Reset();
         GlobalFlags.Reset();
         GlobalVariables.Reset();
     }

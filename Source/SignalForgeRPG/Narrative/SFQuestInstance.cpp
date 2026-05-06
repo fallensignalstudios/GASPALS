@@ -1,3 +1,5 @@
+// Copyright Fallen Signal Studios LLC. All Rights Reserved.
+
 #include "SFQuestInstance.h"
 
 #include "SFNarrativeComponent.h"
