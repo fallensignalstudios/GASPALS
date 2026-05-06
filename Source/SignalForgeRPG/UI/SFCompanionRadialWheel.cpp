@@ -214,12 +214,15 @@ void USFCompanionRadialWheel::ConfirmIndex(int32 Index)
 	{
 		return;
 	}
-	const FSFRadialWheelSlot& Slot = Slots[Index];
-	if (!Slot.bEnabled)
+
+	const FSFRadialWheelSlot& RadialSlot = Slots[Index];
+
+	if (!RadialSlot.bEnabled)
 	{
 		return;
 	}
-	OnSlotConfirmed.Broadcast(Index, Slot);
+
+	OnSlotConfirmed.Broadcast(Index, RadialSlot);
 }
 
 void USFCompanionRadialWheel::CancelWheel()
