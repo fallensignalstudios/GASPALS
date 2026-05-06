@@ -49,31 +49,61 @@ FSFNarrativeValidationResult USFNarrativeValidationLibrary::ValidateQuestDefinit
             QuestDef);
     }
 
-    if (!QuestDef->HasAnyStates())
+    // USFQuestDefinition has no HasAnyStates/HasValidStartState/Validate*
+    // helpers; inline the equivalent checks against its States array and
+    // InitialStateId field.
+    if (QuestDef->States.Num() == 0)
     {
         Result.AddError(
             FText::FromString(FString::Printf(TEXT("Quest '%s' defines no states."), *QuestId.ToString())),
             QuestDef);
     }
-    else if (!QuestDef->HasValidStartState())
+    else
     {
-        Result.AddError(
-            FText::FromString(FString::Printf(TEXT("Quest '%s' has no valid start state."), *QuestId.ToString())),
-            QuestDef);
-    }
+        const bool bHasValidStart =
+            !QuestDef->InitialStateId.IsNone()
+            && QuestDef->States.ContainsByPredicate(
+                [&](const FSFQuestStateDefinition& S) { return S.StateId == QuestDef->InitialStateId; });
 
-    TArray<FText> TransitionIssues;
-    QuestDef->ValidateTransitions(TransitionIssues);
-    for (const FText& Issue : TransitionIssues)
-    {
-        Result.AddError(Issue, QuestDef);
-    }
+        if (!bHasValidStart)
+        {
+            Result.AddError(
+                FText::FromString(FString::Printf(
+                    TEXT("Quest '%s' has no valid start state (InitialStateId='%s')."),
+                    *QuestId.ToString(),
+                    *QuestDef->InitialStateId.ToString())),
+                QuestDef);
+        }
 
-    TArray<FText> TaskIssues;
-    QuestDef->ValidateTasks(TaskIssues);
-    for (const FText& Issue : TaskIssues)
-    {
-        Result.AddError(Issue, QuestDef);
+        // Per-state checks: duplicate ids, empty StateId, no tasks, etc.
+        TSet<FName> SeenStateIds;
+        for (int32 Index = 0; Index < QuestDef->States.Num(); ++Index)
+        {
+            const FSFQuestStateDefinition& State = QuestDef->States[Index];
+
+            if (State.StateId.IsNone())
+            {
+                Result.AddError(
+                    FText::FromString(FString::Printf(
+                        TEXT("Quest '%s' state[%d] has empty StateId."),
+                        *QuestId.ToString(), Index)),
+                    QuestDef);
+                continue;
+            }
+
+            if (SeenStateIds.Contains(State.StateId))
+            {
+                Result.AddError(
+                    FText::FromString(FString::Printf(
+                        TEXT("Quest '%s' has duplicate StateId '%s'."),
+                        *QuestId.ToString(), *State.StateId.ToString())),
+                    QuestDef);
+            }
+            else
+            {
+                SeenStateIds.Add(State.StateId);
+            }
+        }
     }
 
     return Result;

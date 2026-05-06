@@ -78,14 +78,20 @@ public:
     // Config / dependencies
     //
 
+    /**
+     * Defined out-of-line in the .cpp because TSoftObjectPtr<T>::LoadSynchronous
+     * instantiates Cast<T> inline, which requires the full T definition. The
+     * forward declarations above are sufficient for the header; the .cpp pulls
+     * in the full asset headers.
+     */
     UFUNCTION(BlueprintPure, Category = "Narrative|Config")
-    USFNarrativeDataAsset* GetNarrativeData() const { return NarrativeData.LoadSynchronous(); }
+    USFNarrativeDataAsset* GetNarrativeData() const;
 
     UFUNCTION(BlueprintPure, Category = "Narrative|Config")
-    USFQuestDatabase* GetQuestDatabase() const { return QuestDatabase.LoadSynchronous(); }
+    USFQuestDatabase* GetQuestDatabase() const;
 
     UFUNCTION(BlueprintPure, Category = "Narrative|Config")
-    USFDialogueNarrativeMap* GetDialogueNarrativeMap() const { return DialogueNarrativeMap.LoadSynchronous(); }
+    USFDialogueNarrativeMap* GetDialogueNarrativeMap() const;
 
     //
     // Quest API

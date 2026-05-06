@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "UObject/PrimaryAssetId.h"
 #include "SFNarrativeTypes.h"
 #include "SFQuestDefinition.generated.h"
@@ -25,6 +26,14 @@ public:
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Quest")
     FName InitialStateId = NAME_None;
+
+    /**
+     * Classification tags used for quest filtering / queries by USFQuestDatabase
+     * (e.g. Quest.Type.Main, Quest.Type.Side, Quest.Region.Sector7).
+     * Leave empty if your project filters quests another way.
+     */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Quest")
+    FGameplayTagContainer QuestTags;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Quest")
     TArray<FSFQuestStateDefinition> States;

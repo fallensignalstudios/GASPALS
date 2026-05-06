@@ -117,7 +117,14 @@ FSFFactionStandingValue USFNarrativeStateSubsystem::ApplyFactionDelta(
         Result = FSFFactionStandingValue();
     }
 
-    Result.ApplyDelta(Delta);
+    // Apply delta inline (FSFFactionStandingValue has no ApplyDelta method).
+    Result.Trust      += Delta.TrustDelta;
+    Result.Fear       += Delta.FearDelta;
+    Result.Respect    += Delta.RespectDelta;
+    Result.Dependency += Delta.DependencyDelta;
+    Result.Alignment  += Delta.AlignmentDelta;
+    Result.Betrayal   += Delta.BetrayalDelta;
+
     FactionStandingByTag.Add(Delta.FactionTag, Result);
     return Result;
 }
