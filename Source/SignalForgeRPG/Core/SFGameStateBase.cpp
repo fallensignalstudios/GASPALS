@@ -9,8 +9,8 @@ ASFGameStateBase::ASFGameStateBase()
 	// GameState lives for the entire match — replicate at a modest rate
 	// so world-phase changes and shared narrative deltas reach clients
 	// promptly without hogging bandwidth.
-	NetUpdateFrequency = 10.0f;
-	MinNetUpdateFrequency = 2.0f;
+	SetNetUpdateFrequency(10.0f);
+	SetMinNetUpdateFrequency(2.0f);
 
 	NarrativeReplicator = CreateDefaultSubobject<USFNarrativeReplicatorComponent>(TEXT("NarrativeReplicator"));
 	NarrativeReplicator->SetIsReplicated(true);

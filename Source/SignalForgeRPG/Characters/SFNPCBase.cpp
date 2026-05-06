@@ -91,9 +91,9 @@ USFNarrativeComponent* ASFNPCBase::ResolveInstigatorNarrative(const FSFInteracti
 
 	// InteractingActor may be the pawn; the narrative component lives on PlayerState.
 	APawn* AsPawn = Cast<APawn>(InteractionContext.InteractingActor);
-	APlayerState* PlayerState = AsPawn ? AsPawn->GetPlayerState() : nullptr;
+	APlayerState* InstigatorPlayerState = AsPawn ? AsPawn->GetPlayerState() : nullptr;
 
-	if (ASFPlayerState* SFPlayerState = Cast<ASFPlayerState>(PlayerState))
+	if (ASFPlayerState* SFPlayerState = Cast<ASFPlayerState>(InstigatorPlayerState))
 	{
 		return SFPlayerState->GetNarrativeComponent();
 	}
