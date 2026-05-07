@@ -1,18 +1,26 @@
 #include "AI/SFCompanionAIController.h"
 
-#include "AI/SFCompanionBlackboardKeys.h"
-#include "BehaviorTree/BlackboardComponent.h"
+#include "AI/Companion/SFCompanionStateMachine.h"
 #include "Companions/SFCompanionCharacter.h"
 #include "Companions/SFCompanionTacticsComponent.h"
-#include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 
 ASFCompanionAIController::ASFCompanionAIController()
 {
-	// Inherits perception + BT/blackboard stack from ASFNPCAIController.
+	// FSM needs to tick every frame for poll-driven transitions / re-paths.
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
+
+	// IMPORTANT: leave DefaultBehaviorTree null. The parent ASFNPCAIController
+	// only starts a BT when DefaultBehaviorTree is set, so leaving it unset
+	// is enough to keep the BT layer dormant. We don't override OnPossess
+	// just to skip BT init — we still want the perception bind from Super.
 }
 
 void ASFCompanionAIController::OnPossess(APawn* InPawn)
 {
+	// Super handles perception binding + (no-op) BT start because we
+	// leave DefaultBehaviorTree null on this controller.
 	Super::OnPossess(InPawn);
 
 	ControlledCompanion = Cast<ASFCompanionCharacter>(InPawn);
@@ -21,16 +29,24 @@ void ASFCompanionAIController::OnPossess(APawn* InPawn)
 		return;
 	}
 
+	// Subscribe to tactics-driven events. The FSM stays passive on clients
+	// — server alone owns the brain.
 	if (USFCompanionTacticsComponent* Tactics = ControlledCompanion->GetTactics())
 	{
-		Tactics->OnStanceChanged.AddDynamic(this, &ASFCompanionAIController::HandleStanceChanged);
 		Tactics->OnOrderIssued.AddDynamic(this, &ASFCompanionAIController::HandleOrderIssued);
-
-		PushStanceToBlackboard();
-		PushOrderToBlackboard(Tactics->GetActiveOrder());
+		Tactics->OnStanceChanged.AddDynamic(this, &ASFCompanionAIController::HandleStanceChanged);
+		Tactics->OnThresholdCrossed.AddDynamic(this, &ASFCompanionAIController::HandleThresholdCrossed);
 	}
 
-	PushPlayerToBlackboard();
+	// Spin up the state machine on the server only.
+	if (HasAuthority())
+	{
+		StateMachine = NewObject<USFCompanionStateMachine>(this, TEXT("CompanionStateMachine"));
+		if (StateMachine)
+		{
+			StateMachine->Initialize(this);
+		}
+	}
 }
 
 void ASFCompanionAIController::OnUnPossess()
@@ -39,9 +55,16 @@ void ASFCompanionAIController::OnUnPossess()
 	{
 		if (USFCompanionTacticsComponent* Tactics = ControlledCompanion->GetTactics())
 		{
-			Tactics->OnStanceChanged.RemoveDynamic(this, &ASFCompanionAIController::HandleStanceChanged);
 			Tactics->OnOrderIssued.RemoveDynamic(this, &ASFCompanionAIController::HandleOrderIssued);
+			Tactics->OnStanceChanged.RemoveDynamic(this, &ASFCompanionAIController::HandleStanceChanged);
+			Tactics->OnThresholdCrossed.RemoveDynamic(this, &ASFCompanionAIController::HandleThresholdCrossed);
 		}
+	}
+
+	if (StateMachine)
+	{
+		StateMachine->Shutdown();
+		StateMachine = nullptr;
 	}
 
 	ControlledCompanion = nullptr;
@@ -49,65 +72,57 @@ void ASFCompanionAIController::OnUnPossess()
 	Super::OnUnPossess();
 }
 
+void ASFCompanionAIController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (HasAuthority() && StateMachine)
+	{
+		StateMachine->Tick(DeltaSeconds);
+	}
+}
+
+void ASFCompanionAIController::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ASFCompanionAIController, CurrentAIState);
+}
+
+void ASFCompanionAIController::NotifyAIStateChanged(ESFCompanionAIState NewState)
+{
+	if (HasAuthority())
+	{
+		// Mirror the FSM's internal state onto the replicated property.
+		CurrentAIState = NewState;
+	}
+}
+
+// =========================================================================
+// Tactics delegate handlers
+// =========================================================================
 void ASFCompanionAIController::HandleStanceChanged(ESFCompanionStance /*OldStance*/, ESFCompanionStance /*NewStance*/)
 {
-	PushStanceToBlackboard();
+	// Stance is a tactics-layer flavor knob; it doesn't directly drive the
+	// FSM today. Hook in here later if a specific stance needs to force a
+	// state change (e.g. Tank → forced Combat scan).
+	if (HasAuthority() && StateMachine)
+	{
+		StateMachine->OnThresholdChanged();
+	}
 }
 
 void ASFCompanionAIController::HandleOrderIssued(const FSFCompanionOrder& NewOrder)
 {
-	PushOrderToBlackboard(NewOrder);
-}
-
-void ASFCompanionAIController::PushOrderToBlackboard(const FSFCompanionOrder& Order)
-{
-	UBlackboardComponent* BB = GetBlackboardComponent();
-	if (!BB)
+	if (HasAuthority() && StateMachine)
 	{
-		return;
-	}
-
-	SFCompanionBlackboardKeys::SetEnumOrInt(BB, SFCompanionBlackboardKeys::OrderType, static_cast<uint8>(Order.Type));
-	BB->SetValueAsInt(SFCompanionBlackboardKeys::OrderSequence, Order.Sequence);
-	BB->SetValueAsObject(SFCompanionBlackboardKeys::OrderTargetActor, Order.TargetActor.Get());
-	// Write to both canonical and legacy vector keys so older BTs keep working.
-	BB->SetValueAsVector(SFCompanionBlackboardKeys::OrderTargetLocation, Order.TargetLocation);
-	BB->SetValueAsVector(SFCompanionBlackboardKeys::OrderTargetLoc, Order.TargetLocation);
-	BB->SetValueAsName(SFCompanionBlackboardKeys::OrderAbilityTag, Order.AbilityTag.GetTagName());
-	BB->SetValueAsBool(SFCompanionBlackboardKeys::bHasValidOrder, Order.IsValidOrder());
-}
-
-void ASFCompanionAIController::PushStanceToBlackboard()
-{
-	UBlackboardComponent* BB = GetBlackboardComponent();
-	if (!BB || !ControlledCompanion)
-	{
-		return;
-	}
-
-	if (USFCompanionTacticsComponent* Tactics = ControlledCompanion->GetTactics())
-	{
-		const FGameplayTagContainer& StanceTags = Tactics->GetStanceTags();
-		FName FirstTagName = NAME_None;
-		if (StanceTags.Num() > 0)
-		{
-			FirstTagName = StanceTags.First().GetTagName();
-		}
-		BB->SetValueAsName(SFCompanionBlackboardKeys::StanceTag, FirstTagName);
+		StateMachine->OnOrderChanged(NewOrder);
 	}
 }
 
-void ASFCompanionAIController::PushPlayerToBlackboard()
+void ASFCompanionAIController::HandleThresholdCrossed(FGameplayTag /*ThresholdTag*/, bool /*bNowActive*/)
 {
-	UBlackboardComponent* BB = GetBlackboardComponent();
-	if (!BB)
+	if (HasAuthority() && StateMachine)
 	{
-		return;
-	}
-
-	// Single-player assumption (per user scope decision): bind to player 0.
-	if (APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
-	{
-		BB->SetValueAsObject(SFCompanionBlackboardKeys::PlayerActor, PlayerPawn);
+		StateMachine->OnThresholdChanged();
 	}
 }
