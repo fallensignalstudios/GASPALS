@@ -1,5 +1,6 @@
 #include "AI/BTTask_ConsumeOrder.h"
 
+#include "AI/SFCompanionBlackboardKeys.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "Companions/SFCompanionTypes.h"
@@ -17,7 +18,7 @@ EBTNodeResult::Type UBTTask_ConsumeOrder::ExecuteTask(UBehaviorTreeComponent& Ow
 		return EBTNodeResult::Failed;
 	}
 
-	const ESFCompanionOrderType Type = static_cast<ESFCompanionOrderType>(BB->GetValueAsEnum(OrderTypeKey));
+	const ESFCompanionOrderType Type = static_cast<ESFCompanionOrderType>(SFCompanionBlackboardKeys::GetEnumOrInt(BB, OrderTypeKey));
 	if (Type == ESFCompanionOrderType::None)
 	{
 		return EBTNodeResult::Failed;

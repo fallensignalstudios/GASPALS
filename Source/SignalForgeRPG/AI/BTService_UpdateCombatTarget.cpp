@@ -2,6 +2,7 @@
 
 #include "AIController.h"
 #include "AI/SFCompanionAIController.h"
+#include "AI/SFCompanionBlackboardKeys.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Companions/SFCompanionCharacter.h"
@@ -66,7 +67,7 @@ void UBTService_UpdateCombatTarget::TickNode(UBehaviorTreeComponent& OwnerComp, 
 	}
 
 	// FocusFire holds the focus regardless of perception until the order ends.
-	const ESFCompanionOrderType OrderType = static_cast<ESFCompanionOrderType>(BB->GetValueAsEnum(OrderTypeKey));
+	const ESFCompanionOrderType OrderType = static_cast<ESFCompanionOrderType>(SFCompanionBlackboardKeys::GetEnumOrInt(BB, OrderTypeKey));
 	if (OrderType == ESFCompanionOrderType::FocusFire || OrderType == ESFCompanionOrderType::AttackTarget)
 	{
 		// Order branch already wrote OrderTargetActor -> FocusTarget; don't fight it.
