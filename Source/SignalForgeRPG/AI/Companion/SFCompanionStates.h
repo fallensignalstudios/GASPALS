@@ -36,6 +36,8 @@ public:
 
 private:
 	float RepathTimer = 0.f;
+	FVector LastGoal = FVector::ZeroVector;
+	bool bHasLastGoal = false;
 };
 
 class FSFCompanionState_HoldPosition : public FSFCompanionStateBase

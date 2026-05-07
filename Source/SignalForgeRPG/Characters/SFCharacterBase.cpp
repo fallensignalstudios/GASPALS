@@ -685,3 +685,22 @@ void ASFCharacterBase::OnWeaponEquipped_Implementation(const USFWeaponData* Weap
 {
 	ApplyWeaponAnimationFromData(WeaponData);
 }
+
+FVector ASFCharacterBase::GetHeadLookAtLocation_Implementation(bool& bOutWantsLookAt) const
+{
+	// Default: no look-at; callers should branch on bOutWantsLookAt.
+	bOutWantsLookAt = false;
+
+	// Fallback to head bone position if you want a usable point even when disabled.
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		const FName HeadBoneName(TEXT("head")); // Adjust to your skeleton
+		const int32 BoneIndex = MeshComp->GetBoneIndex(HeadBoneName);
+		if (BoneIndex != INDEX_NONE)
+		{
+			return MeshComp->GetBoneLocation(HeadBoneName);
+		}
+	}
+
+	return GetActorLocation();
+}

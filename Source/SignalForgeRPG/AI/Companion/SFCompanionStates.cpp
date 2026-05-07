@@ -25,6 +25,8 @@ namespace SFCompanionStateTuning
 	constexpr float FollowMaxDistance         = 800.f;  // Beyond this, force a repath
 	constexpr float FollowRepathInterval      = 0.5f;   // Seconds between repaths
 	constexpr float FollowAcceptanceRadius    = 150.f;
+	constexpr float FollowStopRadius = 120.f;
+	constexpr float FollowGoalRefreshDistance = 120.f;
 
 	// Hold position
 	constexpr float HoldEngageRadius          = 1500.f; // Threats inside this engage; outside: ignore
@@ -141,6 +143,8 @@ void FSFCompanionState_Idle::Tick(USFCompanionStateMachine& /*Machine*/, float /
 void FSFCompanionState_Follow::Enter(USFCompanionStateMachine& Machine)
 {
 	RepathTimer = 0.f;
+	LastGoal = FVector::ZeroVector;
+	bHasLastGoal = false;
 }
 
 void FSFCompanionState_Follow::Tick(USFCompanionStateMachine& Machine, float DeltaSeconds)
@@ -148,22 +152,20 @@ void FSFCompanionState_Follow::Tick(USFCompanionStateMachine& Machine, float Del
 	using namespace SFCompanionStateTuning;
 
 	ASFCompanionAIController* Controller = GetController(Machine);
-	ASFCompanionCharacter*    Companion  = GetCompanion(Machine);
+	ASFCompanionCharacter* Companion = GetCompanion(Machine);
 	if (!Controller || !Companion) { return; }
 
 	APawn* Player = GetPlayerPawnForMachine(Machine);
-	if (!Player) { StopMovement(Controller); return; }
+	if (!Player) { return; }
 
 	const FVector CompanionLoc = Companion->GetActorLocation();
-	const FVector PlayerLoc    = Player->GetActorLocation();
-	const float   Distance     = FVector::Dist2D(CompanionLoc, PlayerLoc);
+	const FVector PlayerLoc = Player->GetActorLocation();
+	const float Distance = FVector::Dist2D(CompanionLoc, PlayerLoc);
 
 	RepathTimer -= DeltaSeconds;
 
-	// Stay close: if we're inside the desired band, don't repath every frame.
-	if (Distance <= FollowDesiredDistance + FollowAcceptanceRadius)
+	if (Distance <= FollowStopRadius)
 	{
-		// In the comfort zone — issue a stop so we settle into idle anim.
 		if (Controller->GetMoveStatus() == EPathFollowingStatus::Moving)
 		{
 			StopMovement(Controller);
@@ -171,13 +173,22 @@ void FSFCompanionState_Follow::Tick(USFCompanionStateMachine& Machine, float Del
 		return;
 	}
 
-	// Repath periodically or whenever we exceed the hard ceiling.
-	if (RepathTimer <= 0.f || Distance > FollowMaxDistance)
+	if (Distance <= FollowDesiredDistance + FollowAcceptanceRadius)
 	{
-		// Aim a little inside the desired distance so we don't overshoot.
-		const FVector ToCompanion = (CompanionLoc - PlayerLoc).GetSafeNormal2D();
-		const FVector Goal = PlayerLoc + ToCompanion * FollowDesiredDistance;
+		return;
+	}
+
+	const FVector ToCompanion = (CompanionLoc - PlayerLoc).GetSafeNormal2D();
+	const FVector Goal = PlayerLoc + ToCompanion * FollowDesiredDistance;
+
+	const bool bGoalChangedEnough =
+		!bHasLastGoal || FVector::Dist2D(LastGoal, Goal) > FollowGoalRefreshDistance;
+
+	if (Distance > FollowMaxDistance || (RepathTimer <= 0.f && bGoalChangedEnough))
+	{
 		RequestMoveTo(Controller, Goal, FollowAcceptanceRadius);
+		LastGoal = Goal;
+		bHasLastGoal = true;
 		RepathTimer = FollowRepathInterval;
 	}
 }

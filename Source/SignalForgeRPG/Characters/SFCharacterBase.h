@@ -190,6 +190,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Animation|State")
 	bool IsAnimBlocking() const { return bAnimIsBlocking; }
 
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Animation|LookAt")
+	FVector GetHeadLookAtLocation(bool& bOutWantsLookAt) const;
+
 	/** Called by equipment when the active weapon changes. */
 	void ApplyWeaponAnimationFromData(const USFWeaponData* WeaponData);
 	void ClearWeaponAnimationProfile();

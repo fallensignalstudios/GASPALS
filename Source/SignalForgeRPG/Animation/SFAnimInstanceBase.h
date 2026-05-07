@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
+#include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
 #include "Animation/SFAnimationTypes.h"
 #include "SFAnimInstanceBase.generated.h"
@@ -10,6 +11,7 @@ class ASFCharacterBase;
 class UCharacterMovementComponent;
 class UAnimSequenceBase;
 class UAnimMontage;
+class UAbilitySystemComponent;
 
 UCLASS(Blueprintable)
 class SIGNALFORGERPG_API USFAnimInstanceBase : public UAnimInstance
@@ -21,8 +23,9 @@ public:
 
     virtual void NativeInitializeAnimation() override;
     virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+    virtual void NativeUninitializeAnimation() override;
 
-    UFUNCTION(BlueprintPure, Category = "Animation")
+    UFUNCTION(BlueprintPure, Category = "Animation|Owner", meta = (BlueprintThreadSafe))
     bool HasValidOwner() const;
 
     UFUNCTION(BlueprintCallable, Category = "Animation|State")
@@ -31,23 +34,28 @@ public:
         bIsBlocking = bInIsBlocking;
     }
 
-    /** Look up a weapon/attack profile by gameplay tag. */
     UFUNCTION(BlueprintPure, Category = "Animation|Profiles")
     bool GetWeaponProfileByTag(const FGameplayTag& ProfileTag, FSFWeaponAnimationProfile& OutProfile) const;
 
-    /** Apply a tagged override layer (e.g. special pose / layer ABP). */
     UFUNCTION(BlueprintCallable, Category = "Animation|OverrideLayer")
-    bool ApplyOverrideLayer(const FGameplayTag& LayerTag, float BlendInTime);
+    virtual bool ApplyOverrideLayer(
+        UPARAM(meta = (Categories = "SignalForge.Anim.OverrideLayer")) const FGameplayTag& LayerTag,
+        float BlendInTime);
 
-    /** Remove the current override layer. */
     UFUNCTION(BlueprintCallable, Category = "Animation|OverrideLayer")
-    void RemoveOverrideLayer(float BlendOutTime);
+    virtual void RemoveOverrideLayer(float BlendOutTime);
 
     UFUNCTION(BlueprintPure, Category = "Animation|OverrideLayer")
     bool HasOverrideLayer() const { return bHasOverrideLayer; }
 
     UFUNCTION(BlueprintPure, Category = "Animation|OverrideLayer")
     FGameplayTag GetOverrideLayerTag() const { return CurrentOverrideLayerTag; }
+
+    UFUNCTION(BlueprintCallable, Category = "Animation|OverrideLayer")
+    virtual void OnOverrideLayerBlendedOut();
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|LookAt", meta = (ClampMin = "0.0"))
+    float HeadLookAtInterpSpeed = 8.0f;
 
 protected:
     void UpdateOwnerReferences();
@@ -56,7 +64,7 @@ protected:
     void UpdateMovementData(float DeltaSeconds);
     void UpdateAnimationStateFromCharacter(float DeltaSeconds);
 
-    UFUNCTION(BlueprintCallable, Category = "Animation")
+    UFUNCTION(BlueprintCallable, Category = "Animation|Profiles")
     void SetAnimationProfile(const FSFWeaponAnimationProfile& InProfile, float DeltaSeconds);
 
 protected:
@@ -72,17 +80,18 @@ protected:
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Tuning", meta = (ClampMin = "0.0"))
     float OverlayBlendSpeed = 8.0f;
 
-    /** Tagged weapon/ability animation profiles (Narrative-style anim sets). */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Profiles", meta = (Categories = "SignalForge.Anim.Profile", ForceInlineRow))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Profiles",
+        meta = (Categories = "SignalForge.Anim.Profile", ForceInlineRow))
     TMap<FGameplayTag, FSFWeaponAnimationProfile> TaggedWeaponProfiles;
 
-    /** Tagged override layers that can temporarily replace/augment this ABP. */
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|OverrideLayer", meta = (Categories = "SignalForge.Anim.OverrideLayer", ForceInlineRow))
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|OverrideLayer",
+        meta = (Categories = "SignalForge.Anim.OverrideLayer", ForceInlineRow))
     TMap<FGameplayTag, TSubclassOf<UAnimInstance>> TaggedOverrideLayers;
 
-    /** Tags automatically applied while this AnimInstance is active (optional, for GAS/gameplay). */
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Tags")
     FGameplayTagContainer ApplyTags;
+
+    FActiveGameplayEffectHandle ApplyTagsHandle;
 
 private:
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|References", meta = (AllowPrivateAccess = "true"))
@@ -163,15 +172,36 @@ private:
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|State", meta = (AllowPrivateAccess = "true"))
     bool bIsBlocking = false;
 
-    /** Simple override-layer state (no separate instance yet, but tag-driven). */
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|OverrideLayer", meta = (AllowPrivateAccess = "true"))
     bool bHasOverrideLayer = false;
 
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|OverrideLayer", meta = (AllowPrivateAccess = "true"))
+    FGameplayTag LastOverrideLayerTag;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|OverrideLayer", meta = (AllowPrivateAccess = "true"))
     FGameplayTag CurrentOverrideLayerTag;
 
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|OverrideLayer", meta = (AllowPrivateAccess = "true"))
     float OverrideLayerBlendInTime = 0.0f;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|OverrideLayer", meta = (AllowPrivateAccess = "true"))
     float OverrideLayerBlendOutTime = 0.0f;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|LookAt", meta = (AllowPrivateAccess = "true"))
+    bool bWantsHeadLookAt = false;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|LookAt", meta = (AllowPrivateAccess = "true"))
+    FVector HeadLookAtLocationWS = FVector::ZeroVector;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|LookAt", meta = (AllowPrivateAccess = "true"))
+    FVector HeadLookAtLocationLS = FVector::ZeroVector;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|LookAt", meta = (AllowPrivateAccess = "true"))
+    float HeadLookAtAlpha = 0.0f;
+
+    
+
+    FTimerHandle TimerHandle_OverrideLayerBlendedOut;
 
     FRotator PreviousActorRotation = FRotator::ZeroRotator;
 };
