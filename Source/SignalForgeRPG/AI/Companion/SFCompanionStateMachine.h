@@ -37,6 +37,15 @@ class SIGNALFORGERPG_API USFCompanionStateMachine : public UObject
 public:
 	USFCompanionStateMachine();
 
+	/**
+	 * Out-of-line destructor declaration. Required because States is a
+	 * TArray<TUniquePtr<FSFCompanionStateBase>> and FSFCompanionStateBase
+	 * is only forward-declared in this header — the implicit destructor
+	 * would try to instantiate TDefaultDelete on an incomplete type.
+	 * Defined in the cpp where the full state class is visible.
+	 */
+	virtual ~USFCompanionStateMachine() override;
+
 	/** Construct all state instances and bind to the owning controller. */
 	void Initialize(ASFCompanionAIController* InController);
 
