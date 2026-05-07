@@ -40,6 +40,28 @@ class UBlackboardComponent;
  */
 namespace SFCompanionBlackboardKeys
 {
+	// Helper: read an enum-stored byte regardless of whether the BB key is
+	// configured as Enum (UE only resolves enum entries with this) or Int
+	// (designers fall back to Int when the editor can't see the C++ UENUM).
+	// Returns 0 if neither read succeeds.
+	inline uint8 GetEnumOrInt(const UBlackboardComponent* BB, FName KeyName)
+	{
+		if (!BB) { return 0; }
+		const uint8 EnumVal = BB->GetValueAsEnum(KeyName);
+		if (EnumVal != 0) { return EnumVal; }
+		return static_cast<uint8>(BB->GetValueAsInt(KeyName));
+	}
+
+	// Helper: write a byte to an enum-style key supporting both Enum and Int
+	// configurations. Both writes are no-ops on the wrong key type so this is
+	// safe regardless of which the designer picked.
+	inline void SetEnumOrInt(UBlackboardComponent* BB, FName KeyName, uint8 Value)
+	{
+		if (!BB) { return; }
+		BB->SetValueAsEnum(KeyName, Value);
+		BB->SetValueAsInt(KeyName, static_cast<int32>(Value));
+	}
+
 	// --- Actors / focus -----------------------------------------------------
 	inline const FName PlayerActor             = TEXT("PlayerActor");
 	inline const FName FocusTarget             = TEXT("FocusTarget");

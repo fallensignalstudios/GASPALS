@@ -67,7 +67,7 @@ void ASFCompanionAIController::PushOrderToBlackboard(const FSFCompanionOrder& Or
 		return;
 	}
 
-	BB->SetValueAsEnum(SFCompanionBlackboardKeys::OrderType, static_cast<uint8>(Order.Type));
+	SFCompanionBlackboardKeys::SetEnumOrInt(BB, SFCompanionBlackboardKeys::OrderType, static_cast<uint8>(Order.Type));
 	BB->SetValueAsInt(SFCompanionBlackboardKeys::OrderSequence, Order.Sequence);
 	BB->SetValueAsObject(SFCompanionBlackboardKeys::OrderTargetActor, Order.TargetActor.Get());
 	// Write to both canonical and legacy vector keys so older BTs keep working.

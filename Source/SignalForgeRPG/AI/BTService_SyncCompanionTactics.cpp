@@ -1,6 +1,7 @@
 #include "AI/BTService_SyncCompanionTactics.h"
 
 #include "AI/SFCompanionAIController.h"
+#include "AI/SFCompanionBlackboardKeys.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Companions/SFCompanionCharacter.h"
@@ -40,16 +41,20 @@ void UBTService_SyncCompanionTactics::TickNode(UBehaviorTreeComponent& OwnerComp
 	}
 
 	// --- Stance / aggression / engagement range ----------------------------
-	BB->SetValueAsEnum(StanceKey, static_cast<uint8>(Tactics->GetStance()));
-	BB->SetValueAsEnum(AggressionKey, static_cast<uint8>(Tactics->GetAggression()));
-	BB->SetValueAsEnum(EngagementRangeKey, static_cast<uint8>(Tactics->GetEngagementRange()));
+	// Designers can configure these BB keys as either Enum<ESFCompanion*> OR
+	// Int (when the editor can't see the enum types). SetEnumOrInt writes
+	// both representations, so whichever key type the designer picked, the
+	// value lands.
+	SFCompanionBlackboardKeys::SetEnumOrInt(BB, StanceKey, static_cast<uint8>(Tactics->GetStance()));
+	SFCompanionBlackboardKeys::SetEnumOrInt(BB, AggressionKey, static_cast<uint8>(Tactics->GetAggression()));
+	SFCompanionBlackboardKeys::SetEnumOrInt(BB, EngagementRangeKey, static_cast<uint8>(Tactics->GetEngagementRange()));
 
 	const FGameplayTagContainer& StanceTags = Tactics->GetStanceTags();
 	BB->SetValueAsName(StanceTagKey, StanceTags.Num() > 0 ? StanceTags.First().GetTagName() : NAME_None);
 
 	// --- Active order ------------------------------------------------------
 	const FSFCompanionOrder& Order = Tactics->GetActiveOrder();
-	BB->SetValueAsEnum(OrderTypeKey, static_cast<uint8>(Order.Type));
+	SFCompanionBlackboardKeys::SetEnumOrInt(BB, OrderTypeKey, static_cast<uint8>(Order.Type));
 	BB->SetValueAsInt(OrderSequenceKey, Order.Sequence);
 	BB->SetValueAsObject(OrderTargetActorKey, Order.TargetActor.Get());
 	BB->SetValueAsVector(OrderTargetLocationKey, Order.TargetLocation);
