@@ -1,9 +1,14 @@
 #include "AI/SFCompanionAIController.h"
 
 #include "AI/Companion/SFCompanionStateMachine.h"
+#include "Characters/SFCharacterBase.h"
+#include "Characters/SFEnemyCharacter.h"
+#include "Characters/SFNPCNarrativeIdentityComponent.h"
 #include "Companions/SFCompanionCharacter.h"
 #include "Companions/SFCompanionTacticsComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "Perception/AIPerceptionComponent.h"
 
 ASFCompanionAIController::ASFCompanionAIController()
 {
@@ -38,6 +43,17 @@ void ASFCompanionAIController::OnPossess(APawn* InPawn)
 		Tactics->OnThresholdCrossed.AddDynamic(this, &ASFCompanionAIController::HandleThresholdCrossed);
 	}
 
+	// Subscribe to AIPerception. The parent's HandlePerceptionUpdated is
+	// kept bound (it's a no-op for companions since they're not
+	// bIsHostileByDefault) — we just add our own handler alongside it.
+	if (UAIPerceptionComponent* PerceptionComp = GetNPCPerceptionComponent())
+	{
+		if (!PerceptionComp->OnTargetPerceptionUpdated.IsAlreadyBound(this, &ASFCompanionAIController::HandleCompanionPerceptionUpdated))
+		{
+			PerceptionComp->OnTargetPerceptionUpdated.AddDynamic(this, &ASFCompanionAIController::HandleCompanionPerceptionUpdated);
+		}
+	}
+
 	// Spin up the state machine on the server only.
 	if (HasAuthority())
 	{
@@ -60,6 +76,16 @@ void ASFCompanionAIController::OnUnPossess()
 			Tactics->OnThresholdCrossed.RemoveDynamic(this, &ASFCompanionAIController::HandleThresholdCrossed);
 		}
 	}
+
+	if (UAIPerceptionComponent* PerceptionComp = GetNPCPerceptionComponent())
+	{
+		if (PerceptionComp->OnTargetPerceptionUpdated.IsAlreadyBound(this, &ASFCompanionAIController::HandleCompanionPerceptionUpdated))
+		{
+			PerceptionComp->OnTargetPerceptionUpdated.RemoveDynamic(this, &ASFCompanionAIController::HandleCompanionPerceptionUpdated);
+		}
+	}
+
+	PerceivedHostiles.Reset();
 
 	if (StateMachine)
 	{
@@ -125,4 +151,114 @@ void ASFCompanionAIController::HandleThresholdCrossed(FGameplayTag /*ThresholdTa
 	{
 		StateMachine->OnThresholdChanged();
 	}
+}
+
+// =========================================================================
+// Perception
+// =========================================================================
+void ASFCompanionAIController::HandleCompanionPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+{
+	if (!HasAuthority() || !Actor)
+	{
+		return;
+	}
+
+	const bool bSensed = Stimulus.WasSuccessfullySensed();
+	const bool bHostile = IsActorHostileToCompanion(Actor, ControlledCompanion);
+
+	if (bSensed && bHostile)
+	{
+		PerceivedHostiles.AddUnique(Actor);
+	}
+	else
+	{
+		// Lost sight or actor isn't hostile (anymore) — drop it.
+		PerceivedHostiles.RemoveAll([Actor](const TWeakObjectPtr<AActor>& Entry)
+		{
+			return Entry.Get() == Actor;
+		});
+	}
+
+	// Event-driven engagement: poke the FSM immediately rather than waiting
+	// for the next tick. OnThresholdChanged re-runs EvaluateDesiredState.
+	if (StateMachine)
+	{
+		StateMachine->OnThresholdChanged();
+	}
+}
+
+bool ASFCompanionAIController::HasPerceivedHostile() const
+{
+	for (const TWeakObjectPtr<AActor>& Entry : PerceivedHostiles)
+	{
+		if (IsActorHostileToCompanion(Entry.Get(), ControlledCompanion))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+AActor* ASFCompanionAIController::GetClosestPerceivedHostile() const
+{
+	if (!ControlledCompanion) { return nullptr; }
+
+	const FVector Origin = ControlledCompanion->GetActorLocation();
+
+	AActor* Best = nullptr;
+	float   BestDistSq = TNumericLimits<float>::Max();
+
+	for (const TWeakObjectPtr<AActor>& Entry : PerceivedHostiles)
+	{
+		AActor* Actor = Entry.Get();
+		if (!IsActorHostileToCompanion(Actor, ControlledCompanion))
+		{
+			continue;
+		}
+
+		const float DistSq = FVector::DistSquared(Origin, Actor->GetActorLocation());
+		if (DistSq < BestDistSq)
+		{
+			BestDistSq = DistSq;
+			Best = Actor;
+		}
+	}
+
+	return Best;
+}
+
+bool ASFCompanionAIController::IsActorHostileToCompanion(const AActor* Candidate, const ASFCompanionCharacter* Self)
+{
+	if (!IsValid(Candidate))                  { return false; }
+	if (Candidate == Self)                    { return false; }
+
+	// Never target the local player pawn — companions are player-aligned.
+	if (const UWorld* World = Candidate->GetWorld())
+	{
+		if (APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(World, 0))
+		{
+			if (Candidate == PlayerPawn) { return false; }
+		}
+	}
+
+	// Don't engage corpses.
+	if (const ASFCharacterBase* AsChar = Cast<ASFCharacterBase>(Candidate))
+	{
+		if (AsChar->IsDead()) { return false; }
+	}
+
+	// Definitive hostile: anything authored as ASFEnemyCharacter.
+	if (Candidate->IsA<ASFEnemyCharacter>())
+	{
+		return true;
+	}
+
+	// Disposition-driven hostile: NPC whose narrative identity says Hostile.
+	if (const USFNPCNarrativeIdentityComponent* Identity =
+			Candidate->FindComponentByClass<USFNPCNarrativeIdentityComponent>())
+	{
+		return Identity->GetDisposition() == ESFNPCDisposition::Hostile;
+	}
+
+	return false;
 }

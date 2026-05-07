@@ -4,6 +4,7 @@
 #include "AI/SFNPCAIController.h"
 #include "AI/Companion/SFCompanionAIState.h"
 #include "Companions/SFCompanionTypes.h"
+#include "Perception/AIPerceptionTypes.h"
 #include "SFCompanionAIController.generated.h"
 
 class ASFCompanionCharacter;
@@ -47,6 +48,30 @@ public:
 	/** Called by the state machine after a transition completes (server-side). */
 	void NotifyAIStateChanged(ESFCompanionAIState NewState);
 
+	// -------------------------------------------------------------------------
+	// Perception-driven combat target acquisition (server-only)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Returns the closest currently-perceived hostile actor, or nullptr if
+	 * none. The list is maintained from AIPerception updates; stale or dead
+	 * entries are pruned lazily on each query.
+	 */
+	AActor* GetClosestPerceivedHostile() const;
+
+	/** True if the controller currently tracks at least one valid hostile. */
+	bool HasPerceivedHostile() const;
+
+	/**
+	 * Static hostility classifier used by both the controller and the FSM
+	 * Combat state. An actor is hostile to a companion if:
+	 *   - It is an ASFEnemyCharacter, OR
+	 *   - It has a USFNPCNarrativeIdentityComponent with disposition Hostile.
+	 * Returns false for the companion itself, the player pawn, dead actors,
+	 * and anything that doesn't match the above.
+	 */
+	static bool IsActorHostileToCompanion(const AActor* Candidate, const ASFCompanionCharacter* Self);
+
 protected:
 	UPROPERTY(Transient)
 	TObjectPtr<ASFCompanionCharacter> ControlledCompanion = nullptr;
@@ -70,4 +95,16 @@ protected:
 
 	UFUNCTION()
 	void HandleThresholdCrossed(FGameplayTag ThresholdTag, bool bNowActive);
+
+	/**
+	 * AIPerception callback. Server-only. Adds successfully-sensed hostiles
+	 * to PerceivedHostiles, removes them when sense is lost or they die,
+	 * and pokes the FSM so engagement is event-driven (no tick latency).
+	 */
+	UFUNCTION()
+	void HandleCompanionPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+
+	/** Server-only list of currently-perceived hostile actors. */
+	UPROPERTY(Transient)
+	TArray<TWeakObjectPtr<AActor>> PerceivedHostiles;
 };

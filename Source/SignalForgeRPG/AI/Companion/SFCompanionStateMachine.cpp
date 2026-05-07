@@ -154,11 +154,23 @@ ESFCompanionAIState USFCompanionStateMachine::EvaluateDesiredState() const
 		{
 			return ESFCompanionAIState::RetreatToPlayer;
 		}
+
+		// 4. Autonomous engagement. Defensive/Aggressive companions enter
+		//    Combat as soon as perception reports a hostile target. Passive
+		//    companions never auto-engage — they only react to direct orders.
+		if (Tactics->GetAggression() != ESFCompanionAggression::Passive)
+		{
+			if (ASFCompanionAIController* Ctrl = Controller.Get())
+			{
+				if (Ctrl->HasPerceivedHostile())
+				{
+					return ESFCompanionAIState::Combat;
+				}
+			}
+		}
 	}
 
-	// 4. Default — Follow if there's a player to follow, else Idle.
-	// (Combat will be selected by perception when it's wired up; for now
-	//  we never auto-enter Combat without an order.)
+	// 5. Default — Follow if there's a player to follow, else Idle.
 	return ESFCompanionAIState::Follow;
 }
 

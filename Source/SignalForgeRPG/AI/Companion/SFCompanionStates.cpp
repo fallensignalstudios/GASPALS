@@ -39,8 +39,13 @@ namespace SFCompanionStateTuning
 
 	// Combat (autonomous)
 	constexpr float CombatTargetScanInterval  = 0.5f;
-	constexpr float CombatAggressiveScanRange = 2000.f;
-	constexpr float CombatDefensiveScanRange  = 1200.f;
+
+	// Maximum distance from the player a companion will chase an autonomous
+	// (perception-acquired) target before disengaging and returning to the
+	// player. Aggression dial scales this so Aggressive companions roam
+	// further while Defensive ones stay tight.
+	constexpr float CombatLeashRangeDefensive  = 1500.f;
+	constexpr float CombatLeashRangeAggressive = 3000.f;
 
 	// Retreat
 	constexpr float RetreatTargetDistance     = 250.f;
@@ -485,13 +490,20 @@ void FSFCompanionState_UseAbility::Tick(USFCompanionStateMachine& /*Machine*/, f
 }
 
 // =========================================================================
-// Combat (autonomous, no order)
+// Combat (autonomous, perception-driven, no order)
 // =========================================================================
 void FSFCompanionState_Combat::Enter(USFCompanionStateMachine& Machine)
 {
 	CurrentTarget = nullptr;
 	TargetScanTimer = 0.f;
 	AttackTimer = 0.f;
+
+	// Acquire immediately on entry so we don't waste a frame in the
+	// no-target branch below.
+	if (ASFCompanionAIController* Controller = GetController(Machine))
+	{
+		CurrentTarget = Controller->GetClosestPerceivedHostile();
+	}
 }
 
 void FSFCompanionState_Combat::Tick(USFCompanionStateMachine& Machine, float DeltaSeconds)
@@ -503,22 +515,43 @@ void FSFCompanionState_Combat::Tick(USFCompanionStateMachine& Machine, float Del
 	USFCompanionTacticsComponent* Tactics = GetTactics(Machine);
 	if (!Controller || !Companion || !Tactics) { return; }
 
-	// Re-scan for a target periodically. This is the autonomous combat
-	// path — perception integration plugs in here later.
+	// Re-scan periodically or whenever the current target is gone. The
+	// controller's PerceivedHostiles list is updated event-driven by the
+	// AIPerception delegate — we just pick the closest each scan.
 	TargetScanTimer -= DeltaSeconds;
-	if (TargetScanTimer <= 0.f || !IsActorAliveHostile(CurrentTarget.Get()))
+	const bool bNeedsTarget = !ASFCompanionAIController::IsActorHostileToCompanion(CurrentTarget.Get(), Companion);
+	if (TargetScanTimer <= 0.f || bNeedsTarget)
 	{
 		TargetScanTimer = CombatTargetScanInterval;
-		// Without perception wired up yet, we don't auto-acquire. The
-		// machine will fall back to Follow/Idle on the next tick when
-		// CurrentTarget stays null — that's the intended behavior until
-		// perception lands.
+		CurrentTarget = Controller->GetClosestPerceivedHostile();
 	}
 
 	AActor* T = CurrentTarget.Get();
-	if (!IsActorAliveHostile(T))
+	if (!ASFCompanionAIController::IsActorHostileToCompanion(T, Companion))
 	{
+		// No valid target. EvaluateDesiredState() will swap us out next
+		// tick (back to Follow / RetreatToPlayer / etc).
 		return;
+	}
+
+	// Leash check — don't let an autonomous engagement drag the companion
+	// halfway across the map. Order-driven AttackTarget / FocusFire ignore
+	// leashing because the player explicitly committed to the target.
+	if (APawn* Player = GetPlayerPawnForMachine(Machine))
+	{
+		const float LeashRange =
+			(Tactics->GetAggression() == ESFCompanionAggression::Aggressive)
+				? CombatLeashRangeAggressive
+				: CombatLeashRangeDefensive;
+
+		const float DistFromPlayer = FVector::Dist2D(Companion->GetActorLocation(), Player->GetActorLocation());
+		if (DistFromPlayer > LeashRange)
+		{
+			// Drop the target and let EvaluateDesiredState() pull us back
+			// to Follow on the next tick.
+			CurrentTarget = nullptr;
+			return;
+		}
 	}
 
 	const float Dist = FVector::Dist2D(Companion->GetActorLocation(), T->GetActorLocation());
@@ -550,6 +583,7 @@ void FSFCompanionState_Combat::Exit(USFCompanionStateMachine& Machine)
 		Controller->ClearFocus(EAIFocusPriority::Gameplay);
 		Controller->StopMovement();
 	}
+	CurrentTarget = nullptr;
 }
 
 // =========================================================================
