@@ -72,4 +72,13 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Blackboard|Threshold")
 	FName CanUseCommandedAbilityKey = TEXT("bCanUseCommandedAbility");
+
+	// --- Player ------------------------------------------------------------
+
+	UPROPERTY(EditAnywhere, Category = "Blackboard|Player")
+	FName PlayerActorKey = TEXT("PlayerActor");
+
+	/** When true, refresh PlayerActor every tick if the BB key is currently null. */
+	UPROPERTY(EditAnywhere, Category = "Blackboard|Player")
+	bool bAutoResolvePlayer = true;
 };

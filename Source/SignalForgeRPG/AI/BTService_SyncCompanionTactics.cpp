@@ -5,6 +5,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Companions/SFCompanionCharacter.h"
 #include "Companions/SFCompanionTacticsComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 UBTService_SyncCompanionTactics::UBTService_SyncCompanionTactics()
 {
@@ -59,4 +60,20 @@ void UBTService_SyncCompanionTactics::TickNode(UBehaviorTreeComponent& OwnerComp
 	BB->SetValueAsBool(SelfLowHealthKey, Tactics->IsSelfLowHealth());
 	BB->SetValueAsBool(PlayerLowHealthKey, Tactics->IsPlayerLowHealth());
 	BB->SetValueAsBool(CanUseCommandedAbilityKey, Tactics->CanCommandAbility());
+
+	// --- Player resolution -------------------------------------------------
+	// OnPossess seeds PlayerActor once, but the player pawn may not exist yet
+	// when companions are placed in the level. If the key is null, keep
+	// trying every tick until we find a player pawn.
+	if (bAutoResolvePlayer)
+	{
+		UObject* CurrentPlayer = BB->GetValueAsObject(PlayerActorKey);
+		if (!CurrentPlayer)
+		{
+			if (APawn* Player = UGameplayStatics::GetPlayerPawn(Companion, 0))
+			{
+				BB->SetValueAsObject(PlayerActorKey, Player);
+			}
+		}
+	}
 }
