@@ -3,10 +3,16 @@
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
 #include "AI/Companion/SFCompanionAIState.h"
+#include "AI/Companion/SFCompanionStateBase.h"
 #include "Companions/SFCompanionTypes.h"
 #include "SFCompanionStateMachine.generated.h"
 
-class FSFCompanionStateBase;
+// SFCompanionStateBase.h is included (not forward-declared) because
+// TArray<TUniquePtr<FSFCompanionStateBase>> States below requires the
+// full type for TUniquePtr's destructor instantiation — UHT's auto-gen
+// vtable helper constructor evaluates that template at translation
+// units that don't otherwise pull in the states header.
+
 class ASFCompanionAIController;
 class ASFCompanionCharacter;
 class USFCompanionTacticsComponent;
@@ -36,15 +42,6 @@ class SIGNALFORGERPG_API USFCompanionStateMachine : public UObject
 
 public:
 	USFCompanionStateMachine();
-
-	/**
-	 * Out-of-line destructor declaration. Required because States is a
-	 * TArray<TUniquePtr<FSFCompanionStateBase>> and FSFCompanionStateBase
-	 * is only forward-declared in this header — the implicit destructor
-	 * would try to instantiate TDefaultDelete on an incomplete type.
-	 * Defined in the cpp where the full state class is visible.
-	 */
-	virtual ~USFCompanionStateMachine() override;
 
 	/** Construct all state instances and bind to the owning controller. */
 	void Initialize(ASFCompanionAIController* InController);
