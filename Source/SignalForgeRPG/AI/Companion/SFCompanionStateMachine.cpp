@@ -11,9 +11,6 @@ USFCompanionStateMachine::USFCompanionStateMachine()
 {
 }
 
-// Out-of-line so TUniquePtr<FSFCompanionStateBase> can see the full type.
-USFCompanionStateMachine::~USFCompanionStateMachine() = default;
-
 void USFCompanionStateMachine::Initialize(ASFCompanionAIController* InController)
 {
 	Controller = InController;
