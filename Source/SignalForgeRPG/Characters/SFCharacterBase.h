@@ -26,6 +26,11 @@ class USFInteractionComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSFAttributeChangedSignature, float, NewValue, float, MaxValue);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnOverlayLinkedAnimLayerChangedSignature,
+	TSubclassOf<UAnimInstance>, NewLayerClass,
+	TSubclassOf<UAnimInstance>, PreviousLayerClass);
+
 UCLASS()
 class SIGNALFORGERPG_API ASFCharacterBase : public ACharacter, public IAbilitySystemInterface, public ISFHitResolverInterface
 {
@@ -194,6 +199,17 @@ public:
 	void ApplyWeaponAnimationFromData(const USFWeaponData* WeaponData);
 	void ClearWeaponAnimationProfile();
 
+protected:
+	/**
+	 * Performs the actual LinkAnimClassLayers / UnlinkAnimClassLayers calls
+	 * on the main mesh, broadcasts OnOverlayLinkedAnimLayerChanged, and
+	 * updates CurrentOverlayLinkedAnimLayerClass. Safe to call with nullptr
+	 * to clear.
+	 */
+	void SetOverlayLinkedAnimLayer(TSubclassOf<UAnimInstance> NewLayerClass);
+
+public:
+
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	USFInteractionComponent* GetInteractionComponent() const { return InteractionComponent; }
 
@@ -202,6 +218,28 @@ public:
 	{
 		return CurrentOverlayLinkedAnimLayerClass;
 	}
+
+	/**
+	 * Form tag used to pick a per-form overlay layer from
+	 * USFWeaponData::FormSpecificOverlayLayers. Default returns an invalid tag,
+	 * which means "use the weapon's base OverlayLinkedAnimLayerClass".
+	 * Override in subclasses (player, companion, enemy variants) to opt into
+	 * form-specific layers.
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintPure, Category = "Animation|Weapon")
+	FGameplayTag GetCharacterFormTag() const;
+
+	/**
+	 * Re-applies the currently equipped weapon's overlay anim layer to the
+	 * mesh. Useful after a form/stance change that affects which form-specific
+	 * layer should be active.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Animation|Weapon")
+	void RefreshOverlayLinkedAnimLayer();
+
+	/** Fires whenever the linked overlay layer class changes (link or unlink). */
+	UPROPERTY(BlueprintAssignable, Category = "Animation|Weapon")
+	FOnOverlayLinkedAnimLayerChangedSignature OnOverlayLinkedAnimLayerChanged;
 
 	UFUNCTION(BlueprintPure, Category = "Animation|Weapon|Sequences")
 	UAnimSequenceBase* GetCurrentIdleOverlaySequence() const
