@@ -642,7 +642,15 @@ void ASFCharacterBase::ApplyWeaponAnimationFromData(const USFWeaponData* WeaponD
 	CurrentWeaponAnimationProfile = Profile;
 	CurrentOverlayMode = Profile.OverlayMode;
 	bUseUpperBodyOverlay = Profile.bUseUpperBodyOverlay;
-	CurrentOverlayLinkedAnimLayerClass = WeaponData->GetOverlayLinkedAnimLayerClass();
+
+	// Pick the form-specific overlay layer if this character has a form tag,
+	// otherwise fall back to the weapon's base overlay layer.
+	const FGameplayTag FormTag = GetCharacterFormTag();
+	const TSubclassOf<UAnimInstance> NewLayerClass = FormTag.IsValid()
+		? WeaponData->GetOverlayLayerForForm(FormTag)
+		: WeaponData->GetOverlayLinkedAnimLayerClass();
+
+	SetOverlayLinkedAnimLayer(NewLayerClass);
 
 	// Resolve animation sequences from the weapon's animation set
 	if (USFWeaponAnimationSet* AnimationSet = WeaponData->GetWeaponAnimationSet())
@@ -672,7 +680,7 @@ void ASFCharacterBase::ClearWeaponAnimationProfile()
 	CurrentCombatMode = ESFCombatMode::None;
 	bUseUpperBodyOverlay = true;
 	CurrentWeaponAnimationProfile = FSFWeaponAnimationProfile{};
-	CurrentOverlayLinkedAnimLayerClass = nullptr;
+	SetOverlayLinkedAnimLayer(nullptr);
 	bHasWeaponAnimationProfile = false;
 
 	// Clear cached sequences
@@ -686,21 +694,65 @@ void ASFCharacterBase::OnWeaponEquipped_Implementation(const USFWeaponData* Weap
 	ApplyWeaponAnimationFromData(WeaponData);
 }
 
-FVector ASFCharacterBase::GetHeadLookAtLocation_Implementation(bool& bOutWantsLookAt) const
-{
-	// Default: no look-at; callers should branch on bOutWantsLookAt.
-	bOutWantsLookAt = false;
+// -----------------------------------------------------------------------------
+// Overlay linked anim layer (Lyra-style "Attach Object to Hand" anim half).
+// The data half (mesh / socket / weapon BP) lives on USFWeaponData and is
+// applied by the equipment component / weapon actor; this function handles
+// the LinkAnimClassLayers side so that any ASFCharacterBase (player,
+// companion, enemy NPC) gets the right overlay automatically based on the
+// equipped weapon's data asset.
+// -----------------------------------------------------------------------------
 
-	// Fallback to head bone position if you want a usable point even when disabled.
+void ASFCharacterBase::SetOverlayLinkedAnimLayer(TSubclassOf<UAnimInstance> NewLayerClass)
+{
+	const TSubclassOf<UAnimInstance> PreviousLayerClass = CurrentOverlayLinkedAnimLayerClass;
+
+	if (PreviousLayerClass == NewLayerClass)
+	{
+		return;
+	}
+
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
-		const FName HeadBoneName(TEXT("head")); // Adjust to your skeleton
-		const int32 BoneIndex = MeshComp->GetBoneIndex(HeadBoneName);
-		if (BoneIndex != INDEX_NONE)
+		if (PreviousLayerClass)
 		{
-			return MeshComp->GetBoneLocation(HeadBoneName);
+			MeshComp->UnlinkAnimClassLayers(PreviousLayerClass);
+		}
+		if (NewLayerClass)
+		{
+			MeshComp->LinkAnimClassLayers(NewLayerClass);
 		}
 	}
 
-	return GetActorLocation();
+	CurrentOverlayLinkedAnimLayerClass = NewLayerClass;
+	OnOverlayLinkedAnimLayerChanged.Broadcast(NewLayerClass, PreviousLayerClass);
+}
+
+void ASFCharacterBase::RefreshOverlayLinkedAnimLayer()
+{
+	if (!EquipmentComponent)
+	{
+		SetOverlayLinkedAnimLayer(nullptr);
+		return;
+	}
+
+	const USFWeaponData* WeaponData = EquipmentComponent->GetCurrentWeaponData();
+	if (!WeaponData)
+	{
+		SetOverlayLinkedAnimLayer(nullptr);
+		return;
+	}
+
+	const FGameplayTag FormTag = GetCharacterFormTag();
+	const TSubclassOf<UAnimInstance> NewLayerClass = FormTag.IsValid()
+		? WeaponData->GetOverlayLayerForForm(FormTag)
+		: WeaponData->GetOverlayLinkedAnimLayerClass();
+
+	SetOverlayLinkedAnimLayer(NewLayerClass);
+}
+
+FGameplayTag ASFCharacterBase::GetCharacterFormTag_Implementation() const
+{
+	// Default: no form tag, use weapon's base overlay layer.
+	return FGameplayTag();
 }
