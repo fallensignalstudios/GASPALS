@@ -7,6 +7,7 @@
 class USFPlayerHUDWidgetController;
 class USFPlayerEquipmentWidget;
 class USFPlayerInventoryWidget;
+class USFPlayerQuestLogWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class SIGNALFORGERPG_API USFPlayerMenuWidget : public UUserWidget
@@ -45,4 +46,7 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "Menu")
 	TObjectPtr<USFPlayerInventoryWidget> InventoryPanel = nullptr;
+
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly, Category = "Menu")
+	TObjectPtr<USFPlayerQuestLogWidget> QuestLogPanel = nullptr;
 };
