@@ -3,9 +3,12 @@
 #include "Characters/SFCharacterBase.h"
 #include "Components/SFEquipmentComponent.h"
 #include "Components/SFInventoryComponent.h"
+#include "Core/SFPlayerState.h"
+#include "Narrative/SFNarrativeComponent.h"
 #include "UI/SFPlayerEquipmentWidget.h"
 #include "UI/SFPlayerHUDWidgetController.h"
 #include "UI/SFPlayerInventoryWidget.h"
+#include "UI/SFPlayerQuestLogWidget.h"
 
 void USFPlayerMenuWidget::NativeConstruct()
 {
@@ -44,6 +47,13 @@ void USFPlayerMenuWidget::InitializeMenu(USFPlayerHUDWidgetController* InHUDWidg
 		InventoryPanel->InitializeInventoryWidget(InventoryComponent, EquipmentComponent);
 	}
 
+	if (QuestLogPanel)
+	{
+		ASFPlayerState* SFPlayerState = PlayerCharacter->GetPlayerState<ASFPlayerState>();
+		USFNarrativeComponent* NarrativeComponent = SFPlayerState ? SFPlayerState->GetNarrativeComponent() : nullptr;
+		QuestLogPanel->InitializeQuestLogWidget(NarrativeComponent);
+	}
+
 	BP_OnMenuInitialized();
 }
 
@@ -57,6 +67,11 @@ void USFPlayerMenuWidget::DeinitializeMenu()
 	if (InventoryPanel)
 	{
 		InventoryPanel->DeinitializeInventoryWidget();
+	}
+
+	if (QuestLogPanel)
+	{
+		QuestLogPanel->DeinitializeQuestLogWidget();
 	}
 
 	HUDWidgetController = nullptr;
