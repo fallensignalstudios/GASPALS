@@ -7,6 +7,8 @@
 #include "Narrative/SFQuestInstance.h"
 #include "Narrative/SFQuestRuntime.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogSFQuestLogController, Log, All);
+
 #define LOCTEXT_NAMESPACE "SFQuestLogWidgetController"
 
 namespace
@@ -47,6 +49,12 @@ void USFQuestLogWidgetController::Initialize(USFNarrativeComponent* InNarrativeC
 
 	BindToSources();
 	RebuildDisplayEntries();
+
+	UE_LOG(LogSFQuestLogController, Log,
+		TEXT("[QuestController] Initialize: NarrativeComponent=%s, Runtime=%s, Entries=%d"),
+		*GetNameSafe(NarrativeComponent),
+		*GetNameSafe(NarrativeComponent ? NarrativeComponent->GetQuestRuntime() : nullptr),
+		CurrentDisplayEntries.Num());
 }
 
 void USFQuestLogWidgetController::Deinitialize()
@@ -194,6 +202,8 @@ void USFQuestLogWidgetController::RebuildDisplayEntries()
 
 	if (!NarrativeComponent)
 	{
+		UE_LOG(LogSFQuestLogController, Verbose,
+			TEXT("[QuestController] RebuildDisplayEntries: NarrativeComponent is null — broadcasting empty list."));
 		OnQuestLogDisplayDataUpdated.Broadcast(CurrentDisplayEntries);
 		return;
 	}
@@ -201,11 +211,16 @@ void USFQuestLogWidgetController::RebuildDisplayEntries()
 	USFQuestRuntime* Runtime = NarrativeComponent->GetQuestRuntime();
 	if (!Runtime)
 	{
+		UE_LOG(LogSFQuestLogController, Warning,
+			TEXT("[QuestController] RebuildDisplayEntries: NarrativeComponent has no QuestRuntime. The narrative component may not have finished initializing yet."));
 		OnQuestLogDisplayDataUpdated.Broadcast(CurrentDisplayEntries);
 		return;
 	}
 
 	const TArray<USFQuestInstance*> Instances = Runtime->GetAllQuestInstances();
+	UE_LOG(LogSFQuestLogController, Verbose,
+		TEXT("[QuestController] RebuildDisplayEntries: runtime has %d quest instance(s)."),
+		Instances.Num());
 	CurrentDisplayEntries.Reserve(Instances.Num());
 
 	for (USFQuestInstance* Instance : Instances)

@@ -6,8 +6,13 @@
 #include "Components/PanelWidget.h"
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
+#include "Core/SFPlayerState.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
 #include "Narrative/SFNarrativeComponent.h"
 #include "UI/SFQuestEntryWidget.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogSFQuestLogWidget, Log, All);
 
 #define LOCTEXT_NAMESPACE "SFPlayerQuestLogWidget"
 
@@ -34,8 +39,23 @@ void USFPlayerQuestLogWidget::NativeConstruct()
 	}
 
 	BindToController();
+
+	// Self-healing path: even when the parent menu didn't (or couldn't yet)
+	// provide a narrative component, try to find one on the local player so
+	// the widget still populates if/when the menu re-opens after a quest exists.
+	if (WidgetController && !WidgetController->GetNarrativeComponent())
+	{
+		TryAutoResolveNarrativeComponent();
+	}
+
 	UpdateButtonLabels();
 	RefreshSelectedDetails();
+
+	UE_LOG(LogSFQuestLogWidget, Verbose,
+		TEXT("[QuestLog] NativeConstruct: NarrativeComponent=%s, EntryContainer=%s, QuestEntryWidgetClass=%s"),
+		*GetNameSafe(WidgetController ? WidgetController->GetNarrativeComponent() : nullptr),
+		*GetNameSafe(EntryContainer),
+		*GetNameSafe(QuestEntryWidgetClass));
 }
 
 void USFPlayerQuestLogWidget::NativeDestruct()
@@ -68,14 +88,52 @@ void USFPlayerQuestLogWidget::InitializeQuestLogWidget(USFNarrativeComponent* In
 
 	BindToController();
 
+	// If the caller couldn't supply a narrative component (e.g. PlayerState
+	// hadn't replicated yet), fall back to walking the owning player so we
+	// don't silently leave the controller in a broken/empty state.
+	USFNarrativeComponent* ResolvedComponent = InNarrativeComponent;
+	if (!ResolvedComponent)
+	{
+		UE_LOG(LogSFQuestLogWidget, Warning,
+			TEXT("[QuestLog] InitializeQuestLogWidget called with null NarrativeComponent. Attempting auto-resolve from owning player."));
+	}
+
 	if (WidgetController)
 	{
-		WidgetController->Initialize(InNarrativeComponent);
-		WidgetController->RefreshQuestLogDisplayData();
+		WidgetController->Initialize(ResolvedComponent);
+
+		if (!ResolvedComponent)
+		{
+			TryAutoResolveNarrativeComponent();
+		}
+		else
+		{
+			WidgetController->RefreshQuestLogDisplayData();
+		}
 	}
 
 	UpdateButtonLabels();
 	RefreshSelectedDetails();
+
+	USFNarrativeComponent* FinalComponent = WidgetController ? WidgetController->GetNarrativeComponent() : nullptr;
+	const int32 EntryCount = WidgetController ? WidgetController->GetCurrentDisplayEntries().Num() : 0;
+	UE_LOG(LogSFQuestLogWidget, Log,
+		TEXT("[QuestLog] InitializeQuestLogWidget done. NarrativeComponent=%s, Entries=%d, EntryContainer=%s, QuestEntryWidgetClass=%s"),
+		*GetNameSafe(FinalComponent),
+		EntryCount,
+		*GetNameSafe(EntryContainer),
+		*GetNameSafe(QuestEntryWidgetClass));
+
+	if (!EntryContainer)
+	{
+		UE_LOG(LogSFQuestLogWidget, Warning,
+			TEXT("[QuestLog] EntryContainer is null. Add a UPanelWidget (ScrollBox or VerticalBox) named 'EntryContainer' inside WBP_PlayerQuestLog and check Is Variable."));
+	}
+	if (!QuestEntryWidgetClass)
+	{
+		UE_LOG(LogSFQuestLogWidget, Warning,
+			TEXT("[QuestLog] QuestEntryWidgetClass is unset. Open WBP_PlayerQuestLog Class Defaults and assign your WBP_QuestEntry to 'Quest Entry Widget Class'."));
+	}
 }
 
 void USFPlayerQuestLogWidget::DeinitializeQuestLogWidget()
@@ -113,6 +171,42 @@ void USFPlayerQuestLogWidget::BindToController()
 	{
 		WidgetController->OnTrackedQuestChanged.AddDynamic(this, &USFPlayerQuestLogWidget::HandleTrackedQuestChanged);
 	}
+}
+
+bool USFPlayerQuestLogWidget::TryAutoResolveNarrativeComponent()
+{
+	if (!WidgetController)
+	{
+		return false;
+	}
+	if (WidgetController->GetNarrativeComponent())
+	{
+		return true;
+	}
+
+	// Walk the local player chain to find an ASFPlayerState that owns a
+	// USFNarrativeComponent. Works regardless of which actor created this widget.
+	APlayerController* PC = GetOwningPlayer();
+	APlayerState* PS = PC ? PC->PlayerState : nullptr;
+	ASFPlayerState* SFPS = Cast<ASFPlayerState>(PS);
+	USFNarrativeComponent* NC = SFPS ? SFPS->GetNarrativeComponent() : nullptr;
+
+	if (!NC)
+	{
+		UE_LOG(LogSFQuestLogWidget, Warning,
+			TEXT("[QuestLog] Auto-resolve failed. PC=%s PS=%s SFPS=%s NC=null. Verify the active GameMode's PlayerStateClass is ASFPlayerState (or a subclass)."),
+			*GetNameSafe(PC), *GetNameSafe(PS), *GetNameSafe(SFPS));
+		return false;
+	}
+
+	WidgetController->Initialize(NC);
+	WidgetController->RefreshQuestLogDisplayData();
+
+	UE_LOG(LogSFQuestLogWidget, Log,
+		TEXT("[QuestLog] Auto-resolved NarrativeComponent from %s. Entries=%d."),
+		*GetNameSafe(SFPS),
+		WidgetController->GetCurrentDisplayEntries().Num());
+	return true;
 }
 
 void USFPlayerQuestLogWidget::UnbindFromController()
