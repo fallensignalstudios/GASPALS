@@ -51,7 +51,19 @@ void USFPlayerMenuWidget::InitializeMenu(USFPlayerHUDWidgetController* InHUDWidg
 	{
 		ASFPlayerState* SFPlayerState = PlayerCharacter->GetPlayerState<ASFPlayerState>();
 		USFNarrativeComponent* NarrativeComponent = SFPlayerState ? SFPlayerState->GetNarrativeComponent() : nullptr;
+
+		UE_LOG(LogTemp, Log,
+			TEXT("[PlayerMenu] Initializing QuestLogPanel. PlayerCharacter=%s SFPlayerState=%s NarrativeComponent=%s"),
+			*GetNameSafe(PlayerCharacter),
+			*GetNameSafe(SFPlayerState),
+			*GetNameSafe(NarrativeComponent));
+
 		QuestLogPanel->InitializeQuestLogWidget(NarrativeComponent);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[PlayerMenu] QuestLogPanel BindWidgetOptional is null. Drop a WBP_PlayerQuestLog into the menu UMG and rename it to 'QuestLogPanel' (Is Variable checked)."));
 	}
 
 	BP_OnMenuInitialized();

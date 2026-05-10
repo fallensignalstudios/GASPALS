@@ -214,6 +214,13 @@ void ASFPlayerController::OpenPlayerMenu()
 			Menu->InitializeMenu(PlayerHUDWidgetController);
 		}
 	}
+	else if (USFPlayerMenuWidget* ExistingMenu = Cast<USFPlayerMenuWidget>(PlayerMenuWidget))
+	{
+		// Menu was created earlier (e.g. before a quest was started). Re-run
+		// initialization so per-panel controllers re-pull their data sources
+		// (narrative component, equipment, inventory).
+		ExistingMenu->InitializeMenu(PlayerHUDWidgetController);
+	}
 
 	if (!PlayerMenuWidget)
 	{

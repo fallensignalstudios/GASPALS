@@ -132,6 +132,13 @@ protected:
 	void BindToController();
 	void UnbindFromController();
 
+	/**
+	 * If we don't have a narrative component yet, walk owning-player
+	 * → PlayerState → NarrativeComponent and try to attach. Returns true if
+	 * the controller is now wired to a non-null narrative component.
+	 */
+	bool TryAutoResolveNarrativeComponent();
+
 	const FSFQuestDisplayEntry* GetSelectedEntry() const;
 	USFQuestEntryWidget* FindEntryWidgetById(FName QuestId) const;
 	FText BuildSortLabelText() const;
