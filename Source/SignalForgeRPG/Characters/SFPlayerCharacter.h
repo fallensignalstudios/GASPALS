@@ -19,6 +19,10 @@ class USpringArmComponent;
 class UInputMappingContext;
 class UInputAction;
 class USFWeaponData;
+class USFNarrativeComponent;
+class USFQuestDefinition;
+class USFQuestInstance;
+class ASFPlayerState;
 
 UCLASS()
 class SIGNALFORGERPG_API ASFPlayerCharacter : public ASFCharacterBase
@@ -63,6 +67,50 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Class")
 	TObjectPtr<USFClassDefinition> DefaultClassDefinition = nullptr;
+
+	// ----------------------------------------------------------------------
+	// Narrative / Quest access
+	// ----------------------------------------------------------------------
+
+	/** Convenience proxy: pulls the narrative component off ASFPlayerState. */
+	UFUNCTION(BlueprintPure, Category = "Narrative")
+	USFNarrativeComponent* GetNarrativeComponent() const;
+
+	/** Convenience cast for the SF-typed PlayerState. Null if not yet replicated. */
+	UFUNCTION(BlueprintPure, Category = "Narrative")
+	ASFPlayerState* GetSFPlayerState() const;
+
+	/**
+	 * Quests that auto-start on the server when this character first spawns.
+	 * Soft references so unused quests don't get pulled into memory eagerly.
+	 * Use this for the player's opening main-quest entry, tutorial quests, etc.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Quests")
+	TArray<TSoftObjectPtr<USFQuestDefinition>> DefaultStartingQuests;
+
+	/** Server-only: start a single quest by definition. Wraps the narrative component API. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|Quests")
+	USFQuestInstance* StartQuestByDefinition(USFQuestDefinition* QuestDefinition, FName StartStateId = NAME_None);
+
+	/** Server-only: start a quest by primary asset id (e.g. "Quest:Q_TutorialIntro"). */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|Quests")
+	USFQuestInstance* StartQuestByAssetId(FPrimaryAssetId QuestAssetId, FName StartStateId = NAME_None);
+
+	/** Server-only: restart a previously-finished quest from the start. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|Quests")
+	bool RestartQuestByAssetId(FPrimaryAssetId QuestAssetId, FName StartStateId = NAME_None);
+
+	/** Server-only: abandon an in-progress quest. */
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Narrative|Quests")
+	bool AbandonQuestByAssetId(FPrimaryAssetId QuestAssetId);
+
+	/** Cheat / debug: server-only exec to start a quest by primary-asset-id string. Usage in PIE: SF_StartQuest Quest:Q_Test */
+	UFUNCTION(Exec, Category = "Narrative|Quests|Debug")
+	void SF_StartQuest(const FString& AssetIdString);
+
+	/** Cheat / debug: server-only exec to abandon a quest by primary-asset-id string. */
+	UFUNCTION(Exec, Category = "Narrative|Quests|Debug")
+	void SF_AbandonQuest(const FString& AssetIdString);
 
 protected:
 	virtual void BeginPlay() override;
