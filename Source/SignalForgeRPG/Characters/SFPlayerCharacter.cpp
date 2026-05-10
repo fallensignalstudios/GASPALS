@@ -25,6 +25,10 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Light.h"
 #include "Combat/SFWeaponData.h"
+#include "Core/SFPlayerState.h"
+#include "Narrative/SFNarrativeComponent.h"
+#include "Narrative/SFQuestDefinition.h"
+#include "Narrative/SFQuestInstance.h"
 
 ASFPlayerCharacter::ASFPlayerCharacter()
 {
@@ -147,6 +151,157 @@ void ASFPlayerCharacter::BeginPlay()
 	{
 		DialogueCameraComponent->InitializeFromDialogueComponent(DialogueComponent);
 	}
+
+	// Server-only: kick off any quests the player should always have on spawn.
+	// Deferred slightly so the PlayerState/NarrativeComponent are fully
+	// initialized (PlayerState replication is up by BeginPlay on the server,
+	// but the narrative subsystems may still be wiring themselves in PIE).
+	if (HasAuthority() && DefaultStartingQuests.Num() > 0)
+	{
+		FTimerHandle StartingQuestsHandle;
+		GetWorldTimerManager().SetTimer(
+			StartingQuestsHandle,
+			FTimerDelegate::CreateWeakLambda(this, [this]()
+			{
+				USFNarrativeComponent* NarrativeComponent = GetNarrativeComponent();
+				if (!NarrativeComponent)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[SFPlayerCharacter] Cannot start default quests — NarrativeComponent unavailable. Verify the active GameMode's PlayerStateClass is ASFPlayerState (or a subclass)."));
+					return;
+				}
+
+				for (const TSoftObjectPtr<USFQuestDefinition>& SoftDef : DefaultStartingQuests)
+				{
+					if (SoftDef.IsNull())
+					{
+						continue;
+					}
+
+					USFQuestDefinition* QuestDef = SoftDef.LoadSynchronous();
+					if (!QuestDef)
+					{
+						UE_LOG(LogTemp, Warning, TEXT("[SFPlayerCharacter] DefaultStartingQuests entry %s failed to load."), *SoftDef.ToString());
+						continue;
+					}
+
+					const FPrimaryAssetId AssetId = QuestDef->GetPrimaryAssetId();
+					if (NarrativeComponent->GetQuestInstanceByAssetId(AssetId) != nullptr)
+					{
+						// Already started (e.g. carried over from save). Skip silently.
+						continue;
+					}
+
+					USFQuestInstance* Started = NarrativeComponent->StartQuestByAssetId(AssetId);
+					UE_CLOG(!Started, LogTemp, Warning, TEXT("[SFPlayerCharacter] Failed to start default quest %s."), *AssetId.ToString());
+					UE_CLOG(Started, LogTemp, Log, TEXT("[SFPlayerCharacter] Auto-started default quest %s."), *AssetId.ToString());
+				}
+			}),
+			0.25f,
+			false);
+	}
+}
+
+// ----------------------------------------------------------------------
+// Narrative / Quest API
+// ----------------------------------------------------------------------
+
+ASFPlayerState* ASFPlayerCharacter::GetSFPlayerState() const
+{
+	return GetPlayerState<ASFPlayerState>();
+}
+
+USFNarrativeComponent* ASFPlayerCharacter::GetNarrativeComponent() const
+{
+	if (ASFPlayerState* SFPS = GetSFPlayerState())
+	{
+		return SFPS->GetNarrativeComponent();
+	}
+	return nullptr;
+}
+
+USFQuestInstance* ASFPlayerCharacter::StartQuestByDefinition(USFQuestDefinition* QuestDefinition, FName StartStateId)
+{
+	if (!QuestDefinition)
+	{
+		return nullptr;
+	}
+	return StartQuestByAssetId(QuestDefinition->GetPrimaryAssetId(), StartStateId);
+}
+
+USFQuestInstance* ASFPlayerCharacter::StartQuestByAssetId(FPrimaryAssetId QuestAssetId, FName StartStateId)
+{
+	USFNarrativeComponent* NarrativeComponent = GetNarrativeComponent();
+	if (!NarrativeComponent || !QuestAssetId.IsValid())
+	{
+		return nullptr;
+	}
+	return NarrativeComponent->StartQuestByAssetId(QuestAssetId, StartStateId);
+}
+
+bool ASFPlayerCharacter::RestartQuestByAssetId(FPrimaryAssetId QuestAssetId, FName StartStateId)
+{
+	USFNarrativeComponent* NarrativeComponent = GetNarrativeComponent();
+	if (!NarrativeComponent || !QuestAssetId.IsValid())
+	{
+		return false;
+	}
+	return NarrativeComponent->RestartQuestByAssetId(QuestAssetId, StartStateId);
+}
+
+bool ASFPlayerCharacter::AbandonQuestByAssetId(FPrimaryAssetId QuestAssetId)
+{
+	USFNarrativeComponent* NarrativeComponent = GetNarrativeComponent();
+	if (!NarrativeComponent || !QuestAssetId.IsValid())
+	{
+		return false;
+	}
+	return NarrativeComponent->AbandonQuestByAssetId(QuestAssetId);
+}
+
+void ASFPlayerCharacter::SF_StartQuest(const FString& AssetIdString)
+{
+	if (!HasAuthority())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFPlayerCharacter] SF_StartQuest must be run on the server (authority)."));
+		return;
+	}
+
+	const FPrimaryAssetId AssetId = FPrimaryAssetId::FromString(AssetIdString);
+	if (!AssetId.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFPlayerCharacter] SF_StartQuest: '%s' is not a valid PrimaryAssetId. Expected form: 'Quest:Q_MyQuestId'."), *AssetIdString);
+		return;
+	}
+
+	USFQuestInstance* Started = StartQuestByAssetId(AssetId);
+	if (Started)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[SFPlayerCharacter] SF_StartQuest: started %s."), *AssetId.ToString());
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFPlayerCharacter] SF_StartQuest: failed to start %s. Confirm the quest is registered with the QuestDatabase and the asset is loaded."), *AssetId.ToString());
+	}
+}
+
+void ASFPlayerCharacter::SF_AbandonQuest(const FString& AssetIdString)
+{
+	if (!HasAuthority())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFPlayerCharacter] SF_AbandonQuest must be run on the server (authority)."));
+		return;
+	}
+
+	const FPrimaryAssetId AssetId = FPrimaryAssetId::FromString(AssetIdString);
+	if (!AssetId.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFPlayerCharacter] SF_AbandonQuest: '%s' is not a valid PrimaryAssetId."), *AssetIdString);
+		return;
+	}
+
+	const bool bAbandoned = AbandonQuestByAssetId(AssetId);
+	UE_CLOG(bAbandoned, LogTemp, Log, TEXT("[SFPlayerCharacter] SF_AbandonQuest: abandoned %s."), *AssetId.ToString());
+	UE_CLOG(!bAbandoned, LogTemp, Warning, TEXT("[SFPlayerCharacter] SF_AbandonQuest: no in-progress quest with id %s."), *AssetId.ToString());
 }
 
 void ASFPlayerCharacter::Tick(float DeltaTime)
