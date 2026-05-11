@@ -879,21 +879,37 @@ bool USFEquipmentComponent::UnequipInventoryEntry(FGuid InventoryEntryId)
 }
 void USFEquipmentComponent::GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, USFWeaponData* WeaponData)
 {
+	UE_LOG(LogTemp, Warning,
+		TEXT("GrantWeaponAbilitiesForSlot: Slot=%d WeaponData=%s"),
+		(int32)Slot,
+		WeaponData ? *WeaponData->GetName() : TEXT("<NULL>"));
+
 	if (!WeaponData)
 	{
 		return;
 	}
 
+	UE_LOG(LogTemp, Warning,
+		TEXT("  PrimaryFireAbility=%s  SecondaryFireAbility=%s  ReloadAbility=%s  ExtraWeaponAbilities=%d"),
+		WeaponData->PrimaryFireAbility ? *WeaponData->PrimaryFireAbility->GetName() : TEXT("<NULL>"),
+		WeaponData->SecondaryFireAbility ? *WeaponData->SecondaryFireAbility->GetName() : TEXT("<NULL>"),
+		WeaponData->ReloadAbility ? *WeaponData->ReloadAbility->GetName() : TEXT("<NULL>"),
+		WeaponData->ExtraWeaponAbilities.Num());
+
 	ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetOwner());
 	if (!Character)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("  -> aborting: owner is not ASFCharacterBase"));
 		return;
 	}
 
 	UAbilitySystemComponent* ASC = Character->GetAbilitySystemComponent();
 	if (!ASC || !ASC->IsOwnerActorAuthoritative())
 	{
-		// Only the server actually owns ability specs; clients will receive them via replication.
+		UE_LOG(LogTemp, Warning,
+			TEXT("  -> aborting: ASC=%p IsAuthoritative=%d (clients receive specs via replication)"),
+			ASC,
+			ASC ? (ASC->IsOwnerActorAuthoritative() ? 1 : 0) : 0);
 		return;
 	}
 

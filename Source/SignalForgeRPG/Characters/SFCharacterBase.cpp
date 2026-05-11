@@ -508,14 +508,21 @@ FGameplayAbilitySpecHandle ASFCharacterBase::GrantCharacterAbility(
 
 	FGameplayAbilitySpec AbilitySpec(AbilityClass, AbilityLevel);
 
+	FGameplayTag GrantedInputTag;
 	if (const USFGameplayAbility* AbilityCDO = AbilityClass->GetDefaultObject<USFGameplayAbility>())
 	{
-		const FGameplayTag InputTag = AbilityCDO->GetInputTag();
-		if (InputTag.IsValid())
+		GrantedInputTag = AbilityCDO->GetInputTag();
+		if (GrantedInputTag.IsValid())
 		{
-			AbilitySpec.GetDynamicSpecSourceTags().AddTag(InputTag);
+			AbilitySpec.GetDynamicSpecSourceTags().AddTag(GrantedInputTag);
 		}
 	}
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("GrantCharacterAbility: class=%s InputTag=%s (CDO valid=%d)"),
+		*AbilityClass->GetName(),
+		GrantedInputTag.IsValid() ? *GrantedInputTag.ToString() : TEXT("<INVALID/EMPTY>"),
+		AbilityClass->GetDefaultObject<USFGameplayAbility>() != nullptr ? 1 : 0);
 
 	return AbilitySystemComponent->GiveAbility(AbilitySpec);
 }
