@@ -16,6 +16,7 @@
 #include "Characters/SFCharacterBase.h"
 #include "Characters/SFEnemyCharacter.h"
 #include "Core/SignalForgeGameplayTags.h"
+#include "Engine/OverlapResult.h"
 
 ASFProjectileBase::ASFProjectileBase()
 {
@@ -176,7 +177,7 @@ float ASFProjectileBase::ComputeFalloffMultiplier(const FVector& HitLocation) co
 
 void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 {
-	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+	const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
 
 	// VFX
 	if (ImpactNiagara)
@@ -217,13 +218,13 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 				const float FalloffMult = ComputeFalloffMultiplier(Hit.ImpactPoint);
 				const float FinalDamage = BaseDamage * FalloffMult;
 
-				if (Tags.Data_BaseDamage.IsValid())
+				if (SFTags.Data_BaseDamage.IsValid())
 				{
-					SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_BaseDamage, FinalDamage);
+					SpecHandle.Data->SetSetByCallerMagnitude(SFTags.Data_BaseDamage, FinalDamage);
 				}
-				if (Tags.Data_FalloffMultiplier.IsValid())
+				if (SFTags.Data_FalloffMultiplier.IsValid())
 				{
-					SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_FalloffMultiplier, FalloffMult);
+					SpecHandle.Data->SetSetByCallerMagnitude(SFTags.Data_FalloffMultiplier, FalloffMult);
 				}
 
 				if (ASFCharacterBase* SourceCharacter = Cast<ASFCharacterBase>(SourceActor))
@@ -242,7 +243,7 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 	// GameplayCue (impact). Default to the override if set, otherwise the standard impact cue.
 	const FGameplayTag ImpactCueTag = ImpactCueTagOverride.IsValid()
 		? ImpactCueTagOverride
-		: Tags.Cue_Hit_Impact;
+		: SFTags.Cue_Hit_Impact;
 
 	if (ImpactCueTag.IsValid())
 	{
@@ -314,7 +315,7 @@ void ASFProjectileBase::HandleRadialImpact(const FHitResult& Hit)
 		FCollisionShape::MakeSphere(RadialRadius),
 		Params);
 
-	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+	const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
 
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
@@ -342,9 +343,9 @@ void ASFProjectileBase::HandleRadialImpact(const FHitResult& Hit)
 						SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, EffectContext);
 					if (SpecHandle.IsValid())
 					{
-						if (Tags.Data_BaseDamage.IsValid())
+						if (SFTags.Data_BaseDamage.IsValid())
 						{
-							SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_BaseDamage, FinalDamage);
+							SpecHandle.Data->SetSetByCallerMagnitude(SFTags.Data_BaseDamage, FinalDamage);
 						}
 						SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 					}

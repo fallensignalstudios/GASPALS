@@ -433,7 +433,7 @@ void USFCombatComponent::TriggerHitFeedback(const FSFHitData& HitData, const FSF
 	// -------- GameplayCue dispatch (target ASC handles VFX + SFX + decals). --------
 	const FVector HitLocation = HitData.HitResult.ImpactPoint.IsNearlyZero()
 		? HitData.TargetActor->GetActorLocation()
-		: HitData.HitResult.ImpactPoint;
+		: FVector(HitData.HitResult.ImpactPoint);
 
 	switch (ResolvedHit.Outcome)
 	{
