@@ -208,6 +208,69 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("State.Broken"),
 		TEXT("Character is guard-broken or staggered"));
 
+	/** Cinematic / hit feedback cues */
+	GameplayTags.Cue_Hit_Impact = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Hit.Impact"),
+		TEXT("Generic melee impact cue (sound, VFX, decals)"));
+
+	GameplayTags.Cue_Hit_Critical = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Hit.Critical"),
+		TEXT("Critical strike cue with amplified VFX and audio"));
+
+	GameplayTags.Cue_Hit_Weakpoint = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Hit.Weakpoint"),
+		TEXT("Weakpoint / armor-piercing hit cue"));
+
+	GameplayTags.Cue_Hit_Block = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Hit.Block"),
+		TEXT("Hit absorbed by a guard"));
+
+	GameplayTags.Cue_Hit_Parry = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Hit.Parry"),
+		TEXT("Perfect parry cinematic cue"));
+
+	GameplayTags.Cue_Hit_GuardBreak = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Hit.GuardBreak"),
+		TEXT("Guard-break impact cue"));
+
+	GameplayTags.Cue_Hit_Finisher = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Hit.Finisher"),
+		TEXT("Finisher / execution cinematic cue"));
+
+	/** Hit reaction direction */
+	GameplayTags.HitReact_Direction_Front = TagManager.AddNativeGameplayTag(
+		FName("HitReact.Direction.Front"),
+		TEXT("Hit was received from the front"));
+
+	GameplayTags.HitReact_Direction_Back = TagManager.AddNativeGameplayTag(
+		FName("HitReact.Direction.Back"),
+		TEXT("Hit was received from behind"));
+
+	GameplayTags.HitReact_Direction_Left = TagManager.AddNativeGameplayTag(
+		FName("HitReact.Direction.Left"),
+		TEXT("Hit was received from the left side"));
+
+	GameplayTags.HitReact_Direction_Right = TagManager.AddNativeGameplayTag(
+		FName("HitReact.Direction.Right"),
+		TEXT("Hit was received from the right side"));
+
+	/** Hit reaction severity */
+	GameplayTags.HitReact_Severity_Light = TagManager.AddNativeGameplayTag(
+		FName("HitReact.Severity.Light"),
+		TEXT("Minor flinch / light hit reaction"));
+
+	GameplayTags.HitReact_Severity_Heavy = TagManager.AddNativeGameplayTag(
+		FName("HitReact.Severity.Heavy"),
+		TEXT("Strong hit reaction with brief locomotion interrupt"));
+
+	GameplayTags.HitReact_Severity_Stagger = TagManager.AddNativeGameplayTag(
+		FName("HitReact.Severity.Stagger"),
+		TEXT("Full stagger reaction; cancels actions"));
+
+	GameplayTags.HitReact_Severity_Launch = TagManager.AddNativeGameplayTag(
+		FName("HitReact.Severity.Launch"),
+		TEXT("Launched / knocked back reaction"));
+
 	/** Input */
 	GameplayTags.Input_Ability_Sprint = TagManager.AddNativeGameplayTag(
 		FName("InputTag.Ability.Sprint"),

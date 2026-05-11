@@ -70,6 +70,27 @@ public:
 	FGameplayTag State_Blocking;
 	FGameplayTag State_Broken;
 
+	/** Cinematic / hit feedback */
+	FGameplayTag Cue_Hit_Impact;
+	FGameplayTag Cue_Hit_Critical;
+	FGameplayTag Cue_Hit_Weakpoint;
+	FGameplayTag Cue_Hit_Block;
+	FGameplayTag Cue_Hit_Parry;
+	FGameplayTag Cue_Hit_GuardBreak;
+	FGameplayTag Cue_Hit_Finisher;
+
+	/** Hit reaction direction (relative to target's forward) */
+	FGameplayTag HitReact_Direction_Front;
+	FGameplayTag HitReact_Direction_Back;
+	FGameplayTag HitReact_Direction_Left;
+	FGameplayTag HitReact_Direction_Right;
+
+	/** Hit reaction severity */
+	FGameplayTag HitReact_Severity_Light;
+	FGameplayTag HitReact_Severity_Heavy;
+	FGameplayTag HitReact_Severity_Stagger;
+	FGameplayTag HitReact_Severity_Launch;
+
 	/** Input */
 	FGameplayTag Input_Ability_Sprint;
 	FGameplayTag Input_Ability_1;
