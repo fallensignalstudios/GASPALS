@@ -91,6 +91,40 @@ public:
 	FGameplayTag HitReact_Severity_Stagger;
 	FGameplayTag HitReact_Severity_Launch;
 
+	/** Ranged weapon abilities */
+	FGameplayTag Ability_Weapon_PrimaryFire;
+	FGameplayTag Ability_Weapon_SecondaryFire;
+	FGameplayTag Ability_Weapon_Reload;
+	FGameplayTag Ability_Weapon_ADS;
+	FGameplayTag Ability_Grenade_Throw;
+
+	/** Ranged weapon state */
+	FGameplayTag State_Weapon_Firing;
+	FGameplayTag State_Weapon_Reloading;
+	FGameplayTag State_Weapon_ADS;
+	FGameplayTag State_Weapon_Empty;
+	FGameplayTag State_Weapon_Overheated;
+	FGameplayTag State_Grenade_Cooking;
+
+	/** Weapon / grenade GameplayCues */
+	FGameplayTag Cue_Weapon_MuzzleFlash;
+	FGameplayTag Cue_Weapon_ShellEject;
+	FGameplayTag Cue_Weapon_Reload;
+	FGameplayTag Cue_Weapon_Empty;
+	FGameplayTag Cue_Weapon_Tracer;
+	FGameplayTag Cue_Grenade_Explode;
+	FGameplayTag Cue_Grenade_Bounce;
+
+	/** Inputs for ranged weapons */
+	FGameplayTag Input_PrimaryFire;
+	FGameplayTag Input_SecondaryFire;
+	FGameplayTag Input_Reload;
+	FGameplayTag Input_Grenade;
+
+	/** Damage scaling SetByCallers (ranged) */
+	FGameplayTag Data_FalloffMultiplier;
+	FGameplayTag Data_RangedDistance;
+
 	/** Input */
 	FGameplayTag Input_Ability_Sprint;
 	FGameplayTag Input_Ability_1;

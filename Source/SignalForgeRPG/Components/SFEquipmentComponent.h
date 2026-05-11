@@ -6,7 +6,11 @@
 #include "Inventory/SFSlotTypes.h"
 #include "Combat/SFWeaponInstanceTypes.h"
 #include "Inventory/SFInventoryTypes.h"
+#include "Abilities/GameplayAbilityTypes.h"
+#include "GameplayAbilitySpecHandle.h"
 #include "SFEquipmentComponent.generated.h"
+
+class UGameplayAbility;
 
 class USFItemDefinition;
 class USFWeaponData;
@@ -123,6 +127,13 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Equipment")
 	TMap<ESFEquipmentSlot, FSFEquipmentSlotEntry> EquippedSlots;
 
+	/**
+	 * Tracks ability spec handles granted by a weapon currently occupying a slot.
+	 * On unequip we clear these handles so the weapon's primary/secondary/reload/extra abilities
+	 * no longer linger on the owner's ASC.
+	 */
+	TMap<ESFEquipmentSlot, TArray<FGameplayAbilitySpecHandle>> GrantedAbilityHandles;
+
 public:
 	/** Equip a raw weapon data asset as the active weapon (no instance perks/rolls). */
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
@@ -175,6 +186,23 @@ public:
 	{
 		return CurrentWeaponInstance.IsValid();
 	}
+
+	UFUNCTION(BlueprintPure, Category = "Equipment")
+	ESFEquipmentSlot GetActiveWeaponSlot() const
+	{
+		return ActiveWeaponSlot;
+	}
+
+	/**
+	 * Lightweight in-place update of the active weapon's instance data (e.g. ammo count
+	 * changing after firing). Does not re-equip, re-grant abilities, or re-spawn the
+	 * weapon actor. Broadcasts OnEquippedWeaponChanged so HUDs/widgets can refresh.
+	 *
+	 * The instance must match the currently-active weapon by InstanceId, otherwise the
+	 * call is rejected to prevent accidental cross-weapon overwrites.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	bool UpdateActiveWeaponInstance(const FSFWeaponInstanceData& UpdatedInstance);
 
 	// For compatibility; returns the actor for the active weapon slot if any.
 	UFUNCTION(BlueprintPure, Category = "Equipment")
@@ -274,6 +302,12 @@ protected:
 		const FGuid* InventoryEntryId = nullptr);
 
 	bool IsWeaponSlot(ESFEquipmentSlot Slot) const;
+
+	/** Grant weapon-defined abilities onto the owning character's ASC. Tracked per slot. */
+	void GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, USFWeaponData* WeaponData);
+
+	/** Remove any weapon-defined abilities granted for the given slot. */
+	void RemoveWeaponAbilitiesForSlot(ESFEquipmentSlot Slot);
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
 	bool bEquipDefaultWeaponOnBeginPlay = true;

@@ -10,6 +10,8 @@
 #include "Components/SFInventoryComponent.h"
 #include "Characters/SFCharacterBase.h"
 #include "Core/SignalForgeGameplayTags.h"
+#include "AbilitySystemComponent.h"
+#include "Abilities/GameplayAbility.h"
 
 USFEquipmentComponent::USFEquipmentComponent()
 {
@@ -83,6 +85,10 @@ bool USFEquipmentComponent::EquipWeaponInstance(const FSFWeaponInstanceData& Wea
 	CurrentWeaponInstance = WeaponInstance;
 
 	RefreshEquippedWeaponActor();
+
+	// Replace any prior weapon-granted abilities for this slot, then grant new ones.
+	RemoveWeaponAbilitiesForSlot(InSlot);
+	GrantWeaponAbilitiesForSlot(InSlot, NewWeaponData);
 
 	if (ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetOwner()))
 	{
@@ -358,6 +364,7 @@ bool USFEquipmentComponent::UnequipSlot(ESFEquipmentSlot Slot)
 	if (IsWeaponSlot(Slot))
 	{
 		DestroyEquippedWeaponActorForSlot(Slot);
+		RemoveWeaponAbilitiesForSlot(Slot);
 
 		if (ActiveWeaponSlot == Slot)
 		{
@@ -379,6 +386,7 @@ void USFEquipmentComponent::ClearEquippedWeapon()
 	}
 
 	DestroyEquippedWeaponActorForSlot(ActiveWeaponSlot);
+	RemoveWeaponAbilitiesForSlot(ActiveWeaponSlot);
 
 	CurrentWeaponInstance = FSFWeaponInstanceData();
 	ActiveWeaponSlot = ESFEquipmentSlot::None;
@@ -415,6 +423,15 @@ void USFEquipmentComponent::ClearAllEquipment()
 		}
 	}
 	EquippedWeaponActors.Empty();
+
+	// Clear all weapon-granted ability handles before we forget which slot owned them.
+	TArray<ESFEquipmentSlot> SlotsWithAbilities;
+	GrantedAbilityHandles.GenerateKeyArray(SlotsWithAbilities);
+	for (const ESFEquipmentSlot Slot : SlotsWithAbilities)
+	{
+		RemoveWeaponAbilitiesForSlot(Slot);
+	}
+	GrantedAbilityHandles.Empty();
 
 	EquippedSlots.Reset();
 	CurrentWeaponInstance = FSFWeaponInstanceData();
@@ -859,4 +876,100 @@ bool USFEquipmentComponent::UnequipInventoryEntry(FGuid InventoryEntryId)
 	}
 
 	return false;
+}
+void USFEquipmentComponent::GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, USFWeaponData* WeaponData)
+{
+	if (!WeaponData)
+	{
+		return;
+	}
+
+	ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetOwner());
+	if (!Character)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = Character->GetAbilitySystemComponent();
+	if (!ASC || !ASC->IsOwnerActorAuthoritative())
+	{
+		// Only the server actually owns ability specs; clients will receive them via replication.
+		return;
+	}
+
+	TArray<FGameplayAbilitySpecHandle>& Handles = GrantedAbilityHandles.FindOrAdd(Slot);
+
+	auto GrantOne = [&](TSubclassOf<UGameplayAbility> AbilityClass)
+	{
+		if (!AbilityClass)
+		{
+			return;
+		}
+		const FGameplayAbilitySpecHandle NewHandle = Character->GrantCharacterAbility(AbilityClass, 1);
+		if (NewHandle.IsValid())
+		{
+			Handles.Add(NewHandle);
+		}
+	};
+
+	GrantOne(WeaponData->PrimaryFireAbility);
+	GrantOne(WeaponData->SecondaryFireAbility);
+	GrantOne(WeaponData->ReloadAbility);
+	for (const TSubclassOf<UGameplayAbility>& Extra : WeaponData->ExtraWeaponAbilities)
+	{
+		GrantOne(Extra);
+	}
+}
+
+void USFEquipmentComponent::RemoveWeaponAbilitiesForSlot(ESFEquipmentSlot Slot)
+{
+	TArray<FGameplayAbilitySpecHandle>* Handles = GrantedAbilityHandles.Find(Slot);
+	if (!Handles || Handles->Num() == 0)
+	{
+		GrantedAbilityHandles.Remove(Slot);
+		return;
+	}
+
+	if (ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetOwner()))
+	{
+		if (UAbilitySystemComponent* ASC = Character->GetAbilitySystemComponent())
+		{
+			if (ASC->IsOwnerActorAuthoritative())
+			{
+				for (const FGameplayAbilitySpecHandle& Handle : *Handles)
+				{
+					if (Handle.IsValid())
+					{
+						ASC->ClearAbility(Handle);
+					}
+				}
+			}
+		}
+	}
+
+	GrantedAbilityHandles.Remove(Slot);
+}
+
+bool USFEquipmentComponent::UpdateActiveWeaponInstance(const FSFWeaponInstanceData& UpdatedInstance)
+{
+	if (!CurrentWeaponInstance.IsValid())
+	{
+		return false;
+	}
+
+	if (UpdatedInstance.InstanceId != CurrentWeaponInstance.InstanceId)
+	{
+		// Different instance — reject. Callers should use EquipWeaponInstance to swap weapons.
+		return false;
+	}
+
+	CurrentWeaponInstance = UpdatedInstance;
+
+	USFWeaponData* WeaponData = CurrentWeaponInstance.WeaponDefinition.IsValid()
+		? CurrentWeaponInstance.WeaponDefinition.Get()
+		: CurrentWeaponInstance.WeaponDefinition.LoadSynchronous();
+
+	OnEquippedWeaponChanged.Broadcast(WeaponData, CurrentWeaponInstance);
+	BroadcastEquipmentUpdated();
+	return true;
 }

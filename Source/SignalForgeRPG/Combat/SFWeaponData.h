@@ -17,6 +17,151 @@ class UAnimMontage;
 class UAnimInstance;
 class USFWeaponAnimationSet;
 class USFItemDefinition;
+class ASFProjectileBase;
+class UGameplayAbility;
+class UGameplayEffect;
+class USoundBase;
+class UCameraShakeBase;
+class UCurveFloat;
+
+/** High-level fire mode for ranged weapons. */
+UENUM(BlueprintType)
+enum class ESFWeaponFireMode : uint8
+{
+	Single		UMETA(DisplayName = "Single Shot"),
+	Burst		UMETA(DisplayName = "Burst Fire"),
+	FullAuto	UMETA(DisplayName = "Full Auto"),
+	Charge		UMETA(DisplayName = "Charge / Hold"),
+	Beam		UMETA(DisplayName = "Continuous Beam")
+};
+
+/**
+ * Per-weapon ranged tuning. Drives the default ranged fire ability and weapon-granted abilities.
+ * Designed so that designers can swap rifle/pistol/shotgun/sniper feel by editing a single struct.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFRangedWeaponConfig
+{
+	GENERATED_BODY()
+
+	/** Fire mode determines whether holding the trigger keeps firing, fires bursts, etc. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	ESFWeaponFireMode FireMode = ESFWeaponFireMode::Single;
+
+	/** Cyclic rate of fire, used to derive cycle time between shots. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire", meta = (ClampMin = "30.0", ClampMax = "2400.0"))
+	float RoundsPerMinute = 480.0f;
+
+	/** Rounds per burst when FireMode == Burst. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire", meta = (ClampMin = "1", ClampMax = "16"))
+	int32 BurstCount = 3;
+
+	/** Seconds between shots inside a burst (defaults to 60/RPM if zero). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire", meta = (ClampMin = "0.0"))
+	float BurstIntervalSeconds = 0.05f;
+
+	/** If true, use a hitscan trace; otherwise spawn ProjectileClass. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire")
+	bool bHitscan = true;
+
+	/** Max trace distance for hitscan weapons. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire|Hitscan", meta = (ClampMin = "100.0", EditCondition = "bHitscan"))
+	float HitscanMaxRange = 12000.0f;
+
+	/** Projectile class spawned per shot when bHitscan is false. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Fire|Projectile", meta = (EditCondition = "!bHitscan"))
+	TSubclassOf<ASFProjectileBase> ProjectileClass;
+
+	/** Base damage applied per hit (used by hitscan; projectile uses its own damage effect). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", meta = (ClampMin = "0.0"))
+	float BaseDamage = 18.0f;
+
+	/** Damage effect class applied on hit. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
+	TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+	/** Distance (cm) at which damage starts falling off. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage|Falloff", meta = (ClampMin = "0.0"))
+	float FalloffStartDistance = 2500.0f;
+
+	/** Distance (cm) at which damage hits its minimum multiplier. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage|Falloff", meta = (ClampMin = "0.0"))
+	float FalloffEndDistance = 7500.0f;
+
+	/** Minimum damage multiplier at >= FalloffEndDistance (e.g. 0.35 = 35%). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage|Falloff", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MinFalloffMultiplier = 0.35f;
+
+	/** Optional curve overrides the simple Start/End falloff. X = distance in cm, Y = multiplier [0..1]. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage|Falloff")
+	TObjectPtr<UCurveFloat> DamageFalloffCurve = nullptr;
+
+	/** Multiplier when the trace hits a headshot bone (e.g. head/neck). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", meta = (ClampMin = "1.0"))
+	float HeadshotMultiplier = 2.0f;
+
+	/** Pellets per shot: 1 for rifles/pistols, 8+ for shotguns. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Spread", meta = (ClampMin = "1", ClampMax = "32"))
+	int32 PelletsPerShot = 1;
+
+	/** Cone half-angle in degrees while hipfiring. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Spread", meta = (ClampMin = "0.0", ClampMax = "45.0"))
+	float HipfireSpreadDegrees = 2.5f;
+
+	/** Cone half-angle in degrees while aiming down sights. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Spread", meta = (ClampMin = "0.0", ClampMax = "45.0"))
+	float AdsSpreadDegrees = 0.4f;
+
+	/** Degrees of vertical recoil kicked per shot (controller pitch up). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Recoil", meta = (ClampMin = "0.0"))
+	float VerticalRecoil = 0.6f;
+
+	/** Degrees of horizontal recoil kicked per shot (controller yaw, randomized sign). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Recoil", meta = (ClampMin = "0.0"))
+	float HorizontalRecoil = 0.25f;
+
+	/** Camera shake when firing. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Feedback")
+	TSubclassOf<UCameraShakeBase> FireCameraShake;
+
+	/** Optional fire montage override (defaults to weapon ability montage if null). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Feedback")
+	TObjectPtr<UAnimMontage> FireMontageOverride = nullptr;
+
+	/** Montage played when trying to fire with empty clip. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Feedback")
+	TObjectPtr<UAnimMontage> EmptyClickMontage = nullptr;
+
+	/** Sound when dry-firing on empty clip. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Feedback")
+	TObjectPtr<USoundBase> EmptyClickSound = nullptr;
+
+	/** Optional gameplay cue tag override for muzzle flash (else uses default Cue.Weapon.MuzzleFlash). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Feedback|Cues", meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag MuzzleFlashCueOverride;
+
+	/** Optional gameplay cue tag override for tracer (else uses default Cue.Weapon.Tracer). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Feedback|Cues", meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag TracerCueOverride;
+
+	/** Optional gameplay cue tag override for shell ejection (else uses default Cue.Weapon.ShellEject). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Feedback|Cues", meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag ShellEjectCueOverride;
+
+	/** Reload duration in seconds (used by default reload ability if no montage is set). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Reload", meta = (ClampMin = "0.1"))
+	float ReloadSeconds = 1.8f;
+
+	/** Optional reload montage (default reload ability plays it on the owner). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Reload")
+	TObjectPtr<UAnimMontage> ReloadMontage = nullptr;
+
+	/** Computes interval (seconds) between shots from RPM. */
+	float GetCycleTime() const
+	{
+		return RoundsPerMinute > 0.0f ? (60.0f / RoundsPerMinute) : 0.1f;
+	}
+};
 
 /** Combat tuning very similar to Narrative's AttackDamage + multipliers. */
 USTRUCT(BlueprintType)
@@ -172,6 +317,26 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Ammo")
 	FSFWeaponAmmoConfig AmmoConfig;
+
+	/** Ranged tuning (fire mode, spread, recoil, falloff). Used by the default ranged fire ability. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Ranged")
+	FSFRangedWeaponConfig RangedConfig;
+
+	/** Primary fire ability granted while this weapon is equipped (e.g. WeaponFire). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Abilities")
+	TSubclassOf<UGameplayAbility> PrimaryFireAbility;
+
+	/** Secondary fire / aim-down-sights ability granted while equipped (optional). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Abilities")
+	TSubclassOf<UGameplayAbility> SecondaryFireAbility;
+
+	/** Reload ability granted while equipped (optional). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Abilities")
+	TSubclassOf<UGameplayAbility> ReloadAbility;
+
+	/** Additional weapon-granted abilities (special fire modes, melee bash, signature attacks). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Abilities")
+	TArray<TSubclassOf<UGameplayAbility>> ExtraWeaponAbilities;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Attachments",
 		meta = (Categories = "SignalForge.Equipment.Weapon.AttachSlot"))
