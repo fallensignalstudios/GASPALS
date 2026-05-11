@@ -313,6 +313,10 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("State.Weapon.Overheated"),
 		TEXT("Energy / plasma weapon is overheated"));
 
+	GameplayTags.State_Weapon_Switching = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.Switching"),
+		TEXT("Character is in the middle of a weapon swap / holster / draw"));
+
 	GameplayTags.State_Grenade_Cooking = TagManager.AddNativeGameplayTag(
 		FName("State.Grenade.Cooking"),
 		TEXT("Grenade fuse is burning before throw"));

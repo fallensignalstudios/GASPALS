@@ -662,6 +662,24 @@ void ASFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(SecondaryFireAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnSecondaryFirePressed);
 		EnhancedInputComponent->BindAction(SecondaryFireAction, ETriggerEvent::Completed, this, &ASFPlayerCharacter::OnSecondaryFireReleased);
 	}
+
+	// Weapon slot selection (1 / 2 / 3 / Y). All fire only on press — release is irrelevant.
+	if (SelectPrimaryWeaponAction)
+	{
+		EnhancedInputComponent->BindAction(SelectPrimaryWeaponAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnSelectPrimaryWeapon);
+	}
+	if (SelectSecondaryWeaponAction)
+	{
+		EnhancedInputComponent->BindAction(SelectSecondaryWeaponAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnSelectSecondaryWeapon);
+	}
+	if (SelectHeavyWeaponAction)
+	{
+		EnhancedInputComponent->BindAction(SelectHeavyWeaponAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnSelectHeavyWeapon);
+	}
+	if (HolsterWeaponAction)
+	{
+		EnhancedInputComponent->BindAction(HolsterWeaponAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnHolsterWeapon);
+	}
 }
 
 void ASFPlayerCharacter::Move(const FInputActionValue& Value)
@@ -792,6 +810,38 @@ void ASFPlayerCharacter::OnSecondaryFirePressed(const FInputActionValue& Value)
 void ASFPlayerCharacter::OnSecondaryFireReleased(const FInputActionValue& Value)
 {
 	ProcessAbilityInputReleased(FSignalForgeGameplayTags::Get().Input_SecondaryFire);
+}
+
+void ASFPlayerCharacter::OnSelectPrimaryWeapon(const FInputActionValue& Value)
+{
+	if (USFEquipmentComponent* Equipment = GetEquipmentComponent())
+	{
+		Equipment->SwitchToWeaponSlot(ESFEquipmentSlot::PrimaryWeapon);
+	}
+}
+
+void ASFPlayerCharacter::OnSelectSecondaryWeapon(const FInputActionValue& Value)
+{
+	if (USFEquipmentComponent* Equipment = GetEquipmentComponent())
+	{
+		Equipment->SwitchToWeaponSlot(ESFEquipmentSlot::SecondaryWeapon);
+	}
+}
+
+void ASFPlayerCharacter::OnSelectHeavyWeapon(const FInputActionValue& Value)
+{
+	if (USFEquipmentComponent* Equipment = GetEquipmentComponent())
+	{
+		Equipment->SwitchToWeaponSlot(ESFEquipmentSlot::HeavyWeapon);
+	}
+}
+
+void ASFPlayerCharacter::OnHolsterWeapon(const FInputActionValue& Value)
+{
+	if (USFEquipmentComponent* Equipment = GetEquipmentComponent())
+	{
+		Equipment->HolsterActiveWeapon();
+	}
 }
 
 void ASFPlayerCharacter::HandleInteractInput(const FInputActionValue& Value)

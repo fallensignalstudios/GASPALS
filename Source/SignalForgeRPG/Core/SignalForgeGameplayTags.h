@@ -104,6 +104,7 @@ public:
 	FGameplayTag State_Weapon_ADS;
 	FGameplayTag State_Weapon_Empty;
 	FGameplayTag State_Weapon_Overheated;
+	FGameplayTag State_Weapon_Switching;
 	FGameplayTag State_Grenade_Cooking;
 
 	/** Weapon / grenade GameplayCues */

@@ -23,10 +23,11 @@ USFGameplayAbility_Reload::USFGameplayAbility_Reload()
 	AssetTags.AddTag(Tags.Ability_Weapon_Reload);
 	SetAssetTags(AssetTags);
 
-	// While reloading, suppress firing.
+	// While reloading, suppress firing. Also block reload itself while a weapon swap is in flight.
 	FGameplayTagContainer BlockedTags;
 	BlockedTags.AddTag(Tags.Ability_Weapon_PrimaryFire);
 	BlockedTags.AddTag(Tags.Ability_Weapon_SecondaryFire);
+	BlockedTags.AddTag(Tags.State_Weapon_Switching);
 	ActivationBlockedTags = BlockedTags;
 
 	FGameplayTagContainer GrantedTags;

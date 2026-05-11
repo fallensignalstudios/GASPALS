@@ -14,6 +14,9 @@
 #include "Core/SignalForgeGameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "Abilities/GameplayAbility.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
+#include "TimerManager.h"
 
 USFEquipmentComponent::USFEquipmentComponent()
 {
@@ -83,6 +86,16 @@ bool USFEquipmentComponent::EquipWeaponInstance(const FSFWeaponInstanceData& Wea
 		return true;
 	}
 
+	// Strict ability model: when we change the active slot, the previously-active slot's
+	// weapon abilities must no longer be usable. The new slot's abilities are granted below.
+	// (Same-slot re-equip is allowed — we still re-grant in case the weapon data changed.)
+	if (ActiveWeaponSlot != ESFEquipmentSlot::None && ActiveWeaponSlot != InSlot)
+	{
+		RemoveWeaponAbilitiesForSlot(ActiveWeaponSlot);
+		// Snap the now-inactive weapon visual to its holster socket.
+		UpdateWeaponActorAttachmentForSlot(ActiveWeaponSlot, /*bIsActive=*/false);
+	}
+
 	ActiveWeaponSlot = InSlot;
 	CurrentWeaponInstance = WeaponInstance;
 
@@ -126,6 +139,9 @@ bool USFEquipmentComponent::EquipWeaponInstance(const FSFWeaponInstanceData& Wea
 	}
 
 	RefreshEquippedWeaponActor();
+
+	// New slot is now active — make sure its visual is on the hand socket, not the holster.
+	UpdateWeaponActorAttachmentForSlot(InSlot, /*bIsActive=*/true);
 
 	// Replace any prior weapon-granted abilities for this slot, then grant new ones.
 	RemoveWeaponAbilitiesForSlot(InSlot);
@@ -730,8 +746,20 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 	if (USkeletalMeshComponent* OwnerMesh = GetOwnerSkeletalMesh())
 	{
 		const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
-		NewActor->AttachToComponent(OwnerMesh, AttachRules, WeaponData->AttachSocketName);
-		NewActor->SetActorRelativeTransform(WeaponData->RelativeAttachTransform);
+		// Attach to the appropriate socket based on whether this slot is currently active.
+		// Non-active slots use the holster socket when one is provided; if no holster socket is
+		// configured we fall back to the hand socket (loud-and-visible default beats silent fail).
+		const bool bIsActiveSlot = (ActiveWeaponSlot == Slot);
+		const bool bHasHolsterSocket = WeaponData->HolsteredAttachSocketName != NAME_None;
+		const FName SocketName = (!bIsActiveSlot && bHasHolsterSocket)
+			? WeaponData->HolsteredAttachSocketName
+			: WeaponData->AttachSocketName;
+		const FTransform& RelativeXform = (!bIsActiveSlot && bHasHolsterSocket)
+			? WeaponData->HolsteredRelativeAttachTransform
+			: WeaponData->RelativeAttachTransform;
+
+		NewActor->AttachToComponent(OwnerMesh, AttachRules, SocketName);
+		NewActor->SetActorRelativeTransform(RelativeXform);
 	}
 	else
 	{
@@ -1029,4 +1057,266 @@ bool USFEquipmentComponent::UpdateActiveWeaponInstance(const FSFWeaponInstanceDa
 	OnEquippedWeaponChanged.Broadcast(WeaponData, CurrentWeaponInstance);
 	BroadcastEquipmentUpdated();
 	return true;
+}
+
+// ============================================================================
+// Weapon switching + holstering
+// ============================================================================
+
+void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot Slot, bool bIsActive)
+{
+	if (Slot == ESFEquipmentSlot::None)
+	{
+		return;
+	}
+
+	const TObjectPtr<ASFWeaponActor>* Found = EquippedWeaponActors.Find(Slot);
+	ASFWeaponActor* Actor = Found ? Found->Get() : nullptr;
+	if (!Actor)
+	{
+		return;
+	}
+
+	USkeletalMeshComponent* OwnerMesh = GetOwnerSkeletalMesh();
+	if (!OwnerMesh)
+	{
+		return;
+	}
+
+	const FSFEquipmentSlotEntry* Entry = EquippedSlots.Find(Slot);
+	if (!Entry || !Entry->WeaponInstance.IsValid())
+	{
+		return;
+	}
+
+	USFWeaponData* WeaponData = Entry->WeaponInstance.WeaponDefinition.IsValid()
+		? Entry->WeaponInstance.WeaponDefinition.Get()
+		: Entry->WeaponInstance.WeaponDefinition.LoadSynchronous();
+	if (!WeaponData)
+	{
+		return;
+	}
+
+	const bool bHasHolsterSocket = WeaponData->HolsteredAttachSocketName != NAME_None;
+	const FName SocketName = (!bIsActive && bHasHolsterSocket)
+		? WeaponData->HolsteredAttachSocketName
+		: WeaponData->AttachSocketName;
+	const FTransform& RelativeXform = (!bIsActive && bHasHolsterSocket)
+		? WeaponData->HolsteredRelativeAttachTransform
+		: WeaponData->RelativeAttachTransform;
+
+	const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
+	Actor->AttachToComponent(OwnerMesh, AttachRules, SocketName);
+	Actor->SetActorRelativeTransform(RelativeXform);
+}
+
+bool USFEquipmentComponent::SwitchToWeaponSlot(ESFEquipmentSlot Slot)
+{
+	if (!IsWeaponSlot(Slot))
+	{
+		return false;
+	}
+
+	// Block re-entrant switches: if a swap is already in flight, ignore (could be debounced
+	// later with a queue if designers want chainable cycle).
+	if (bIsSwitchingWeapons)
+	{
+		return false;
+	}
+
+	// Same slot already active? No-op. (Pressing 1 while Primary is active = nothing.)
+	if (ActiveWeaponSlot == Slot)
+	{
+		return false;
+	}
+
+	const FSFEquipmentSlotEntry Entry = GetEquipmentSlotEntry(Slot);
+	if (!Entry.bHasItemEquipped || !Entry.WeaponInstance.IsValid())
+	{
+		// Empty slot — nothing to draw.
+		return false;
+	}
+
+	USFWeaponData* TargetWeaponData = Entry.WeaponInstance.WeaponDefinition.IsValid()
+		? Entry.WeaponInstance.WeaponDefinition.Get()
+		: Entry.WeaponInstance.WeaponDefinition.LoadSynchronous();
+	if (!TargetWeaponData)
+	{
+		return false;
+	}
+
+	ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetOwner());
+	UAbilitySystemComponent* ASC = Character ? Character->GetAbilitySystemComponent() : nullptr;
+
+	// While the swap is in flight, block fire / reload / ADS via State.Weapon.Switching.
+	// Also pre-emptively yank the OUTGOING weapon's abilities so trigger-held full-auto stops.
+	if (ActiveWeaponSlot != ESFEquipmentSlot::None)
+	{
+		RemoveWeaponAbilitiesForSlot(ActiveWeaponSlot);
+	}
+
+	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+	if (ASC && Tags.State_Weapon_Switching.IsValid())
+	{
+		ASC->AddLooseGameplayTag(Tags.State_Weapon_Switching, 1);
+	}
+
+	// Optional holster/draw montages — animation only, doesn't gate the timer.
+	if (Character)
+	{
+		if (USkeletalMeshComponent* Mesh = Character->GetMesh())
+		{
+			if (UAnimInstance* Anim = Mesh->GetAnimInstance())
+			{
+				// Holster outgoing weapon (if there was one).
+				if (ActiveWeaponSlot != ESFEquipmentSlot::None)
+				{
+					if (USFWeaponData* OldData = GetCurrentWeaponData())
+					{
+						if (OldData->HolsterMontage)
+						{
+							Anim->Montage_Play(OldData->HolsterMontage, 1.0f);
+						}
+					}
+				}
+				// Draw incoming weapon.
+				if (TargetWeaponData->DrawMontage)
+				{
+					Anim->Montage_Play(TargetWeaponData->DrawMontage, 1.0f);
+				}
+			}
+		}
+	}
+
+	bIsSwitchingWeapons = true;
+	bPendingSwitchIsHolster = false;
+	PendingSwitchSlot = Slot;
+
+	OnWeaponSwitchStarted.Broadcast(Slot, Entry.ItemDefinition, Entry.WeaponInstance);
+
+	const float SwapTime = FMath::Max(0.0f, TargetWeaponData->SwapTimeSeconds);
+	UWorld* World = GetWorld();
+	if (SwapTime <= KINDA_SMALL_NUMBER || !World)
+	{
+		// Zero-delay path: fire the completion immediately.
+		FinishWeaponSwitch();
+		return true;
+	}
+
+	World->GetTimerManager().SetTimer(
+		SwitchTimerHandle,
+		FTimerDelegate::CreateUObject(this, &USFEquipmentComponent::FinishWeaponSwitch),
+		SwapTime,
+		false);
+	return true;
+}
+
+bool USFEquipmentComponent::HolsterActiveWeapon()
+{
+	if (bIsSwitchingWeapons)
+	{
+		return false;
+	}
+
+	if (ActiveWeaponSlot == ESFEquipmentSlot::None)
+	{
+		return false;
+	}
+
+	const ESFEquipmentSlot SlotToHolster = ActiveWeaponSlot;
+	const FSFEquipmentSlotEntry Entry = GetEquipmentSlotEntry(SlotToHolster);
+
+	USFWeaponData* OldData = GetCurrentWeaponData();
+	const float SwapTime = OldData ? FMath::Max(0.0f, OldData->SwapTimeSeconds) : 0.0f;
+
+	ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetOwner());
+	UAbilitySystemComponent* ASC = Character ? Character->GetAbilitySystemComponent() : nullptr;
+
+	// Immediately revoke abilities so the soon-to-be-holstered weapon can't fire any more shots.
+	RemoveWeaponAbilitiesForSlot(SlotToHolster);
+
+	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+	if (ASC && Tags.State_Weapon_Switching.IsValid())
+	{
+		ASC->AddLooseGameplayTag(Tags.State_Weapon_Switching, 1);
+	}
+
+	if (Character && OldData && OldData->HolsterMontage)
+	{
+		if (USkeletalMeshComponent* Mesh = Character->GetMesh())
+		{
+			if (UAnimInstance* Anim = Mesh->GetAnimInstance())
+			{
+				Anim->Montage_Play(OldData->HolsterMontage, 1.0f);
+			}
+		}
+	}
+
+	bIsSwitchingWeapons = true;
+	bPendingSwitchIsHolster = true;
+	PendingSwitchSlot = SlotToHolster;
+
+	OnWeaponSwitchStarted.Broadcast(SlotToHolster, Entry.ItemDefinition, Entry.WeaponInstance);
+
+	UWorld* World = GetWorld();
+	if (SwapTime <= KINDA_SMALL_NUMBER || !World)
+	{
+		FinishWeaponSwitch();
+		return true;
+	}
+
+	World->GetTimerManager().SetTimer(
+		SwitchTimerHandle,
+		FTimerDelegate::CreateUObject(this, &USFEquipmentComponent::FinishWeaponSwitch),
+		SwapTime,
+		false);
+	return true;
+}
+
+void USFEquipmentComponent::FinishWeaponSwitch()
+{
+	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+
+	ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetOwner());
+	UAbilitySystemComponent* ASC = Character ? Character->GetAbilitySystemComponent() : nullptr;
+
+	if (ASC && Tags.State_Weapon_Switching.IsValid())
+	{
+		ASC->RemoveLooseGameplayTag(Tags.State_Weapon_Switching, 1);
+	}
+
+	const ESFEquipmentSlot TargetSlot = PendingSwitchSlot;
+	const bool bWasHolster = bPendingSwitchIsHolster;
+
+	// Reset state up front so any reentrancy from broadcast callbacks works.
+	bIsSwitchingWeapons = false;
+	bPendingSwitchIsHolster = false;
+	PendingSwitchSlot = ESFEquipmentSlot::None;
+	SwitchTimerHandle.Invalidate();
+
+	if (bWasHolster)
+	{
+		// Holster path: visually move the weapon to its holster socket and clear active.
+		UpdateWeaponActorAttachmentForSlot(TargetSlot, /*bIsActive=*/false);
+
+		ActiveWeaponSlot = ESFEquipmentSlot::None;
+		CurrentWeaponInstance = FSFWeaponInstanceData();
+		OnEquippedWeaponChanged.Broadcast(nullptr, FSFWeaponInstanceData());
+		BroadcastEquipmentUpdated();
+
+		const FSFEquipmentSlotEntry Entry = GetEquipmentSlotEntry(TargetSlot);
+		OnWeaponSwitchCompleted.Broadcast(TargetSlot, Entry.ItemDefinition, Entry.WeaponInstance);
+		return;
+	}
+
+	// Swap path: promote target slot to active. EquipWeaponInstance handles ability grant,
+	// visual reattachment to hand socket, and broadcasts.
+	const FSFEquipmentSlotEntry Entry = GetEquipmentSlotEntry(TargetSlot);
+	if (Entry.bHasItemEquipped && Entry.WeaponInstance.IsValid())
+	{
+		EquipWeaponInstance(Entry.WeaponInstance, TargetSlot);
+	}
+
+	const FSFEquipmentSlotEntry FinalEntry = GetEquipmentSlotEntry(TargetSlot);
+	OnWeaponSwitchCompleted.Broadcast(TargetSlot, FinalEntry.ItemDefinition, FinalEntry.WeaponInstance);
 }

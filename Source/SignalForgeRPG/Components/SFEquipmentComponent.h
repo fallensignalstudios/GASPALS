@@ -171,6 +171,30 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Equipment")
 	void SetActiveWeaponSlot(ESFEquipmentSlot Slot);
 
+	/**
+	 * Initiates a weapon switch to the given slot. Adds State.Weapon.Switching for the swap
+	 * duration (Min of source weapon's HolsterTime and target weapon's SwapTimeSeconds), then
+	 * promotes the target slot to active and re-grants abilities. If Slot is already active,
+	 * returns false. If the slot is empty, returns false. The actual swap completion fires
+	 * asynchronously via timer; subscribe to OnWeaponSwitchCompleted to react.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	bool SwitchToWeaponSlot(ESFEquipmentSlot Slot);
+
+	/**
+	 * Holsters the currently active weapon: removes its abilities, snaps the visual actor to
+	 * its HolsteredAttachSocketName, clears ActiveWeaponSlot. Does NOT remove the weapon from
+	 * the slot — the entry stays in EquippedSlots so the player can re-draw it later.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Equipment")
+	bool HolsterActiveWeapon();
+
+	UFUNCTION(BlueprintPure, Category = "Equipment")
+	bool IsSwitchingWeapons() const
+	{
+		return bIsSwitchingWeapons;
+	}
+
 	/** Convenience: get current weapon definition from the active instance. */
 	UFUNCTION(BlueprintPure, Category = "Equipment")
 	USFWeaponData* GetCurrentWeaponData() const;
@@ -274,6 +298,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Equipment")
 	FOnEquipmentSlotChangedSignature OnEquipmentSlotChanged;
 
+	/** Broadcast when a weapon switch begins (after State.Weapon.Switching is added). */
+	UPROPERTY(BlueprintAssignable, Category = "Equipment")
+	FOnEquipmentSlotChangedSignature OnWeaponSwitchStarted;
+
+	/** Broadcast when a weapon switch finishes (after the new slot becomes active). */
+	UPROPERTY(BlueprintAssignable, Category = "Equipment")
+	FOnEquipmentSlotChangedSignature OnWeaponSwitchCompleted;
+
 	UFUNCTION(BlueprintPure, Category = "Equipment")
 	bool IsInventoryEntryEquipped(FGuid InventoryEntryId) const;
 
@@ -308,6 +340,22 @@ protected:
 
 	/** Remove any weapon-defined abilities granted for the given slot. */
 	void RemoveWeaponAbilitiesForSlot(ESFEquipmentSlot Slot);
+
+	/**
+	 * Snap the visual actor for the given slot to either its hand socket (when active) or its
+	 * holster socket (otherwise). Idempotent. Called whenever ActiveWeaponSlot changes.
+	 */
+	void UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot Slot, bool bIsActive);
+
+	/** Timer callback that finalizes SwitchToWeaponSlot once SwapTimeSeconds has elapsed. */
+	UFUNCTION()
+	void FinishWeaponSwitch();
+
+	// --- Weapon switching state ---
+	FTimerHandle SwitchTimerHandle;
+	ESFEquipmentSlot PendingSwitchSlot = ESFEquipmentSlot::None;
+	bool bIsSwitchingWeapons = false;
+	bool bPendingSwitchIsHolster = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment")
 	bool bEquipDefaultWeaponOnBeginPlay = true;

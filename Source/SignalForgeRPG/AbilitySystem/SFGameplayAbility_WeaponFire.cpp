@@ -39,6 +39,11 @@ USFGameplayAbility_WeaponFire::USFGameplayAbility_WeaponFire()
 	CancelTags.AddTag(Tags.Ability_Weapon_PrimaryFire);
 	CancelAbilitiesWithTag = CancelTags;
 
+	// Don't allow firing while a weapon swap or reload is in flight.
+	FGameplayTagContainer BlockedTags;
+	BlockedTags.AddTag(Tags.State_Weapon_Switching);
+	ActivationBlockedTags = BlockedTags;
+
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 }
@@ -284,10 +289,18 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 
 		if (Config.bHitscan)
 		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("WeaponFire::FireOneShot -> HITSCAN branch (Config.bHitscan=true on %s). ")
+				TEXT("Uncheck 'Hitscan' on the weapon data asset to take the projectile branch."),
+				WeaponData ? *WeaponData->GetName() : TEXT("<null>"));
 			FireHitscanPellet(Character, WeaponActor, Config, MuzzleLocation, ShotRotation);
 		}
 		else
 		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("WeaponFire::FireOneShot -> PROJECTILE branch on %s, ProjectileClass=%s"),
+				WeaponData ? *WeaponData->GetName() : TEXT("<null>"),
+				Config.ProjectileClass ? *Config.ProjectileClass->GetName() : TEXT("<null>"));
 			FireProjectilePellet(Character, WeaponActor, Config, MuzzleLocation, ShotRotation);
 		}
 	}
