@@ -84,6 +84,13 @@ bool USFEquipmentComponent::EquipWeaponInstance(const FSFWeaponInstanceData& Wea
 	ActiveWeaponSlot = InSlot;
 	CurrentWeaponInstance = WeaponInstance;
 
+	// Auto-fill the clip on first equip so a fresh weapon doesn't dry-fire on its first trigger pull.
+	// (AmmoInClip defaults to 0 on FSFWeaponInstanceData; only the Reload ability ever raises it.)
+	if (NewWeaponData->AmmoConfig.ClipSize > 0 && CurrentWeaponInstance.AmmoInClip <= 0)
+	{
+		CurrentWeaponInstance.AmmoInClip = NewWeaponData->AmmoConfig.ClipSize;
+	}
+
 	RefreshEquippedWeaponActor();
 
 	// Replace any prior weapon-granted abilities for this slot, then grant new ones.
