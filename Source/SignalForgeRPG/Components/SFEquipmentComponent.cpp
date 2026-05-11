@@ -716,9 +716,39 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 {
 	DestroyEquippedWeaponActorForSlot(Slot);
 
-	if (!WeaponData || !WeaponData->WeaponActorClass)
+	if (!WeaponData)
 	{
 		return;
+	}
+
+	// Misconfiguration guards: warn loudly so designers immediately see why a slot
+	// has no visible mesh or always attaches to the hand socket instead of holster.
+	if (!WeaponData->WeaponActorClass)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFEquipment: WeaponActorClass is NULL on '%s' (slot %d) -- no mesh will be spawned. ")
+			TEXT("Assign a BP_Weapon_* class on the weapon data asset."),
+			*WeaponData->GetName(),
+			static_cast<int32>(Slot));
+		return;
+	}
+
+	if (WeaponData->AttachSocketName == NAME_None)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFEquipment: AttachSocketName is NAME_None on '%s' (slot %d) -- weapon will attach to mesh root. ")
+			TEXT("Set the hand socket (e.g. 'GripPoint' / 'hand_r_socket') on the weapon data asset."),
+			*WeaponData->GetName(),
+			static_cast<int32>(Slot));
+	}
+
+	if (WeaponData->HolsteredAttachSocketName == NAME_None)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFEquipment: HolsteredAttachSocketName is NAME_None on '%s' (slot %d) -- holstered weapons will use the hand socket as a fallback. ")
+			TEXT("Set a holster socket (e.g. 'spine_03_holster_primary') on the weapon data asset to avoid weapons stacking in the hand."),
+			*WeaponData->GetName(),
+			static_cast<int32>(Slot));
 	}
 
 	AActor* OwnerActor = GetOwner();
