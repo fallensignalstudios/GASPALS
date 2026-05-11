@@ -7,6 +7,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Core/SignalForgeGameplayTags.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GameplayCueManager.h"
@@ -174,7 +175,7 @@ void ASFGrenadeBase::Explode()
 		FCollisionShape::MakeSphere(FMath::Max(InnerRadius, OuterRadius)),
 		Params);
 
-	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+	const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
 
 	UAbilitySystemComponent* SourceASC = Thrower
 		? UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Thrower)
@@ -213,9 +214,9 @@ void ASFGrenadeBase::Explode()
 				FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(DamageEffectClass, 1.0f, Context);
 				if (SpecHandle.IsValid())
 				{
-					if (Tags.Data_BaseDamage.IsValid())
+					if (SFTags.Data_BaseDamage.IsValid())
 					{
-						SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_BaseDamage, FinalDamage);
+						SpecHandle.Data->SetSetByCallerMagnitude(SFTags.Data_BaseDamage, FinalDamage);
 					}
 					SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 				}
@@ -241,8 +242,8 @@ void ASFGrenadeBase::Explode()
 
 void ASFGrenadeBase::DispatchBounceCue(const FHitResult& Hit)
 {
-	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
-	const FGameplayTag CueTag = BounceCueOverride.IsValid() ? BounceCueOverride : Tags.Cue_Grenade_Bounce;
+	const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
+	const FGameplayTag CueTag = BounceCueOverride.IsValid() ? BounceCueOverride : SFTags.Cue_Grenade_Bounce;
 	if (!CueTag.IsValid())
 	{
 		return;
@@ -264,8 +265,8 @@ void ASFGrenadeBase::DispatchBounceCue(const FHitResult& Hit)
 
 void ASFGrenadeBase::DispatchExplodeCue(const FVector& Location)
 {
-	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
-	const FGameplayTag CueTag = ExplosionCueOverride.IsValid() ? ExplosionCueOverride : Tags.Cue_Grenade_Explode;
+	const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
+	const FGameplayTag CueTag = ExplosionCueOverride.IsValid() ? ExplosionCueOverride : SFTags.Cue_Grenade_Explode;
 	if (!CueTag.IsValid())
 	{
 		return;
