@@ -1,7 +1,9 @@
 #include "Components/SFEquipmentComponent.h"
 
+#include "Combat/SFAmmoType.h"
 #include "Combat/SFWeaponActor.h"
 #include "Combat/SFWeaponData.h"
+#include "Components/SFAmmoReserveComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
@@ -84,11 +86,43 @@ bool USFEquipmentComponent::EquipWeaponInstance(const FSFWeaponInstanceData& Wea
 	ActiveWeaponSlot = InSlot;
 	CurrentWeaponInstance = WeaponInstance;
 
-	// Auto-fill the clip on first equip so a fresh weapon doesn't dry-fire on its first trigger pull.
-	// (AmmoInClip defaults to 0 on FSFWeaponInstanceData; only the Reload ability ever raises it.)
+	// Auto-load the clip on first equip so a fresh weapon doesn't dry-fire on its first trigger
+	// pull. If the weapon has an AmmoType, draw from the carrier's reserve; otherwise (energy /
+	// reserve-less weapons) just top to ClipSize so the weapon is usable. Instances with prior
+	// non-zero ammo (e.g. a saved half-empty clip) are left alone.
 	if (NewWeaponData->AmmoConfig.ClipSize > 0 && CurrentWeaponInstance.AmmoInClip <= 0)
 	{
-		CurrentWeaponInstance.AmmoInClip = NewWeaponData->AmmoConfig.ClipSize;
+		const int32 ClipSize = NewWeaponData->AmmoConfig.ClipSize;
+		USFAmmoType* AmmoType = NewWeaponData->AmmoConfig.AmmoType;
+
+		if (AmmoType)
+		{
+			if (ASFCharacterBase* OwningCharacter = Cast<ASFCharacterBase>(GetOwner()))
+			{
+				if (USFAmmoReserveComponent* Reserve = OwningCharacter->GetAmmoReserveComponent())
+				{
+					// Seed the reserve once if it's empty, so freshly-spawned characters with no
+					// loadout still have something to load. Designers can override by setting the
+					// reserve explicitly before equip, or by setting DefaultStartingAmount to 0.
+					Reserve->EnsureStartingAmmo(AmmoType);
+					const int32 Drawn = Reserve->ConsumeAmmo(AmmoType, ClipSize);
+					CurrentWeaponInstance.AmmoInClip = Drawn;
+				}
+				else
+				{
+					CurrentWeaponInstance.AmmoInClip = ClipSize;
+				}
+			}
+			else
+			{
+				CurrentWeaponInstance.AmmoInClip = ClipSize;
+			}
+		}
+		else
+		{
+			// Weapon doesn't draw from a pooled reserve — free top-up.
+			CurrentWeaponInstance.AmmoInClip = ClipSize;
+		}
 	}
 
 	RefreshEquippedWeaponActor();

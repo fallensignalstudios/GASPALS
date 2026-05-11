@@ -9,6 +9,7 @@
 #include "Combat/SFHitResolverInterface.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SFEquipmentComponent.h"
+#include "Components/SFAmmoReserveComponent.h"
 #include "Components/SFInventoryComponent.h"
 #include "Components/SFProgressionComponent.h"
 #include "Components/SFStatRegenComponent.h"
@@ -36,6 +37,7 @@ ASFCharacterBase::ASFCharacterBase()
 	CombatComponent = CreateDefaultSubobject<USFCombatComponent>(TEXT("CombatComponent"));
 	ProgressionComponent = CreateDefaultSubobject<USFProgressionComponent>(TEXT("ProgressionComponent"));
 	EquipmentComponent = CreateDefaultSubobject<USFEquipmentComponent>(TEXT("EquipmentComponent"));
+	AmmoReserveComponent = CreateDefaultSubobject<USFAmmoReserveComponent>(TEXT("AmmoReserveComponent"));
 	InventoryComponent = CreateDefaultSubobject<USFInventoryComponent>(TEXT("InventoryComponent"));
 	InteractionComponent = CreateDefaultSubobject<USFInteractionComponent>(TEXT("InteractionComponent"));
 

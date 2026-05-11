@@ -8,6 +8,7 @@
 #include "Camera/CameraShakeBase.h"
 #include "Characters/SFCharacterBase.h"
 #include "Characters/SFEnemyCharacter.h"
+#include "Characters/SFPlayerCharacter.h"
 #include "Combat/SFProjectileBase.h"
 #include "Combat/SFWeaponActor.h"
 #include "Combat/SFWeaponData.h"
@@ -93,8 +94,22 @@ void USFGameplayAbility_WeaponFire::ActivateAbility(
 	CachedActivationInfo = ActivationInfo;
 	BurstShotsRemaining = 0;
 	bIsCycling = false;
+	bTriggerHeld = true;
+	CachedFireMode = ESFWeaponFireMode::Single;
 
 	HandleTriggerPull();
+}
+
+void USFGameplayAbility_WeaponFire::InputReleased(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo)
+{
+	bTriggerHeld = false;
+	// Don't end the ability here — let the in-flight cycle finish so the last shot's
+	// state (cue, montage, recoil) plays out cleanly. The cycle callback will see
+	// bTriggerHeld=false and exit instead of looping.
+	Super::InputReleased(Handle, ActorInfo, ActivationInfo);
 }
 
 void USFGameplayAbility_WeaponFire::EndAbility(
@@ -124,6 +139,8 @@ void USFGameplayAbility_WeaponFire::EndAbility(
 	CachedActivationInfo = FGameplayAbilityActivationInfo();
 	BurstShotsRemaining = 0;
 	bIsCycling = false;
+	bTriggerHeld = false;
+	CachedFireMode = ESFWeaponFireMode::Single;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -183,6 +200,8 @@ void USFGameplayAbility_WeaponFire::HandleTriggerPull()
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("WeaponFire::HandleTriggerPull -> firing (ammo OK)"));
+
+	CachedFireMode = Config.FireMode;
 
 	switch (Config.FireMode)
 	{
@@ -325,6 +344,8 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 			CycleTimerHandle,
 			FTimerDelegate::CreateWeakLambda(this, [this]()
 			{
+				bIsCycling = false;
+
 				if (CachedActorInfo && CachedActorInfo->AbilitySystemComponent.IsValid())
 				{
 					const FSignalForgeGameplayTags& T = FSignalForgeGameplayTags::Get();
@@ -333,6 +354,16 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 						CachedActorInfo->AbilitySystemComponent->RemoveLooseGameplayTag(T.State_Weapon_Firing);
 					}
 				}
+
+				// Full-auto: if the trigger is still held when the cycle expires, fire again
+				// instead of ending. The next shot re-enters HandleTriggerPull which re-checks
+				// ammo/context, so running dry naturally falls through to EmptyClick.
+				if (CachedFireMode == ESFWeaponFireMode::FullAuto && bTriggerHeld && CachedActorInfo)
+				{
+					HandleTriggerPull();
+					return;
+				}
+
 				FinishAbility(false);
 			}),
 			CycleTime,
@@ -403,12 +434,17 @@ void USFGameplayAbility_WeaponFire::FireProjectilePellet(
 		: DefaultProjectileClass;
 	if (!ProjectileClass)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("WeaponFire::FireProjectilePellet -> NO ProjectileClass set. ")
+			TEXT("Set Config.ProjectileClass on the weapon data (or DefaultProjectileClass on the ability) ")
+			TEXT("and make sure Config.bHitscan is FALSE so projectile path is taken."));
 		return;
 	}
 
 	UWorld* World = Character->GetWorld();
 	if (!World)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("WeaponFire::FireProjectilePellet -> no World, cannot spawn projectile."));
 		return;
 	}
 
@@ -418,18 +454,31 @@ void USFGameplayAbility_WeaponFire::FireProjectilePellet(
 	SpawnParams.SpawnCollisionHandlingOverride =
 		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-	if (ASFProjectileBase* Projectile = World->SpawnActor<ASFProjectileBase>(
-			ProjectileClass, MuzzleLocation, AimRotation, SpawnParams))
-	{
-		Projectile->SetSourceActor(Character);
-		Projectile->SetBaseDamage(Config.BaseDamage);
-		Projectile->SetDamageFalloff(Config.FalloffStartDistance, Config.FalloffEndDistance, Config.MinFalloffMultiplier);
+	UE_LOG(LogTemp, Warning,
+		TEXT("WeaponFire::FireProjectilePellet -> spawning %s at %s"),
+		*ProjectileClass->GetName(),
+		*MuzzleLocation.ToCompactString());
 
-		TSubclassOf<UGameplayEffect> EffectClass = Config.DamageEffectClass
-			? Config.DamageEffectClass
-			: DefaultDamageEffect;
-		Projectile->SetDamageEffect(EffectClass);
+	ASFProjectileBase* Projectile = World->SpawnActor<ASFProjectileBase>(
+		ProjectileClass, MuzzleLocation, AimRotation, SpawnParams);
+
+	if (!Projectile)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("WeaponFire::FireProjectilePellet -> SpawnActor returned NULL for %s. ")
+			TEXT("Check the BP_Projectile collision setup / world settings."),
+			*ProjectileClass->GetName());
+		return;
 	}
+
+	Projectile->SetSourceActor(Character);
+	Projectile->SetBaseDamage(Config.BaseDamage);
+	Projectile->SetDamageFalloff(Config.FalloffStartDistance, Config.FalloffEndDistance, Config.MinFalloffMultiplier);
+
+	TSubclassOf<UGameplayEffect> EffectClass = Config.DamageEffectClass
+		? Config.DamageEffectClass
+		: DefaultDamageEffect;
+	Projectile->SetDamageEffect(EffectClass);
 }
 
 void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
@@ -588,17 +637,27 @@ void USFGameplayAbility_WeaponFire::ApplyRecoilAndShake(
 		? FMath::Max(0.0f, Config.AdsRecoilMultiplier)
 		: 1.0f;
 
-	if (APlayerController* PC = Cast<APlayerController>(Character->GetController()))
+	// Route the per-shot kick through the player character's smooth interpolator so the camera
+	// absorbs recoil over multiple frames instead of snapping. NPCs (no SFPlayerCharacter) just
+	// skip the camera kick — they don't have a player camera to nudge anyway.
+	if (ASFPlayerCharacter* PlayerChar = Cast<ASFPlayerCharacter>(Character))
 	{
-		if (Config.VerticalRecoil > 0.0f)
-		{
-			// Negative pitch input pushes the camera up (matches default UE pitch convention).
-			PC->AddPitchInput(-Config.VerticalRecoil * RecoilScale);
-		}
+		const float PitchKick = FMath::Max(0.0f, Config.VerticalRecoil) * RecoilScale;
+		float YawKick = 0.0f;
 		if (Config.HorizontalRecoil > 0.0f)
 		{
 			const float Sign = FMath::FRandRange(-1.0f, 1.0f) >= 0.0f ? 1.0f : -1.0f;
-			PC->AddYawInput(Config.HorizontalRecoil * RecoilScale * Sign);
+			YawKick = Config.HorizontalRecoil * RecoilScale * Sign;
+		}
+
+		if (PitchKick > 0.0f || !FMath::IsNearlyZero(YawKick))
+		{
+			PlayerChar->ApplyRecoilKick(
+				PitchKick,
+				YawKick,
+				Config.RecoilInterpSpeed,
+				Config.RecoilRecoverySpeed,
+				Config.RecoilRecoveryFraction);
 		}
 	}
 

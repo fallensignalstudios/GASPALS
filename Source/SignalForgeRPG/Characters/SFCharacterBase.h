@@ -18,6 +18,7 @@ class USFCombatComponent;
 class USFStatRegenComponent;
 class USFProgressionComponent;
 class USFEquipmentComponent;
+class USFAmmoReserveComponent;
 class USFInventoryComponent;
 class UGameplayEffect;
 class UGameplayAbility;
@@ -68,6 +69,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USFEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Components")
+	USFAmmoReserveComponent* GetAmmoReserveComponent() const { return AmmoReserveComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USFInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
@@ -329,6 +333,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USFEquipmentComponent> EquipmentComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USFAmmoReserveComponent> AmmoReserveComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USFInventoryComponent> InventoryComponent;

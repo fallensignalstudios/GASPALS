@@ -4,8 +4,10 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Animation/AnimMontage.h"
 #include "Characters/SFCharacterBase.h"
+#include "Combat/SFAmmoType.h"
 #include "Combat/SFWeaponData.h"
 #include "Combat/SFWeaponInstanceTypes.h"
+#include "Components/SFAmmoReserveComponent.h"
 #include "Components/SFEquipmentComponent.h"
 #include "Core/SignalForgeGameplayTags.h"
 #include "Engine/World.h"
@@ -72,7 +74,22 @@ bool USFGameplayAbility_Reload::CanActivateAbility(
 
 	// Don't reload if already full.
 	const FSFWeaponInstanceData Instance = Equipment->GetCurrentWeaponInstance();
-	return Instance.AmmoInClip < WeaponData->AmmoConfig.ClipSize;
+	if (Instance.AmmoInClip >= WeaponData->AmmoConfig.ClipSize)
+	{
+		return false;
+	}
+
+	// If this weapon uses a pooled reserve, gate on reserve having anything left.
+	// (A weapon with no AmmoType uses magic refill and can always reload.)
+	if (USFAmmoType* AmmoType = WeaponData->AmmoConfig.AmmoType)
+	{
+		if (USFAmmoReserveComponent* Reserve = Character->GetAmmoReserveComponent())
+		{
+			return Reserve->GetAmmoCount(AmmoType) > 0;
+		}
+	}
+
+	return true;
 }
 
 void USFGameplayAbility_Reload::ActivateAbility(
@@ -196,8 +213,37 @@ void USFGameplayAbility_Reload::FinishReload(bool bRefillClip)
 		if (ResolveContext(Equipment, WeaponData) && WeaponData->AmmoConfig.ClipSize > 0)
 		{
 			FSFWeaponInstanceData CurrentInstance = Equipment->GetCurrentWeaponInstance();
-			CurrentInstance.AmmoInClip = WeaponData->AmmoConfig.ClipSize;
-			Equipment->UpdateActiveWeaponInstance(CurrentInstance);
+			const int32 ClipSize = WeaponData->AmmoConfig.ClipSize;
+			const int32 NeededRounds = ClipSize - CurrentInstance.AmmoInClip;
+
+			if (NeededRounds > 0)
+			{
+				USFAmmoType* AmmoType = WeaponData->AmmoConfig.AmmoType;
+				if (AmmoType)
+				{
+					// Pull rounds from the carrier's reserve pool. If the reserve is empty,
+					// the clip ends up with whatever was already loaded (zero refill).
+					if (ASFCharacterBase* OwningCharacter = Cast<ASFCharacterBase>(CachedActorInfo->AvatarActor.Get()))
+					{
+						if (USFAmmoReserveComponent* Reserve = OwningCharacter->GetAmmoReserveComponent())
+						{
+							const int32 Drawn = Reserve->ConsumeAmmo(AmmoType, NeededRounds);
+							CurrentInstance.AmmoInClip += Drawn;
+						}
+						else
+						{
+							CurrentInstance.AmmoInClip = ClipSize; // No reserve component — fall back to full refill.
+						}
+					}
+				}
+				else
+				{
+					// Weapon doesn't draw from a reserve (e.g. energy weapon) — free refill.
+					CurrentInstance.AmmoInClip = ClipSize;
+				}
+
+				Equipment->UpdateActiveWeaponInstance(CurrentInstance);
+			}
 		}
 	}
 

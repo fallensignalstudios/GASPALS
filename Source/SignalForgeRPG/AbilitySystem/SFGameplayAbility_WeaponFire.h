@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystem/SFGameplayAbility.h"
+#include "Combat/SFWeaponData.h"
 #include "GameplayTagContainer.h"
 #include "SFGameplayAbility_WeaponFire.generated.h"
 
@@ -62,6 +63,13 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
+
+	/** GAS calls this when the player releases the input button bound to this ability.
+	 *  We use it to stop full-auto looping. */
+	virtual void InputReleased(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo) override;
 
 protected:
 	/** Fallback config used when the equipped weapon has no override (or there is no weapon). */
@@ -161,4 +169,10 @@ private:
 
 	int32 BurstShotsRemaining = 0;
 	bool bIsCycling = false;
+
+	/** True while the player is still holding the fire button. Drives full-auto looping. */
+	bool bTriggerHeld = false;
+
+	/** Cached fire mode of the current trigger pull so the cycle callback knows whether to loop. */
+	ESFWeaponFireMode CachedFireMode = ESFWeaponFireMode::Single;
 };
