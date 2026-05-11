@@ -148,4 +148,7 @@ private:
 
 	/** Cached tick rate (Hz) for the active beam; used for per-tick recoil scaling. */
 	float CachedTicksPerSecond = 20.0f;
+
+	/** True iff we currently hold a State.Weapon.Firing tag count we still need to remove. */
+	bool bAppliedFiringTag = false;
 };
