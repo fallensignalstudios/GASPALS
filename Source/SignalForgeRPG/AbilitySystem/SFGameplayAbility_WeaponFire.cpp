@@ -152,9 +152,19 @@ void USFGameplayAbility_WeaponFire::HandleTriggerPull()
 
 	if (!Character || !ResolveRangedContext(Character, Equipment, WeaponData, WeaponActor, Config))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("WeaponFire::HandleTriggerPull -> ResolveRangedContext FAILED (Character=%p)"), Character);
 		FinishAbility(true);
 		return;
 	}
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("WeaponFire::HandleTriggerPull WeaponData=%s ClipSize=%d AmmoPerShot=%d AmmoInClip=%d FireMode=%d bHitscan=%d"),
+		*WeaponData->GetName(),
+		WeaponData->AmmoConfig.ClipSize,
+		WeaponData->AmmoConfig.AmmoPerShot,
+		Equipment->GetCurrentWeaponInstance().AmmoInClip,
+		(int32)Config.FireMode,
+		Config.bHitscan ? 1 : 0);
 
 	// Empty-clip handling
 	if (WeaponData->AmmoConfig.ClipSize > 0)
@@ -162,11 +172,17 @@ void USFGameplayAbility_WeaponFire::HandleTriggerPull()
 		const FSFWeaponInstanceData CurrentInstance = Equipment->GetCurrentWeaponInstance();
 		if (CurrentInstance.AmmoInClip < FMath::Max(1, WeaponData->AmmoConfig.AmmoPerShot))
 		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("WeaponFire::HandleTriggerPull -> EMPTY CLICK (AmmoInClip=%d < AmmoPerShot=%d). Reload or set starting ammo."),
+				CurrentInstance.AmmoInClip,
+				FMath::Max(1, WeaponData->AmmoConfig.AmmoPerShot));
 			HandleEmptyClick(Character, Config);
 			FinishAbility(false);
 			return;
 		}
 	}
+
+	UE_LOG(LogTemp, Warning, TEXT("WeaponFire::HandleTriggerPull -> firing (ammo OK)"));
 
 	switch (Config.FireMode)
 	{
