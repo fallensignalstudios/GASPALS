@@ -180,6 +180,23 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> BlockAction = nullptr;
 
+	/** Weapon input actions — routed via InputTag to whichever ability the equipped weapon granted. */
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> PrimaryFireAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> ADSAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> ReloadAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> GrenadeAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> SecondaryFireAction = nullptr;
+
 	/** Components */
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -262,6 +279,20 @@ private:
 	void HandleCameraZoom(const FInputActionValue& Value);
 	void OnBlockPressed(const FInputActionValue& Value);
 	void OnBlockReleased(const FInputActionValue& Value);
+
+	/** Weapon input handlers — dispatch through the InputTag system so the currently-equipped
+	 *  weapon's granted ability (e.g. WeaponFire for ranged, AttackLight for melee) responds. */
+	void OnPrimaryFirePressed(const FInputActionValue& Value);
+	void OnPrimaryFireReleased(const FInputActionValue& Value);
+	void OnADSPressed(const FInputActionValue& Value);
+	void OnADSReleased(const FInputActionValue& Value);
+	void OnReloadPressed(const FInputActionValue& Value);
+	void OnReloadReleased(const FInputActionValue& Value);
+	void OnGrenadePressed(const FInputActionValue& Value);
+	void OnGrenadeReleased(const FInputActionValue& Value);
+	void OnSecondaryFirePressed(const FInputActionValue& Value);
+	void OnSecondaryFireReleased(const FInputActionValue& Value);
+
 	virtual void PawnClientRestart() override;
 
 private:

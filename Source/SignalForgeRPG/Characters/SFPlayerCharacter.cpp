@@ -542,6 +542,39 @@ void ASFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 			this,
 			&ASFPlayerCharacter::OnBlockReleased);
 	}
+
+	// Weapon inputs — routed through InputTag so the equipped weapon's granted ability responds.
+	// Each binding pairs Started + Completed so WhileInputActive abilities (e.g. ADS) receive
+	// release events as well.
+	if (PrimaryFireAction)
+	{
+		EnhancedInputComponent->BindAction(PrimaryFireAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnPrimaryFirePressed);
+		EnhancedInputComponent->BindAction(PrimaryFireAction, ETriggerEvent::Completed, this, &ASFPlayerCharacter::OnPrimaryFireReleased);
+	}
+
+	if (ADSAction)
+	{
+		EnhancedInputComponent->BindAction(ADSAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnADSPressed);
+		EnhancedInputComponent->BindAction(ADSAction, ETriggerEvent::Completed, this, &ASFPlayerCharacter::OnADSReleased);
+	}
+
+	if (ReloadAction)
+	{
+		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnReloadPressed);
+		EnhancedInputComponent->BindAction(ReloadAction, ETriggerEvent::Completed, this, &ASFPlayerCharacter::OnReloadReleased);
+	}
+
+	if (GrenadeAction)
+	{
+		EnhancedInputComponent->BindAction(GrenadeAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnGrenadePressed);
+		EnhancedInputComponent->BindAction(GrenadeAction, ETriggerEvent::Completed, this, &ASFPlayerCharacter::OnGrenadeReleased);
+	}
+
+	if (SecondaryFireAction)
+	{
+		EnhancedInputComponent->BindAction(SecondaryFireAction, ETriggerEvent::Started, this, &ASFPlayerCharacter::OnSecondaryFirePressed);
+		EnhancedInputComponent->BindAction(SecondaryFireAction, ETriggerEvent::Completed, this, &ASFPlayerCharacter::OnSecondaryFireReleased);
+	}
 }
 
 void ASFPlayerCharacter::Move(const FInputActionValue& Value)
@@ -616,6 +649,62 @@ void ASFPlayerCharacter::OnBlockReleased(const FInputActionValue& Value)
 {
 	UE_LOG(LogTemp, Warning, TEXT("Player OnBlockReleased"));
 	ProcessAbilityInputReleased(FSignalForgeGameplayTags::Get().Input_Ability_Block);
+}
+
+// --- Weapon input handlers ------------------------------------------------------------------
+// These do not know or care which weapon is equipped. They translate a physical button into
+// an InputTag and hand it to the ASC; whichever ability the currently-equipped weapon granted
+// with a matching InputTag (e.g. USFGameplayAbility_WeaponFire for a rifle, or
+// USFGameplayAbility_AttackLight for a sword) is the one that fires.
+
+void ASFPlayerCharacter::OnPrimaryFirePressed(const FInputActionValue& Value)
+{
+	ProcessAbilityInputPressed(FSignalForgeGameplayTags::Get().Input_PrimaryFire);
+}
+
+void ASFPlayerCharacter::OnPrimaryFireReleased(const FInputActionValue& Value)
+{
+	ProcessAbilityInputReleased(FSignalForgeGameplayTags::Get().Input_PrimaryFire);
+}
+
+void ASFPlayerCharacter::OnADSPressed(const FInputActionValue& Value)
+{
+	ProcessAbilityInputPressed(FSignalForgeGameplayTags::Get().Input_ADS);
+}
+
+void ASFPlayerCharacter::OnADSReleased(const FInputActionValue& Value)
+{
+	ProcessAbilityInputReleased(FSignalForgeGameplayTags::Get().Input_ADS);
+}
+
+void ASFPlayerCharacter::OnReloadPressed(const FInputActionValue& Value)
+{
+	ProcessAbilityInputPressed(FSignalForgeGameplayTags::Get().Input_Reload);
+}
+
+void ASFPlayerCharacter::OnReloadReleased(const FInputActionValue& Value)
+{
+	ProcessAbilityInputReleased(FSignalForgeGameplayTags::Get().Input_Reload);
+}
+
+void ASFPlayerCharacter::OnGrenadePressed(const FInputActionValue& Value)
+{
+	ProcessAbilityInputPressed(FSignalForgeGameplayTags::Get().Input_Grenade);
+}
+
+void ASFPlayerCharacter::OnGrenadeReleased(const FInputActionValue& Value)
+{
+	ProcessAbilityInputReleased(FSignalForgeGameplayTags::Get().Input_Grenade);
+}
+
+void ASFPlayerCharacter::OnSecondaryFirePressed(const FInputActionValue& Value)
+{
+	ProcessAbilityInputPressed(FSignalForgeGameplayTags::Get().Input_SecondaryFire);
+}
+
+void ASFPlayerCharacter::OnSecondaryFireReleased(const FInputActionValue& Value)
+{
+	ProcessAbilityInputReleased(FSignalForgeGameplayTags::Get().Input_SecondaryFire);
 }
 
 void ASFPlayerCharacter::HandleInteractInput(const FInputActionValue& Value)
