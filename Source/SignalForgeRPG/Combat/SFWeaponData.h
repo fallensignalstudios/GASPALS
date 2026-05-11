@@ -112,6 +112,38 @@ struct SIGNALFORGERPG_API FSFRangedWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Spread", meta = (ClampMin = "0.0", ClampMax = "45.0"))
 	float AdsSpreadDegrees = 0.4f;
 
+	/** Camera FOV while in ADS (0 = leave camera FOV alone, useful for non-zoom weapons). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS", meta = (ClampMin = "0.0", ClampMax = "170.0"))
+	float AdsCameraFOV = 55.0f;
+
+	/** Spring-arm target length while ADS (0 = leave arm length alone). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS", meta = (ClampMin = "0.0"))
+	float AdsSpringArmLength = 150.0f;
+
+	/** Spring-arm socket-offset Y (right) while ADS, useful for shoulder-aim. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS")
+	FVector AdsSpringArmSocketOffset = FVector(0.0f, 35.0f, 10.0f);
+
+	/** Seconds to interp into ADS (zoom-in time). Smaller = snappier. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS", meta = (ClampMin = "0.01", ClampMax = "1.5"))
+	float AdsBlendInSeconds = 0.18f;
+
+	/** Seconds to interp back to hipfire on release. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS", meta = (ClampMin = "0.01", ClampMax = "1.5"))
+	float AdsBlendOutSeconds = 0.12f;
+
+	/** Movement speed multiplier while ADS (e.g. 0.55 = walk speed reduced 45%). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS", meta = (ClampMin = "0.1", ClampMax = "1.5"))
+	float AdsMovementSpeedMultiplier = 0.55f;
+
+	/** Recoil multiplier while ADS (e.g. 0.7 = 30% less recoil when aimed). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float AdsRecoilMultiplier = 0.7f;
+
+	/** Optional ADS pose montage looped while aimed (e.g. raised-rifle additive). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS")
+	TObjectPtr<UAnimMontage> AdsPoseMontage = nullptr;
+
 	/** Degrees of vertical recoil kicked per shot (controller pitch up). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Recoil", meta = (ClampMin = "0.0"))
 	float VerticalRecoil = 0.6f;
