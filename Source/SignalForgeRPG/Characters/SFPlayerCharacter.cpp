@@ -27,8 +27,10 @@
 #include "Combat/SFWeaponData.h"
 #include "Core/SFPlayerState.h"
 #include "Narrative/SFNarrativeComponent.h"
+#include "Narrative/SFQuestDatabase.h"
 #include "Narrative/SFQuestDefinition.h"
 #include "Narrative/SFQuestInstance.h"
+#include "Narrative/SFQuestRuntime.h"
 
 ASFPlayerCharacter::ASFPlayerCharacter()
 {
@@ -191,9 +193,63 @@ void ASFPlayerCharacter::BeginPlay()
 						continue;
 					}
 
-					USFQuestInstance* Started = NarrativeComponent->StartQuestByAssetId(AssetId);
-					UE_CLOG(!Started, LogTemp, Warning, TEXT("[SFPlayerCharacter] Failed to start default quest %s."), *AssetId.ToString());
-					UE_CLOG(Started, LogTemp, Log, TEXT("[SFPlayerCharacter] Auto-started default quest %s."), *AssetId.ToString());
+					// We already have the loaded definition in hand — skip
+					// StartQuestByAssetId so we don't depend on the QuestDatabase
+					// or Asset Manager being able to resolve the id. Go straight
+					// to the runtime.
+					USFQuestRuntime* QuestRuntime = NarrativeComponent->GetQuestRuntime();
+					if (!QuestRuntime)
+					{
+						UE_LOG(LogTemp, Warning,
+							TEXT("[SFPlayerCharacter] Default quest %s skipped: NarrativeComponent has no QuestRuntime yet."),
+							*AssetId.ToString());
+						continue;
+					}
+
+					// Pre-validate the most common designer-side mistakes so we can
+					// emit a precise warning instead of a generic "failed to start".
+					if (QuestDef->InitialStateId.IsNone())
+					{
+						UE_LOG(LogTemp, Warning,
+							TEXT("[SFPlayerCharacter] Default quest %s has an empty InitialStateId on its data asset (%s). Open the asset and set InitialStateId to the StateId of the state the quest should start in."),
+							*AssetId.ToString(),
+							*GetNameSafe(QuestDef));
+						continue;
+					}
+					if (QuestDef->States.Num() == 0)
+					{
+						UE_LOG(LogTemp, Warning,
+							TEXT("[SFPlayerCharacter] Default quest %s has zero entries in its States array (%s). Add at least one FSFQuestStateDefinition (its StateId must match InitialStateId)."),
+							*AssetId.ToString(),
+							*GetNameSafe(QuestDef));
+						continue;
+					}
+
+					USFQuestInstance* Started = QuestRuntime->StartQuestByDefinition(QuestDef);
+					if (!Started)
+					{
+						// Surface the remaining reasons in one log line so the
+						// designer can act without digging into the runtime source.
+						USFQuestDatabase* DB = NarrativeComponent->GetQuestDatabase();
+						const bool bDbHasQuest = DB && DB->GetQuestById(AssetId) != nullptr;
+						UE_LOG(LogTemp, Warning,
+							TEXT("[SFPlayerCharacter] Failed to start default quest %s. Asset=%s, InitialStateId=%s, NumStates=%d, HasAuthority=%d, Runtime=%s, QuestDatabase=%s, DBHasQuest=%d. Verify the state matching InitialStateId actually exists in the States array."),
+							*AssetId.ToString(),
+							*GetNameSafe(QuestDef),
+							*QuestDef->InitialStateId.ToString(),
+							QuestDef->States.Num(),
+							HasAuthority() ? 1 : 0,
+							*GetNameSafe(QuestRuntime),
+							*GetNameSafe(DB),
+							bDbHasQuest ? 1 : 0);
+					}
+					else
+					{
+						UE_LOG(LogTemp, Log,
+							TEXT("[SFPlayerCharacter] Auto-started default quest %s (Asset=%s)."),
+							*AssetId.ToString(),
+							*GetNameSafe(QuestDef));
+					}
 				}
 			}),
 			0.25f,
@@ -225,6 +281,18 @@ USFQuestInstance* ASFPlayerCharacter::StartQuestByDefinition(USFQuestDefinition*
 	{
 		return nullptr;
 	}
+
+	// Prefer the direct runtime path: we already have the definition, no need
+	// to round-trip through the QuestDatabase / Asset Manager resolver.
+	if (USFNarrativeComponent* NarrativeComponent = GetNarrativeComponent())
+	{
+		if (USFQuestRuntime* QuestRuntime = NarrativeComponent->GetQuestRuntime())
+		{
+			return QuestRuntime->StartQuestByDefinition(QuestDefinition, StartStateId);
+		}
+	}
+
+	// Fallback for completeness if the runtime isn't available.
 	return StartQuestByAssetId(QuestDefinition->GetPrimaryAssetId(), StartStateId);
 }
 
