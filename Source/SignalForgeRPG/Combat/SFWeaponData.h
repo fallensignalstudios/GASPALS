@@ -211,6 +211,84 @@ struct SIGNALFORGERPG_API FSFRangedWeaponConfig
 	}
 };
 
+/**
+ * Tuning for continuous-beam weapons (energy rifles, plasma cutters, trace rifles).
+ * The beam fires as a stream of per-tick hitscans at a rate derived from the parent
+ * FSFRangedWeaponConfig::RoundsPerMinute (RPM / 60 = ticks per second), so all fire
+ * modes share one unified rate-of-fire knob. Damage, recoil, and battery drain are
+ * specified per *tick* so designers can dial DPS independent of tick rate by tweaking
+ * RPM or the per-tick values.
+ *
+ * Battery model: a float charge meter on the weapon instance that drains while held
+ * and recharges (after a delay) while released. Empty battery overheats the weapon
+ * and locks fire until charge climbs back above the resume threshold.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFBeamWeaponConfig
+{
+	GENERATED_BODY()
+
+	/** Maximum beam length / hitscan trace distance, cm. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam", meta = (ClampMin = "100.0"))
+	float BeamRange = 8000.0f;
+
+	/** Damage applied per beam tick. Effective DPS = (RPM / 60) * DamagePerTick. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Damage", meta = (ClampMin = "0.0"))
+	float DamagePerTick = 4.0f;
+
+	/** If true, beam ticks roll headshot multiplier the same as bullet hits. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Damage")
+	bool bAllowHeadshots = true;
+
+	/** Total battery capacity (arbitrary units, designer tuning). Drained per tick, recharged over time. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Battery", meta = (ClampMin = "1.0"))
+	float BatteryCapacity = 100.0f;
+
+	/** Charge consumed per beam tick. With default capacity 100 and drain 2 at 1200 RPM (20 Hz) -> 2.5s sustained fire. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Battery", meta = (ClampMin = "0.0"))
+	float DrainPerTick = 2.0f;
+
+	/** Charge regenerated per second while the weapon is idle (after the recharge delay elapses). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Battery", meta = (ClampMin = "0.0"))
+	float RechargeUnitsPerSecond = 40.0f;
+
+	/** Seconds of idle (no fire) before recharge starts. Encourages tap-fire discipline. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Battery", meta = (ClampMin = "0.0"))
+	float RechargeDelaySeconds = 1.0f;
+
+	/**
+	 * After overheating (battery hits 0) the weapon stays locked until charge rises above
+	 * this fraction of capacity. Prevents stuttery 1-tick-on, 1-tick-off behaviour. 0.25 = wait
+	 * for 25% charge before player can fire again.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Battery", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float OverheatResumeChargeFraction = 0.25f;
+
+	/** Optional looping fire montage (held while beam is active). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Feedback")
+	TObjectPtr<UAnimMontage> BeamLoopMontage = nullptr;
+
+	/**
+	 * Cue spawned once when the beam starts (loop VFX/audio handle).
+	 * Stopped via Cue.Weapon.BeamStop. The cue receiver is responsible for spawning the
+	 * Niagara ribbon and tracking it; param Location = muzzle, Normal = aim direction.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Feedback|Cues", meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag BeamStartCueOverride;
+
+	/** Cue executed each tick to update the beam endpoint VFX (Location = hit/end, Normal = surface or aim). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Feedback|Cues", meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag BeamTickCueOverride;
+
+	/** Cue executed when the beam stops (release / overheat / cancel). Tells the receiver to tear down the loop VFX. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Feedback|Cues", meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag BeamStopCueOverride;
+
+	/** Sound played once when the beam overheats. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Beam|Feedback")
+	TObjectPtr<USoundBase> OverheatSound = nullptr;
+};
+
 /** Combat tuning very similar to Narrative's AttackDamage + multipliers. */
 USTRUCT(BlueprintType)
 struct SIGNALFORGERPG_API FSFWeaponCombatTuning
@@ -375,6 +453,12 @@ public:
 	/** Ranged tuning (fire mode, spread, recoil, falloff). Used by the default ranged fire ability. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Ranged")
 	FSFRangedWeaponConfig RangedConfig;
+
+	/** Beam tuning. Only consulted when RangedConfig.FireMode == Beam and the granted primary
+	 *  fire ability is USFGameplayAbility_WeaponBeam. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Beam",
+		meta = (EditCondition = "RangedConfig.FireMode == ESFWeaponFireMode::Beam"))
+	FSFBeamWeaponConfig BeamConfig;
 
 	/** Primary fire ability granted while this weapon is equipped (e.g. WeaponFire). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Abilities")

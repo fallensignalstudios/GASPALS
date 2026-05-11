@@ -288,6 +288,10 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("Ability.Weapon.ADS"),
 		TEXT("Aim down sights ability"));
 
+	GameplayTags.Ability_Weapon_BeamFire = TagManager.AddNativeGameplayTag(
+		FName("Ability.Weapon.BeamFire"),
+		TEXT("Continuous-beam weapon fire (held trigger, per-tick hitscan)"));
+
 	GameplayTags.Ability_Grenade_Throw = TagManager.AddNativeGameplayTag(
 		FName("Ability.Grenade.Throw"),
 		TEXT("Throw grenade ability"));
@@ -349,6 +353,26 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.Cue_Weapon_ADS_Exit = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Weapon.ADS.Exit"),
 		TEXT("Leaving aim-down-sights"));
+
+	GameplayTags.Cue_Weapon_BeamStart = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.BeamStart"),
+		TEXT("Beam ignition: spawn the looping ribbon VFX + muzzle glow at the weapon's muzzle"));
+
+	GameplayTags.Cue_Weapon_BeamTick = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.BeamTick"),
+		TEXT("Per-tick beam update: Location = endpoint, Normal = impact normal or aim direction"));
+
+	GameplayTags.Cue_Weapon_BeamStop = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.BeamStop"),
+		TEXT("Beam shutoff: tear down the looping ribbon VFX"));
+
+	GameplayTags.Cue_Weapon_BeamImpact = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.BeamImpact"),
+		TEXT("Per-tick impact at the surface the beam is hitting (sparks / decals)"));
+
+	GameplayTags.Cue_Weapon_BeamOverheat = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.BeamOverheat"),
+		TEXT("Battery depleted, weapon overheats (vent steam + warning audio)"));
 
 	GameplayTags.Cue_Grenade_Explode = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Grenade.Explode"),

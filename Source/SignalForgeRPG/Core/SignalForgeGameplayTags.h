@@ -96,6 +96,7 @@ public:
 	FGameplayTag Ability_Weapon_SecondaryFire;
 	FGameplayTag Ability_Weapon_Reload;
 	FGameplayTag Ability_Weapon_ADS;
+	FGameplayTag Ability_Weapon_BeamFire;
 	FGameplayTag Ability_Grenade_Throw;
 
 	/** Ranged weapon state */
@@ -115,6 +116,11 @@ public:
 	FGameplayTag Cue_Weapon_Tracer;
 	FGameplayTag Cue_Weapon_ADS_Enter;
 	FGameplayTag Cue_Weapon_ADS_Exit;
+	FGameplayTag Cue_Weapon_BeamStart;
+	FGameplayTag Cue_Weapon_BeamTick;
+	FGameplayTag Cue_Weapon_BeamStop;
+	FGameplayTag Cue_Weapon_BeamImpact;
+	FGameplayTag Cue_Weapon_BeamOverheat;
 	FGameplayTag Cue_Grenade_Explode;
 	FGameplayTag Cue_Grenade_Bounce;
 
