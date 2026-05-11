@@ -482,6 +482,22 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Visual")
 	FTransform HolsteredRelativeAttachTransform = FTransform::Identity;
 
+	/**
+	 * Time (seconds) it takes to swap *to* this weapon from a different slot, or from holstered
+	 * to drawn. While this timer runs the owner has the State.Weapon.Switching tag, which blocks
+	 * fire / reload / ADS abilities. Use 0 for instant snap (debug / cheat weapons).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Switching", meta = (ClampMin = "0.0"))
+	float SwapTimeSeconds = 0.5f;
+
+	/** Optional draw montage played on the character when this weapon becomes active. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Switching")
+	TObjectPtr<UAnimMontage> DrawMontage = nullptr;
+
+	/** Optional holster montage played on the character when this weapon leaves the active slot. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Switching")
+	TObjectPtr<UAnimMontage> HolsterMontage = nullptr;
+
 	// Optional crosshair UI
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|UI")
 	TSubclassOf<UUserWidget> CrosshairWidgetClass;

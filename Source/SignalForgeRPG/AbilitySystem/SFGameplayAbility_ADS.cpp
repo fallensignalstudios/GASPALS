@@ -29,8 +29,9 @@ USFGameplayAbility_ADS::USFGameplayAbility_ADS()
 	// While the ability is active, owner is treated as ADS by everyone (WeaponFire reads this).
 	ActivationOwnedTags.AddTag(Tags.State_Weapon_ADS);
 
-	// Don't ADS while reloading.
+	// Don't ADS while reloading or while a weapon swap is in flight.
 	ActivationBlockedTags.AddTag(Tags.State_Weapon_Reloading);
+	ActivationBlockedTags.AddTag(Tags.State_Weapon_Switching);
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;

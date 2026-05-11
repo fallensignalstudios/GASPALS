@@ -230,6 +230,20 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
 	TObjectPtr<UInputAction> SecondaryFireAction = nullptr;
 
+	/** Number-key slot select inputs (1 / 2 / 3 in the default mapping). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> SelectPrimaryWeaponAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> SelectSecondaryWeaponAction = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> SelectHeavyWeaponAction = nullptr;
+
+	/** Optional holster toggle (recommend binding to Y in your IMC). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> HolsterWeaponAction = nullptr;
+
 	/** Components */
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -325,6 +339,12 @@ private:
 	void OnGrenadeReleased(const FInputActionValue& Value);
 	void OnSecondaryFirePressed(const FInputActionValue& Value);
 	void OnSecondaryFireReleased(const FInputActionValue& Value);
+
+	/** Slot select handlers — each routes to USFEquipmentComponent::SwitchToWeaponSlot. */
+	void OnSelectPrimaryWeapon(const FInputActionValue& Value);
+	void OnSelectSecondaryWeapon(const FInputActionValue& Value);
+	void OnSelectHeavyWeapon(const FInputActionValue& Value);
+	void OnHolsterWeapon(const FInputActionValue& Value);
 
 	virtual void PawnClientRestart() override;
 

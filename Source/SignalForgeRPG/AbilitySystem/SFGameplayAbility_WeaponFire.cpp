@@ -39,6 +39,11 @@ USFGameplayAbility_WeaponFire::USFGameplayAbility_WeaponFire()
 	CancelTags.AddTag(Tags.Ability_Weapon_PrimaryFire);
 	CancelAbilitiesWithTag = CancelTags;
 
+	// Don't allow firing while a weapon swap or reload is in flight.
+	FGameplayTagContainer BlockedTags;
+	BlockedTags.AddTag(Tags.State_Weapon_Switching);
+	ActivationBlockedTags = BlockedTags;
+
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 }
