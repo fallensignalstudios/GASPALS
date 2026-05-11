@@ -23,6 +23,7 @@ class UGameplayEffect;
 class USoundBase;
 class UCameraShakeBase;
 class UCurveFloat;
+class USFAmmoType;
 
 /** High-level fire mode for ranged weapons. */
 UENUM(BlueprintType)
@@ -144,13 +145,28 @@ struct SIGNALFORGERPG_API FSFRangedWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "ADS")
 	TObjectPtr<UAnimMontage> AdsPoseMontage = nullptr;
 
-	/** Degrees of vertical recoil kicked per shot (controller pitch up). */
+	/** Degrees of vertical recoil kicked per shot (smoothly interpolated upward, not instant). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Recoil", meta = (ClampMin = "0.0"))
 	float VerticalRecoil = 0.6f;
 
-	/** Degrees of horizontal recoil kicked per shot (controller yaw, randomized sign). */
+	/** Degrees of horizontal recoil kicked per shot (smoothly interpolated, randomized sign). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Recoil", meta = (ClampMin = "0.0"))
 	float HorizontalRecoil = 0.25f;
+
+	/** How fast the controller eases toward the new recoil target (higher = snappier kick).
+	 *  Used as the InterpSpeed in FMath::FInterpTo each tick. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Recoil", meta = (ClampMin = "1.0", ClampMax = "60.0"))
+	float RecoilInterpSpeed = 18.0f;
+
+	/** How fast the controller eases back toward the original aim after the kick. Lower
+	 *  values feel "floaty," higher values snap back hard. 0 disables recovery. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Recoil", meta = (ClampMin = "0.0", ClampMax = "30.0"))
+	float RecoilRecoverySpeed = 8.0f;
+
+	/** Fraction of the kick that recovery returns to the player's original aim (1.0 = full
+	 *  return, 0.0 = aim drift stays where the kick left it). 0.85 feels right for most rifles. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Recoil", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float RecoilRecoveryFraction = 0.85f;
 
 	/** Camera shake when firing. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Feedback")
@@ -234,14 +250,20 @@ struct FSFWeaponAmmoConfig
 {
 	GENERATED_BODY()
 
-	// If null, weapon does not require ammo.
+	/** The pooled ammunition resource this weapon draws from on reload. If null,
+	 *  the weapon does not require reserve ammo and reload magically refills
+	 *  (useful for energy weapons that regenerate, or testing). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ammo")
-	TSubclassOf<USFItemDefinition> RequiredAmmoItemDefinition = nullptr;
+	TObjectPtr<USFAmmoType> AmmoType = nullptr;
 
+	/** Rounds the magazine can hold. 0 = no magazine (e.g. energy weapon with
+	 *  built-in regen, melee, or hitscan-from-infinite). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ammo", meta = (ClampMin = "0"))
 	int32 ClipSize = 0;
 
-	// Optional: per-shot ammo cost for special weapons.
+	/** Per-shot ammo cost for special weapons (e.g. shotgun shell counts as one
+	 *  shot but consumes 8 pellets worth — use 1 here, set Pellets in the
+	 *  ranged config instead). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ammo", meta = (ClampMin = "0"))
 	int32 AmmoPerShot = 1;
 };

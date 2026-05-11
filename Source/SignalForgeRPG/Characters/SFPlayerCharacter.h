@@ -112,11 +112,44 @@ public:
 	UFUNCTION(Exec, Category = "Narrative|Quests|Debug")
 	void SF_AbandonQuest(const FString& AssetIdString);
 
+public:
+	/** Queue a smoothly-interpolated recoil kick. Call this from the WeaponFire ability
+	 *  once per shot — the character ticks the pitch/yaw offset over time so the camera
+	 *  feels like it absorbs the kick instead of teleporting. PitchDegrees pushes the
+	 *  view UP (negative pitch in UE controller-space), YawDegrees may be positive or
+	 *  negative. InterpSpeed controls kick-on speed, RecoverySpeed controls return,
+	 *  RecoveryFraction is how much of the kick the return ultimately recovers. */
+	void ApplyRecoilKick(
+		float PitchDegrees,
+		float YawDegrees,
+		float InterpSpeed,
+		float RecoverySpeed,
+		float RecoveryFraction);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	virtual void Tick(float DeltaTime) override;
+
+	/** Drives the smooth recoil interpolation each frame. */
+	void UpdateRecoil(float DeltaTime);
+
+private:
+	/** Remaining recoil pitch to apply (current frame goal). */
+	float RecoilPitchPending = 0.0f;
+	float RecoilYawPending = 0.0f;
+
+	/** Cached interp speeds from the most recent ApplyRecoilKick call. */
+	float RecoilInterpSpeedCached = 18.0f;
+	float RecoilRecoverySpeedCached = 8.0f;
+	float RecoilRecoveryFractionCached = 0.85f;
+
+	/** Pitch/yaw the camera has already absorbed from kicks — used by recovery to push it back. */
+	float RecoilPitchAbsorbed = 0.0f;
+	float RecoilYawAbsorbed = 0.0f;
+
+protected:
 
 	/** Enhanced Input */
 

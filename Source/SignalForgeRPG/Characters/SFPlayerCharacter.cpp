@@ -418,6 +418,93 @@ void ASFPlayerCharacter::Tick(float DeltaTime)
 			DeltaTime,
 			ZoomInterpSpeed);
 	}
+
+	UpdateRecoil(DeltaTime);
+}
+
+void ASFPlayerCharacter::ApplyRecoilKick(
+	float PitchDegrees,
+	float YawDegrees,
+	float InterpSpeed,
+	float RecoverySpeed,
+	float RecoveryFraction)
+{
+	// Accumulate the new kick on top of whatever is still being absorbed from the
+	// previous shot (rapid fire stacks). Pitch is stored as a positive "upward"
+	// value; UpdateRecoil converts it to the negative-pitch input UE expects.
+	RecoilPitchPending += FMath::Max(0.0f, PitchDegrees);
+	RecoilYawPending += YawDegrees;
+
+	// Latest weapon wins for the smoothing curve — keeps per-weapon tuning honest.
+	RecoilInterpSpeedCached = FMath::Max(0.01f, InterpSpeed);
+	RecoilRecoverySpeedCached = FMath::Max(0.0f, RecoverySpeed);
+	RecoilRecoveryFractionCached = FMath::Clamp(RecoveryFraction, 0.0f, 1.0f);
+}
+
+void ASFPlayerCharacter::UpdateRecoil(float DeltaTime)
+{
+	if (DeltaTime <= 0.0f)
+	{
+		return;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	// --- Kick phase: bleed the pending pitch/yaw into the controller this frame ---
+	if (!FMath::IsNearlyZero(RecoilPitchPending, 0.0001f))
+	{
+		const float Step = FMath::FInterpTo(0.0f, RecoilPitchPending, DeltaTime, RecoilInterpSpeedCached);
+		const float ClampedStep = FMath::Min(Step, RecoilPitchPending);
+		if (ClampedStep > 0.0f)
+		{
+			PC->AddPitchInput(-ClampedStep); // negative pitch = camera up
+			RecoilPitchPending -= ClampedStep;
+			RecoilPitchAbsorbed += ClampedStep;
+		}
+	}
+	else if (!FMath::IsNearlyZero(RecoilPitchAbsorbed, 0.0001f) && RecoilRecoverySpeedCached > 0.0f)
+	{
+		// Recovery phase: push the camera back down by a fraction of what we kicked it up.
+		const float Target = -RecoilPitchAbsorbed * RecoilRecoveryFractionCached;
+		const float Step = FMath::FInterpTo(0.0f, -Target, DeltaTime, RecoilRecoverySpeedCached);
+		const float Applied = FMath::Min(Step, RecoilPitchAbsorbed);
+		if (Applied > 0.0f)
+		{
+			PC->AddPitchInput(Applied * RecoilRecoveryFractionCached); // positive pitch = camera down
+			RecoilPitchAbsorbed -= Applied;
+		}
+	}
+
+	if (!FMath::IsNearlyZero(RecoilYawPending, 0.0001f))
+	{
+		const float Direction = FMath::Sign(RecoilYawPending);
+		const float Magnitude = FMath::Abs(RecoilYawPending);
+		const float StepMag = FMath::FInterpTo(0.0f, Magnitude, DeltaTime, RecoilInterpSpeedCached);
+		const float Step = FMath::Min(StepMag, Magnitude) * Direction;
+		if (!FMath::IsNearlyZero(Step))
+		{
+			PC->AddYawInput(Step);
+			RecoilYawPending -= Step;
+			RecoilYawAbsorbed += Step;
+		}
+	}
+	else if (!FMath::IsNearlyZero(RecoilYawAbsorbed, 0.0001f) && RecoilRecoverySpeedCached > 0.0f)
+	{
+		const float Magnitude = FMath::Abs(RecoilYawAbsorbed);
+		const float Direction = FMath::Sign(RecoilYawAbsorbed);
+		const float StepMag = FMath::FInterpTo(0.0f, Magnitude, DeltaTime, RecoilRecoverySpeedCached);
+		const float Applied = FMath::Min(StepMag, Magnitude);
+		if (Applied > 0.0f)
+		{
+			// Push yaw the opposite way to absorb part of the lateral kick.
+			PC->AddYawInput(-Direction * Applied * RecoilRecoveryFractionCached);
+			RecoilYawAbsorbed -= Direction * Applied;
+		}
+	}
 }
 
 void ASFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
