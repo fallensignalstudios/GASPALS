@@ -81,6 +81,24 @@ struct SIGNALFORGERPG_API FSFWeaponInstanceData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ammo")
 	float LastAttackTime = 0.0f;
 
+	/**
+	 * Current beam battery charge for energy weapons (FSFBeamWeaponConfig).
+	 * Initialized lazily to BatteryCapacity the first time the beam ability runs.
+	 * A negative sentinel means "uninitialized" so we don't have to special-case full
+	 * capacity per weapon-data load. Persists across holster / weapon switch since
+	 * it lives on the instance, not on the ability.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Beam")
+	float BeamBatteryCharge = -1.0f;
+
+	/** True while the weapon is overheated and locked out from firing until charge recovers. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Beam")
+	bool bBeamOverheated = false;
+
+	/** World time (seconds) of the most recent beam tick; drives recharge-delay gating. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Beam")
+	float LastBeamFireWorldTime = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Progression", meta = (ClampMin = "0"))
 	int32 EnhancementLevel = 0;
 
