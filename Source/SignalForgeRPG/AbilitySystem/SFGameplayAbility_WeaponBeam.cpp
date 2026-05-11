@@ -103,8 +103,11 @@ void USFGameplayAbility_WeaponBeam::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	UE_LOG(LogTemp, Log, TEXT("WeaponBeam::ActivateAbility -> entered"));
+
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("WeaponBeam::ActivateAbility -> CommitAbility FAILED (cost/cooldown blocked?)"));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -114,6 +117,7 @@ void USFGameplayAbility_WeaponBeam::ActivateAbility(
 	CachedActivationInfo = ActivationInfo;
 	bTriggerHeld = true;
 	bBeamActive = false;
+	bAppliedFiringTag = false;
 
 	BeginBeam();
 }
@@ -124,17 +128,16 @@ void USFGameplayAbility_WeaponBeam::InputReleased(
 	const FGameplayAbilityActivationInfo ActivationInfo)
 {
 	bTriggerHeld = false;
-	// Don't end the ability immediately — let the next BeamTick see bTriggerHeld=false
-	// and call StopBeam(false) cleanly so the BeamStop cue runs and battery state is
-	// committed to the weapon instance.
+
+	// Trigger released -> shut down the beam, then end the ability so a fresh tap
+	// can re-activate it. Leaving the ability active after release was masking
+	// subsequent fire attempts and producing the "nothing fires" symptom.
 	if (bBeamActive)
 	{
 		StopBeam(/*bOverheated=*/false);
 	}
-	else
-	{
-		FinishAbility(false);
-	}
+
+	FinishAbility(false);
 
 	Super::InputReleased(Handle, ActorInfo, ActivationInfo);
 }
@@ -158,13 +161,16 @@ void USFGameplayAbility_WeaponBeam::EndAbility(
 		World->GetTimerManager().ClearTimer(BeamTickTimerHandle);
 	}
 
-	if (ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
+	// Only remove the Firing tag if we actually added it -- otherwise we trip the
+	// "Attempted to remove tag ... not explicitly in the container" warning.
+	if (bAppliedFiringTag && ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
 	{
 		const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
 		if (Tags.State_Weapon_Firing.IsValid())
 		{
 			ActorInfo->AbilitySystemComponent->RemoveLooseGameplayTag(Tags.State_Weapon_Firing);
 		}
+		bAppliedFiringTag = false;
 	}
 
 	CachedHandle = FGameplayAbilitySpecHandle();
@@ -241,8 +247,14 @@ void USFGameplayAbility_WeaponBeam::BeginBeam()
 		if (Tags.State_Weapon_Firing.IsValid())
 		{
 			ASC->AddLooseGameplayTag(Tags.State_Weapon_Firing, 1);
+			bAppliedFiringTag = true;
 		}
 	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("WeaponBeam::BeginBeam -> ignited (RPM=%.0f -> %.1f Hz, charge=%.1f / %.1f)"),
+		RangedConfig.RoundsPerMinute, CachedTicksPerSecond,
+		Instance.BeamBatteryCharge, BeamConfig.BatteryCapacity);
 
 	// BeamStart cue: muzzle location/forward direction so the cue receiver can attach the loop VFX.
 	FVector MuzzleLocation = Character->GetActorLocation();
@@ -430,13 +442,15 @@ void USFGameplayAbility_WeaponBeam::StopBeam(bool bOverheated)
 	}
 
 	// Clear the firing tag so animations / state machines stop their "beam-on" branch.
-	if (CachedActorInfo && CachedActorInfo->AbilitySystemComponent.IsValid())
+	// Only remove if we actually added it (guards against double-remove via EndAbility safety net).
+	if (bAppliedFiringTag && CachedActorInfo && CachedActorInfo->AbilitySystemComponent.IsValid())
 	{
 		const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
 		if (Tags.State_Weapon_Firing.IsValid())
 		{
 			CachedActorInfo->AbilitySystemComponent->RemoveLooseGameplayTag(Tags.State_Weapon_Firing);
 		}
+		bAppliedFiringTag = false;
 	}
 
 	// BeamStop cue at the muzzle so the ribbon tears down at the right location.
