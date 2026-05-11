@@ -756,3 +756,9 @@ FGameplayTag ASFCharacterBase::GetCharacterFormTag_Implementation() const
 	// Default: no form tag, use weapon's base overlay layer.
 	return FGameplayTag();
 }
+
+FVector ASFCharacterBase::GetHeadLookAtLocation_Implementation(bool& bIsValid) const
+{
+	bIsValid = false;
+	return GetActorLocation() + FVector(0.f, 0.f, BaseEyeHeight);
+}
