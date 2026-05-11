@@ -345,7 +345,7 @@ protected:
 	 * Snap the visual actor for the given slot to either its hand socket (when active) or its
 	 * holster socket (otherwise). Idempotent. Called whenever ActiveWeaponSlot changes.
 	 */
-	void UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot Slot, bool bIsActive);
+	void UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot Slot, bool bShouldBeActive);
 
 	/** Timer callback that finalizes SwitchToWeaponSlot once SwapTimeSeconds has elapsed. */
 	UFUNCTION()

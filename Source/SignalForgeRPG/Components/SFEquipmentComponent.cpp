@@ -1063,7 +1063,7 @@ bool USFEquipmentComponent::UpdateActiveWeaponInstance(const FSFWeaponInstanceDa
 // Weapon switching + holstering
 // ============================================================================
 
-void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot Slot, bool bIsActive)
+void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot Slot, bool bShouldBeActive)
 {
 	if (Slot == ESFEquipmentSlot::None)
 	{
@@ -1098,10 +1098,10 @@ void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot 
 	}
 
 	const bool bHasHolsterSocket = WeaponData->HolsteredAttachSocketName != NAME_None;
-	const FName SocketName = (!bIsActive && bHasHolsterSocket)
+	const FName SocketName = (!bShouldBeActive && bHasHolsterSocket)
 		? WeaponData->HolsteredAttachSocketName
 		: WeaponData->AttachSocketName;
-	const FTransform& RelativeXform = (!bIsActive && bHasHolsterSocket)
+	const FTransform& RelativeXform = (!bShouldBeActive && bHasHolsterSocket)
 		? WeaponData->HolsteredRelativeAttachTransform
 		: WeaponData->RelativeAttachTransform;
 
