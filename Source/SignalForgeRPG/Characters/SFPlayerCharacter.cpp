@@ -27,6 +27,7 @@
 #include "Combat/SFWeaponData.h"
 #include "Core/SFPlayerState.h"
 #include "Narrative/SFNarrativeComponent.h"
+#include "Narrative/SFNarrativeTypes.h"
 #include "Narrative/SFQuestDatabase.h"
 #include "Narrative/SFQuestDefinition.h"
 #include "Narrative/SFQuestInstance.h"
@@ -225,6 +226,32 @@ void ASFPlayerCharacter::BeginPlay()
 						continue;
 					}
 
+					// Verify the InitialStateId actually matches one of the
+					// FSFQuestStateDefinition.StateId values in the array. This
+					// is the most common reason EnterState fails silently.
+					bool bInitialStateExists = false;
+					FString StateIdsList;
+					for (const FSFQuestStateDefinition& StateDef : QuestDef->States)
+					{
+						if (!StateIdsList.IsEmpty()) { StateIdsList += TEXT(", "); }
+						StateIdsList += StateDef.StateId.IsNone() ? FString(TEXT("<None>")) : StateDef.StateId.ToString();
+						if (StateDef.StateId == QuestDef->InitialStateId)
+						{
+							bInitialStateExists = true;
+						}
+					}
+					if (!bInitialStateExists)
+					{
+						UE_LOG(LogTemp, Warning,
+							TEXT("[SFPlayerCharacter] Default quest %s: InitialStateId '%s' does not match any StateId in the States array of %s. Existing StateIds: [%s]. Fix the State entry's StateId field on the data asset so it equals '%s' (or change InitialStateId to one of the existing ids)."),
+							*AssetId.ToString(),
+							*QuestDef->InitialStateId.ToString(),
+							*GetNameSafe(QuestDef),
+							*StateIdsList,
+							*QuestDef->InitialStateId.ToString());
+						continue;
+					}
+
 					USFQuestInstance* Started = QuestRuntime->StartQuestByDefinition(QuestDef);
 					if (!Started)
 					{
@@ -233,11 +260,12 @@ void ASFPlayerCharacter::BeginPlay()
 						USFQuestDatabase* DB = NarrativeComponent->GetQuestDatabase();
 						const bool bDbHasQuest = DB && DB->GetQuestById(AssetId) != nullptr;
 						UE_LOG(LogTemp, Warning,
-							TEXT("[SFPlayerCharacter] Failed to start default quest %s. Asset=%s, InitialStateId=%s, NumStates=%d, HasAuthority=%d, Runtime=%s, QuestDatabase=%s, DBHasQuest=%d. Verify the state matching InitialStateId actually exists in the States array."),
+							TEXT("[SFPlayerCharacter] Failed to start default quest %s. Asset=%s, InitialStateId=%s, NumStates=%d, StateIds=[%s], HasAuthority=%d, Runtime=%s, QuestDatabase=%s, DBHasQuest=%d."),
 							*AssetId.ToString(),
 							*GetNameSafe(QuestDef),
 							*QuestDef->InitialStateId.ToString(),
 							QuestDef->States.Num(),
+							*StateIdsList,
 							HasAuthority() ? 1 : 0,
 							*GetNameSafe(QuestRuntime),
 							*GetNameSafe(DB),
