@@ -271,6 +271,107 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("HitReact.Severity.Launch"),
 		TEXT("Launched / knocked back reaction"));
 
+	/** Ranged weapon abilities */
+	GameplayTags.Ability_Weapon_PrimaryFire = TagManager.AddNativeGameplayTag(
+		FName("Ability.Weapon.PrimaryFire"),
+		TEXT("Weapon primary fire (trigger pull)"));
+
+	GameplayTags.Ability_Weapon_SecondaryFire = TagManager.AddNativeGameplayTag(
+		FName("Ability.Weapon.SecondaryFire"),
+		TEXT("Weapon secondary fire (alt fire / underbarrel)"));
+
+	GameplayTags.Ability_Weapon_Reload = TagManager.AddNativeGameplayTag(
+		FName("Ability.Weapon.Reload"),
+		TEXT("Weapon reload ability"));
+
+	GameplayTags.Ability_Weapon_ADS = TagManager.AddNativeGameplayTag(
+		FName("Ability.Weapon.ADS"),
+		TEXT("Aim down sights ability"));
+
+	GameplayTags.Ability_Grenade_Throw = TagManager.AddNativeGameplayTag(
+		FName("Ability.Grenade.Throw"),
+		TEXT("Throw grenade ability"));
+
+	/** Ranged weapon state */
+	GameplayTags.State_Weapon_Firing = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.Firing"),
+		TEXT("Weapon is in active fire cycle"));
+
+	GameplayTags.State_Weapon_Reloading = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.Reloading"),
+		TEXT("Weapon is currently reloading"));
+
+	GameplayTags.State_Weapon_ADS = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.ADS"),
+		TEXT("Character is aiming down sights"));
+
+	GameplayTags.State_Weapon_Empty = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.Empty"),
+		TEXT("Weapon magazine is empty"));
+
+	GameplayTags.State_Weapon_Overheated = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.Overheated"),
+		TEXT("Energy / plasma weapon is overheated"));
+
+	GameplayTags.State_Grenade_Cooking = TagManager.AddNativeGameplayTag(
+		FName("State.Grenade.Cooking"),
+		TEXT("Grenade fuse is burning before throw"));
+
+	/** Weapon / grenade GameplayCues */
+	GameplayTags.Cue_Weapon_MuzzleFlash = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.MuzzleFlash"),
+		TEXT("Muzzle flash VFX + audio"));
+
+	GameplayTags.Cue_Weapon_ShellEject = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.ShellEject"),
+		TEXT("Brass / shell casing eject"));
+
+	GameplayTags.Cue_Weapon_Reload = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.Reload"),
+		TEXT("Reload audio / mag-swap VFX"));
+
+	GameplayTags.Cue_Weapon_Empty = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.Empty"),
+		TEXT("Dry-fire click"));
+
+	GameplayTags.Cue_Weapon_Tracer = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.Tracer"),
+		TEXT("Tracer / beam trail for hitscan or projectile"));
+
+	GameplayTags.Cue_Grenade_Explode = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Grenade.Explode"),
+		TEXT("Grenade explosion (VFX + audio + radial light)"));
+
+	GameplayTags.Cue_Grenade_Bounce = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Grenade.Bounce"),
+		TEXT("Grenade bounce on surface"));
+
+	/** Ranged inputs */
+	GameplayTags.Input_PrimaryFire = TagManager.AddNativeGameplayTag(
+		FName("InputTag.PrimaryFire"),
+		TEXT("Primary fire input (trigger / LMB)"));
+
+	GameplayTags.Input_SecondaryFire = TagManager.AddNativeGameplayTag(
+		FName("InputTag.SecondaryFire"),
+		TEXT("Secondary fire input (alt fire / RMB)"));
+
+	GameplayTags.Input_Reload = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Reload"),
+		TEXT("Reload input"));
+
+	GameplayTags.Input_Grenade = TagManager.AddNativeGameplayTag(
+		FName("InputTag.Grenade"),
+		TEXT("Grenade throw input"));
+
+	/** Damage scaling SetByCallers (ranged) */
+	GameplayTags.Data_FalloffMultiplier = TagManager.AddNativeGameplayTag(
+		FName("Data.FalloffMultiplier"),
+		TEXT("SetByCaller multiplier from distance falloff"));
+
+	GameplayTags.Data_RangedDistance = TagManager.AddNativeGameplayTag(
+		FName("Data.RangedDistance"),
+		TEXT("SetByCaller cm distance from shooter to target at hit time"));
+
 	/** Input */
 	GameplayTags.Input_Ability_Sprint = TagManager.AddNativeGameplayTag(
 		FName("InputTag.Ability.Sprint"),
