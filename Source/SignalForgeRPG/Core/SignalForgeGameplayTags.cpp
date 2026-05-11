@@ -338,6 +338,14 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("GameplayCue.Weapon.Tracer"),
 		TEXT("Tracer / beam trail for hitscan or projectile"));
 
+	GameplayTags.Cue_Weapon_ADS_Enter = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.ADS.Enter"),
+		TEXT("Entering aim-down-sights (scope SFX, lens VFX, vignette burst)"));
+
+	GameplayTags.Cue_Weapon_ADS_Exit = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.ADS.Exit"),
+		TEXT("Leaving aim-down-sights"));
+
 	GameplayTags.Cue_Grenade_Explode = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Grenade.Explode"),
 		TEXT("Grenade explosion (VFX + audio + radial light)"));
@@ -362,6 +370,10 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.Input_Grenade = TagManager.AddNativeGameplayTag(
 		FName("InputTag.Grenade"),
 		TEXT("Grenade throw input"));
+
+	GameplayTags.Input_ADS = TagManager.AddNativeGameplayTag(
+		FName("InputTag.ADS"),
+		TEXT("Aim-down-sights input (hold to ADS)"));
 
 	/** Damage scaling SetByCallers (ranged) */
 	GameplayTags.Data_FalloffMultiplier = TagManager.AddNativeGameplayTag(

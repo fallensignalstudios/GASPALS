@@ -568,17 +568,21 @@ void USFGameplayAbility_WeaponFire::ApplyRecoilAndShake(
 		return;
 	}
 
+	const float RecoilScale = IsAimingDownSights(Character)
+		? FMath::Max(0.0f, Config.AdsRecoilMultiplier)
+		: 1.0f;
+
 	if (APlayerController* PC = Cast<APlayerController>(Character->GetController()))
 	{
 		if (Config.VerticalRecoil > 0.0f)
 		{
 			// Negative pitch input pushes the camera up (matches default UE pitch convention).
-			PC->AddPitchInput(-Config.VerticalRecoil);
+			PC->AddPitchInput(-Config.VerticalRecoil * RecoilScale);
 		}
 		if (Config.HorizontalRecoil > 0.0f)
 		{
 			const float Sign = FMath::FRandRange(-1.0f, 1.0f) >= 0.0f ? 1.0f : -1.0f;
-			PC->AddYawInput(Config.HorizontalRecoil * Sign);
+			PC->AddYawInput(Config.HorizontalRecoil * RecoilScale * Sign);
 		}
 	}
 

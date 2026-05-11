@@ -112,6 +112,8 @@ public:
 	FGameplayTag Cue_Weapon_Reload;
 	FGameplayTag Cue_Weapon_Empty;
 	FGameplayTag Cue_Weapon_Tracer;
+	FGameplayTag Cue_Weapon_ADS_Enter;
+	FGameplayTag Cue_Weapon_ADS_Exit;
 	FGameplayTag Cue_Grenade_Explode;
 	FGameplayTag Cue_Grenade_Bounce;
 
@@ -120,6 +122,7 @@ public:
 	FGameplayTag Input_SecondaryFire;
 	FGameplayTag Input_Reload;
 	FGameplayTag Input_Grenade;
+	FGameplayTag Input_ADS;
 
 	/** Damage scaling SetByCallers (ranged) */
 	FGameplayTag Data_FalloffMultiplier;
