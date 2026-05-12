@@ -39,6 +39,45 @@ void ASFWeaponActor::InitializeFromWeaponInstance(const FSFWeaponInstanceData& I
 	ApplyWeaponVisuals();
 }
 
+void ASFWeaponActor::ApplyOffhandMeshOverride(USFWeaponData* InWeaponData)
+{
+	if (!InWeaponData)
+	{
+		return;
+	}
+
+	// If the data has no offhand-specific mesh, keep the mainhand mesh (symmetric pair).
+	const bool bHasSkeletalOverride = (InWeaponData->OffhandSkeletalWeaponMesh != nullptr);
+	const bool bHasStaticOverride = (InWeaponData->OffhandStaticWeaponMesh != nullptr);
+	if (!bHasSkeletalOverride && !bHasStaticOverride)
+	{
+		return;
+	}
+
+	// Pick the offhand transform if the designer set one; otherwise fall through to the
+	// mainhand RelativeAttachTransform so the offhand mesh attaches identically.
+	const FTransform& OffhandXform = InWeaponData->OffhandMeshRelativeTransform.Equals(FTransform::Identity)
+		? InWeaponData->RelativeAttachTransform
+		: InWeaponData->OffhandMeshRelativeTransform;
+
+	ClearWeaponVisuals();
+
+	if (bHasSkeletalOverride && SkeletalMeshComponent)
+	{
+		SkeletalMeshComponent->SetSkeletalMesh(InWeaponData->OffhandSkeletalWeaponMesh);
+		SkeletalMeshComponent->SetRelativeTransform(OffhandXform);
+		SkeletalMeshComponent->SetHiddenInGame(false);
+		return;
+	}
+
+	if (bHasStaticOverride && StaticMeshComponent)
+	{
+		StaticMeshComponent->SetStaticMesh(InWeaponData->OffhandStaticWeaponMesh);
+		StaticMeshComponent->SetRelativeTransform(OffhandXform);
+		StaticMeshComponent->SetHiddenInGame(false);
+	}
+}
+
 void ASFWeaponActor::ClearWeaponVisuals()
 {
 	if (StaticMeshComponent)
