@@ -481,6 +481,15 @@ void USFEquipmentComponent::ClearAllEquipment()
 	}
 	EquippedWeaponActors.Empty();
 
+	for (const TPair<ESFEquipmentSlot, TObjectPtr<ASFWeaponActor>>& Pair : OffhandWeaponActors)
+	{
+		if (Pair.Value)
+		{
+			Pair.Value->Destroy();
+		}
+	}
+	OffhandWeaponActors.Empty();
+
 	// Clear all weapon-granted ability handles before we forget which slot owned them.
 	TArray<ESFEquipmentSlot> SlotsWithAbilities;
 	GrantedAbilityHandles.GenerateKeyArray(SlotsWithAbilities);
@@ -531,6 +540,22 @@ ASFWeaponActor* USFEquipmentComponent::GetEquippedWeaponActor() const
 ASFWeaponActor* USFEquipmentComponent::GetEquippedWeaponActorForSlot(ESFEquipmentSlot Slot) const
 {
 	if (const TObjectPtr<ASFWeaponActor>* Found = EquippedWeaponActors.Find(Slot))
+	{
+		return Found->Get();
+	}
+	return nullptr;
+}
+
+ASFWeaponActor* USFEquipmentComponent::GetEquippedOffhandWeaponActor() const
+{
+	return ActiveWeaponSlot != ESFEquipmentSlot::None
+		? GetEquippedOffhandWeaponActorForSlot(ActiveWeaponSlot)
+		: nullptr;
+}
+
+ASFWeaponActor* USFEquipmentComponent::GetEquippedOffhandWeaponActorForSlot(ESFEquipmentSlot Slot) const
+{
+	if (const TObjectPtr<ASFWeaponActor>* Found = OffhandWeaponActors.Find(Slot))
 	{
 		return Found->Get();
 	}
@@ -798,6 +823,94 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 	}
 
 	EquippedWeaponActors.Add(Slot, NewActor);
+
+	// If this weapon is paired (dual-wield), spawn the offhand actor too. Two-handed weapons
+	// explicitly refuse an offhand spawn -- bIsTwoHanded and bIsPairedWeapon are mutually
+	// exclusive (the data-validator on USFWeaponData flags any DA that sets both).
+	if (WeaponData->bIsPairedWeapon && !WeaponData->bIsTwoHanded)
+	{
+		RefreshOffhandWeaponActorForSlot(Slot, WeaponData);
+	}
+}
+
+void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
+	ESFEquipmentSlot Slot,
+	USFWeaponData* WeaponData)
+{
+	DestroyOffhandWeaponActorForSlot(Slot);
+
+	if (!WeaponData || !WeaponData->bIsPairedWeapon)
+	{
+		return;
+	}
+
+	// Offhand class falls back to the mainhand class if not overridden (common case for
+	// dual swords / dual pistols using identical meshes left and right).
+	TSubclassOf<ASFWeaponActor> OffhandClass = WeaponData->OffhandWeaponActorClass
+		? WeaponData->OffhandWeaponActorClass
+		: WeaponData->WeaponActorClass;
+
+	if (!OffhandClass)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFEquipment: paired weapon '%s' has no OffhandWeaponActorClass and no WeaponActorClass fallback; offhand will be invisible."),
+			*WeaponData->GetName());
+		return;
+	}
+
+	if (WeaponData->OffhandAttachSocketName == NAME_None)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFEquipment: paired weapon '%s' has no OffhandAttachSocketName -- offhand will attach to mesh root. ")
+			TEXT("Set 'hand_l_socket' (or your left-hand grip socket) on the weapon data asset."),
+			*WeaponData->GetName());
+	}
+
+	AActor* OwnerActor = GetOwner();
+	UWorld* World = GetWorld();
+	if (!OwnerActor || !World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = OwnerActor;
+	SpawnParams.Instigator = Cast<APawn>(OwnerActor);
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	ASFWeaponActor* OffhandActor =
+		World->SpawnActor<ASFWeaponActor>(OffhandClass, FTransform::Identity, SpawnParams);
+
+	if (!OffhandActor)
+	{
+		return;
+	}
+
+	OffhandActor->InitializeFromWeaponData(WeaponData);
+
+	if (USkeletalMeshComponent* OwnerMesh = GetOwnerSkeletalMesh())
+	{
+		const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
+		const bool bIsActiveSlot = (ActiveWeaponSlot == Slot);
+		const bool bHasHolsterSocket = WeaponData->OffhandHolsteredAttachSocketName != NAME_None;
+
+		const FName SocketName = (!bIsActiveSlot && bHasHolsterSocket)
+			? WeaponData->OffhandHolsteredAttachSocketName
+			: WeaponData->OffhandAttachSocketName;
+		const FTransform& RelativeXform = (!bIsActiveSlot && bHasHolsterSocket)
+			? WeaponData->OffhandHolsteredRelativeAttachTransform
+			: WeaponData->OffhandRelativeAttachTransform;
+
+		OffhandActor->AttachToComponent(OwnerMesh, AttachRules, SocketName);
+		OffhandActor->SetActorRelativeTransform(RelativeXform);
+	}
+	else
+	{
+		OffhandActor->Destroy();
+		return;
+	}
+
+	OffhandWeaponActors.Add(Slot, OffhandActor);
 }
 
 void USFEquipmentComponent::DestroyEquippedWeaponActorForSlot(ESFEquipmentSlot Slot)
@@ -810,6 +923,23 @@ void USFEquipmentComponent::DestroyEquippedWeaponActorForSlot(ESFEquipmentSlot S
 		}
 
 		EquippedWeaponActors.Remove(Slot);
+	}
+
+	// Always tear down the matching offhand actor when the mainhand goes away; otherwise
+	// the left-hand sword would orphan when you swap to a rifle.
+	DestroyOffhandWeaponActorForSlot(Slot);
+}
+
+void USFEquipmentComponent::DestroyOffhandWeaponActorForSlot(ESFEquipmentSlot Slot)
+{
+	if (TObjectPtr<ASFWeaponActor>* Found = OffhandWeaponActors.Find(Slot))
+	{
+		if (Found->Get())
+		{
+			Found->Get()->Destroy();
+		}
+
+		OffhandWeaponActors.Remove(Slot);
 	}
 }
 

@@ -120,6 +120,12 @@ protected:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Equipment")
 	TMap<ESFEquipmentSlot, TObjectPtr<ASFWeaponActor>> EquippedWeaponActors;
 
+	// Offhand visual weapon actors for paired (dual-wield) weapons. Keyed by the *mainhand* slot
+	// so that swapping the mainhand swaps the offhand atomically. A slot is present here only
+	// when its weapon data has bIsPairedWeapon = true; absence means "no offhand for this slot".
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Equipment")
+	TMap<ESFEquipmentSlot, TObjectPtr<ASFWeaponActor>> OffhandWeaponActors;
+
 	// Active weapon slot driving CurrentWeaponInstance and combat.
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Equipment")
 	ESFEquipmentSlot ActiveWeaponSlot = ESFEquipmentSlot::None;
@@ -235,6 +241,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Equipment")
 	ASFWeaponActor* GetEquippedWeaponActorForSlot(ESFEquipmentSlot Slot) const;
 
+	/** Returns the offhand weapon actor for the active paired weapon, or nullptr if none. */
+	UFUNCTION(BlueprintPure, Category = "Equipment")
+	ASFWeaponActor* GetEquippedOffhandWeaponActor() const;
+
+	UFUNCTION(BlueprintPure, Category = "Equipment")
+	ASFWeaponActor* GetEquippedOffhandWeaponActorForSlot(ESFEquipmentSlot Slot) const;
+
 	UFUNCTION(BlueprintPure, Category = "Equipment")
 	bool HasItemEquippedInSlot(ESFEquipmentSlot Slot) const;
 
@@ -323,6 +336,11 @@ protected:
 	// New: per-slot visual actors.
 	void RefreshEquippedWeaponActorForSlot(ESFEquipmentSlot Slot, USFWeaponData* WeaponData);
 	void DestroyEquippedWeaponActorForSlot(ESFEquipmentSlot Slot);
+
+	// Paired-weapon (dual-wield) offhand actor management. Called automatically by
+	// RefreshEquippedWeaponActorForSlot / DestroyEquippedWeaponActorForSlot.
+	void RefreshOffhandWeaponActorForSlot(ESFEquipmentSlot Slot, USFWeaponData* WeaponData);
+	void DestroyOffhandWeaponActorForSlot(ESFEquipmentSlot Slot);
 
 	void BroadcastEquipmentUpdated();
 

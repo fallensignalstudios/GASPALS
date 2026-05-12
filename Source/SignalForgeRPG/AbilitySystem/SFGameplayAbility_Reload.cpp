@@ -23,11 +23,16 @@ USFGameplayAbility_Reload::USFGameplayAbility_Reload()
 	AssetTags.AddTag(Tags.Ability_Weapon_Reload);
 	SetAssetTags(AssetTags);
 
-	// While reloading, suppress firing. Also block reload itself while a weapon swap is in flight.
+	// While reloading, suppress firing. Also block reload itself while a weapon swap is in flight
+	// or a melee swing is mid-animation -- trying to slot a magazine while swinging a sword would
+	// double-bind the right hand.
 	FGameplayTagContainer BlockedTags;
 	BlockedTags.AddTag(Tags.Ability_Weapon_PrimaryFire);
 	BlockedTags.AddTag(Tags.Ability_Weapon_SecondaryFire);
+	BlockedTags.AddTag(Tags.Ability_Weapon_MeleeLight);
+	BlockedTags.AddTag(Tags.Ability_Weapon_MeleeHeavy);
 	BlockedTags.AddTag(Tags.State_Weapon_Switching);
+	BlockedTags.AddTag(Tags.State_Weapon_MeleeSwinging);
 	ActivationBlockedTags = BlockedTags;
 
 	FGameplayTagContainer GrantedTags;

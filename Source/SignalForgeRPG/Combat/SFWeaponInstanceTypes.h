@@ -99,6 +99,29 @@ struct SIGNALFORGERPG_API FSFWeaponInstanceData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Beam")
 	float LastBeamFireWorldTime = 0.0f;
 
+	/**
+	 * Current light-combo step index. Increments per light swing, resets to 0 after
+	 * MeleeConfig.ComboResetSeconds of idle. Persists across holster so a player who
+	 * swaps mid-combo and back resumes where they left off (Bayonetta-style).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melee")
+	int32 MeleeLightComboStep = 0;
+
+	/** Current heavy-combo step. Independent from light combo. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melee")
+	int32 MeleeHeavyComboStep = 0;
+
+	/** World time of the last successful swing input (any lane). Drives combo reset. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melee")
+	float LastMeleeAttackWorldTime = 0.0f;
+
+	/**
+	 * Which hand swung last for paired weapons (0 = mainhand, 1 = offhand). The next swing
+	 * picks the opposite hand. Ignored for non-paired weapons.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melee|Paired")
+	int32 LastSwingHandIndex = 1;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Progression", meta = (ClampMin = "0"))
 	int32 EnhancementLevel = 0;
 

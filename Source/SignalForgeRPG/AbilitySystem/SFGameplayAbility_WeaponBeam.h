@@ -114,7 +114,11 @@ private:
 		const FSFRangedWeaponConfig& RangedConfig,
 		float TicksPerSecond);
 
-	void DispatchBeamCue(const FGameplayTag& Tag, const FVector& Location, const FVector& Normal);
+	void DispatchBeamCue(
+		const FGameplayTag& Tag,
+		const FVector& Location,
+		const FVector& Normal,
+		ASFWeaponActor* WeaponActor = nullptr);
 
 	/** Initialize/refresh battery (creates capacity on first run, drains 0 -> overheated). */
 	void EnsureBatteryInitialized(USFEquipmentComponent* Equipment, const FSFBeamWeaponConfig& BeamConfig);

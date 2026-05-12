@@ -32,6 +32,8 @@ USFGameplayAbility_ADS::USFGameplayAbility_ADS()
 	// Don't ADS while reloading or while a weapon swap is in flight.
 	ActivationBlockedTags.AddTag(Tags.State_Weapon_Reloading);
 	ActivationBlockedTags.AddTag(Tags.State_Weapon_Switching);
+	// Can't aim down sights while a melee swing is in flight.
+	ActivationBlockedTags.AddTag(Tags.State_Weapon_MeleeSwinging);
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;

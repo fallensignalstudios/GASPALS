@@ -39,9 +39,11 @@ USFGameplayAbility_WeaponFire::USFGameplayAbility_WeaponFire()
 	CancelTags.AddTag(Tags.Ability_Weapon_PrimaryFire);
 	CancelAbilitiesWithTag = CancelTags;
 
-	// Don't allow firing while a weapon swap or reload is in flight.
+	// Don't allow firing while a weapon swap is in flight, or while a melee swing is
+	// mid-animation (sword/baton occupying the hand).
 	FGameplayTagContainer BlockedTags;
 	BlockedTags.AddTag(Tags.State_Weapon_Switching);
+	BlockedTags.AddTag(Tags.State_Weapon_MeleeSwinging);
 	ActivationBlockedTags = BlockedTags;
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
