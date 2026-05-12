@@ -827,6 +827,15 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 	// If this weapon is paired (dual-wield), spawn the offhand actor too. Two-handed weapons
 	// explicitly refuse an offhand spawn -- bIsTwoHanded and bIsPairedWeapon are mutually
 	// exclusive (the data-validator on USFWeaponData flags any DA that sets both).
+	UE_LOG(LogTemp, Log,
+		TEXT("SFEquipment: mainhand spawned for '%s' (slot %d). bIsPairedWeapon=%d bIsTwoHanded=%d -- %s"),
+		*WeaponData->GetName(), static_cast<int32>(Slot),
+		WeaponData->bIsPairedWeapon ? 1 : 0,
+		WeaponData->bIsTwoHanded ? 1 : 0,
+		(WeaponData->bIsPairedWeapon && !WeaponData->bIsTwoHanded)
+			? TEXT("will spawn offhand")
+			: TEXT("skipping offhand spawn"));
+
 	if (WeaponData->bIsPairedWeapon && !WeaponData->bIsTwoHanded)
 	{
 		RefreshOffhandWeaponActorForSlot(Slot, WeaponData);
@@ -841,6 +850,10 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 
 	if (!WeaponData || !WeaponData->bIsPairedWeapon)
 	{
+		UE_LOG(LogTemp, Verbose,
+			TEXT("SFEquipment: RefreshOffhand bailed -- WeaponData=%s bIsPairedWeapon=%d"),
+			*GetNameSafe(WeaponData),
+			WeaponData ? (WeaponData->bIsPairedWeapon ? 1 : 0) : 0);
 		return;
 	}
 
@@ -870,6 +883,11 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 	UWorld* World = GetWorld();
 	if (!OwnerActor || !World)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFEquipment: cannot spawn offhand for '%s' -- OwnerActor=%s World=%s"),
+			*WeaponData->GetName(),
+			*GetNameSafe(OwnerActor),
+			World ? TEXT("valid") : TEXT("null"));
 		return;
 	}
 
@@ -916,9 +934,15 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 
 		OffhandActor->AttachToComponent(OwnerMesh, AttachRules, SocketName);
 		OffhandActor->SetActorRelativeTransform(RelativeXform);
+		UE_LOG(LogTemp, Log,
+			TEXT("SFEquipment: offhand attached to socket '%s' (bIsActiveSlot=%d, hasHolster=%d)."),
+			*SocketName.ToString(), bIsActiveSlot ? 1 : 0, bHasHolsterSocket ? 1 : 0);
 	}
 	else
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFEquipment: offhand spawned but owner has no skeletal mesh -- destroying offhand actor for '%s'."),
+			*WeaponData->GetName());
 		OffhandActor->Destroy();
 		return;
 	}
