@@ -827,6 +827,13 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 	// If this weapon is paired (dual-wield), spawn the offhand actor too. Two-handed weapons
 	// explicitly refuse an offhand spawn -- bIsTwoHanded and bIsPairedWeapon are mutually
 	// exclusive (the data-validator on USFWeaponData flags any DA that sets both).
+	if (WeaponData->bIsTwoHanded && WeaponData->bIsPairedWeapon)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("SFEquipment: '%s' has BOTH bIsTwoHanded=true and bIsPairedWeapon=true. These are mutually exclusive -- treating as two-handed and skipping offhand spawn. Untick one of the flags on the Weapon DA."),
+			*WeaponData->GetName());
+	}
+
 	UE_LOG(LogTemp, Log,
 		TEXT("SFEquipment: mainhand spawned for '%s' (slot %d). bIsPairedWeapon=%d bIsTwoHanded=%d -- %s"),
 		*WeaponData->GetName(), static_cast<int32>(Slot),
@@ -1305,6 +1312,32 @@ void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot 
 	const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
 	Actor->AttachToComponent(OwnerMesh, AttachRules, SocketName);
 	Actor->SetActorRelativeTransform(RelativeXform);
+
+	// Paired weapons keep a parallel offhand actor that must move in lockstep with the mainhand
+	// when the player draws/sheathes. Without this the offhand stays welded to its holster socket.
+	if (WeaponData->bIsPairedWeapon && !WeaponData->bIsTwoHanded)
+	{
+		const TObjectPtr<ASFWeaponActor>* FoundOffhand = OffhandWeaponActors.Find(Slot);
+		ASFWeaponActor* OffhandActor = FoundOffhand ? FoundOffhand->Get() : nullptr;
+		if (OffhandActor)
+		{
+			const bool bOffhandHasHolsterSocket = WeaponData->OffhandHolsteredAttachSocketName != NAME_None;
+			const FName OffhandSocketName = (!bIsActive && bOffhandHasHolsterSocket)
+				? WeaponData->OffhandHolsteredAttachSocketName
+				: WeaponData->OffhandAttachSocketName;
+			const FTransform& OffhandRelativeXform = (!bIsActive && bOffhandHasHolsterSocket)
+				? WeaponData->OffhandHolsteredRelativeAttachTransform
+				: WeaponData->OffhandRelativeAttachTransform;
+
+			OffhandActor->AttachToComponent(OwnerMesh, AttachRules, OffhandSocketName);
+			OffhandActor->SetActorRelativeTransform(OffhandRelativeXform);
+
+			UE_LOG(LogTemp, Log,
+				TEXT("SFEquipment: offhand re-attached on draw/sheathe for '%s' -> socket '%s' (bIsActive=%d, hasOffhandHolster=%d)."),
+				*WeaponData->GetName(), *OffhandSocketName.ToString(),
+				bIsActive ? 1 : 0, bOffhandHasHolsterSocket ? 1 : 0);
+		}
+	}
 }
 
 bool USFEquipmentComponent::SwitchToWeaponSlot(ESFEquipmentSlot Slot)

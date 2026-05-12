@@ -789,6 +789,12 @@ public:
 			bHasErrors = true;
 		}
 
+		if (bIsTwoHanded && bIsPairedWeapon)
+		{
+			Context.AddError(NSLOCTEXT("SFWeaponData", "TwoHandedAndPairedMutuallyExclusive", "bIsTwoHanded and bIsPairedWeapon cannot both be true. A two-handed weapon occupies both hands with a single grip; a paired weapon spawns a separate offhand actor. Pick one."));
+			bHasErrors = true;
+		}
+
 		return bHasErrors ? EDataValidationResult::Invalid : Result;
 	}
 #endif
