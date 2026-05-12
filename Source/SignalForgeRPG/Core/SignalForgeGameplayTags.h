@@ -97,6 +97,8 @@ public:
 	FGameplayTag Ability_Weapon_Reload;
 	FGameplayTag Ability_Weapon_ADS;
 	FGameplayTag Ability_Weapon_BeamFire;
+	FGameplayTag Ability_Weapon_MeleeLight;
+	FGameplayTag Ability_Weapon_MeleeHeavy;
 	FGameplayTag Ability_Grenade_Throw;
 
 	/** Ranged weapon state */
@@ -106,6 +108,8 @@ public:
 	FGameplayTag State_Weapon_Empty;
 	FGameplayTag State_Weapon_Overheated;
 	FGameplayTag State_Weapon_Switching;
+	FGameplayTag State_Weapon_MeleeSwinging;
+	FGameplayTag State_Weapon_MeleeCancelWindow;
 	FGameplayTag State_Grenade_Cooking;
 
 	/** Weapon / grenade GameplayCues */
@@ -121,6 +125,8 @@ public:
 	FGameplayTag Cue_Weapon_BeamStop;
 	FGameplayTag Cue_Weapon_BeamImpact;
 	FGameplayTag Cue_Weapon_BeamOverheat;
+	FGameplayTag Cue_Weapon_MeleeHit;
+	FGameplayTag Cue_Weapon_MeleeWhiff;
 	FGameplayTag Cue_Grenade_Explode;
 	FGameplayTag Cue_Grenade_Bounce;
 

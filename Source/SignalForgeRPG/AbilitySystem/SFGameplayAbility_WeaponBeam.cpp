@@ -38,9 +38,11 @@ USFGameplayAbility_WeaponBeam::USFGameplayAbility_WeaponBeam()
 	CancelTags.AddTag(Tags.Ability_Weapon_BeamFire);
 	CancelAbilitiesWithTag = CancelTags;
 
-	// Don't allow ignition while a weapon swap is in flight.
+	// Don't allow ignition while a weapon swap is in flight, or while a melee swing is
+	// mid-animation.
 	FGameplayTagContainer BlockedTags;
 	BlockedTags.AddTag(Tags.State_Weapon_Switching);
+	BlockedTags.AddTag(Tags.State_Weapon_MeleeSwinging);
 	ActivationBlockedTags = BlockedTags;
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;

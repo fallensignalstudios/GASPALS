@@ -289,6 +289,91 @@ struct SIGNALFORGERPG_API FSFBeamWeaponConfig
 	TObjectPtr<USoundBase> OverheatSound = nullptr;
 };
 
+/**
+ * Per-weapon melee tuning. Drives USFGameplayAbility_WeaponMelee.
+ *
+ * Design intent:
+ *  - Combo chain authored as ordered montages (light + heavy lanes). Each chain index has its own
+ *    damage so designers can ramp damage on the final combo step.
+ *  - Hit-detection windows are authored in-montage via AnimNotifyState_SFMeleeWindow; the ability
+ *    sweeps capsules between two weapon sockets every tick the window is open.
+ *  - A "cancel window" near the end of each montage lets the next input chain smoothly instead
+ *    of locking out till the entire montage finishes.
+ *  - Hitstop is a brief local time dilation on the instigator (you, not the world) for impact feel.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFMeleeWeaponConfig
+{
+	GENERATED_BODY()
+
+	/** Ordered light-attack montages. Pressing primary fire steps through this array; combo resets
+	 *  to index 0 after ComboResetSeconds of idle (or when interrupted by damage / weapon swap). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Combo|Light")
+	TArray<TObjectPtr<UAnimMontage>> LightComboMontages;
+
+	/** Per-step damage for the light combo. If the array is shorter than LightComboMontages, the last
+	 *  value is used for trailing steps. If empty, falls back to the base damage SetByCaller. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Combo|Light")
+	TArray<float> LightComboDamages;
+
+	/** Ordered heavy-attack montages (driven by SecondaryFire input). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Combo|Heavy")
+	TArray<TObjectPtr<UAnimMontage>> HeavyComboMontages;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Combo|Heavy")
+	TArray<float> HeavyComboDamages;
+
+	/** Hit-detection sockets on the weapon mesh. Sweeps a capsule from start->end every tick the
+	 *  AnimNotifyState_SFMeleeWindow is active. For dual-wield, the offhand actor is swept by
+	 *  the same socket names on its own mesh. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Hit Detection")
+	FName TraceStartSocket = TEXT("MeleeTraceStart");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Hit Detection")
+	FName TraceEndSocket = TEXT("MeleeTraceEnd");
+
+	/** Capsule radius for the sweep. Larger = more forgiving hit detection. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Hit Detection", meta = (ClampMin = "0.5"))
+	float TraceRadius = 6.0f;
+
+	/** Friendly-fire toggle. False is the standard FPS/coop default. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Hit Detection")
+	bool bCanFriendlyFire = false;
+
+	/** Seconds of brief local time dilation applied to the instigator when a hit lands, for impact feel. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Feel", meta = (ClampMin = "0.0", ClampMax = "0.25"))
+	float HitstopSeconds = 0.06f;
+
+	/** Time dilation value during hitstop. Lower = more pronounced freeze. 1.0 disables hitstop. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Feel", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float HitstopTimeDilation = 0.05f;
+
+	/** GE applied to victims on hit (poise / stagger / knockback). Designer-authored. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Feel")
+	TSubclassOf<UGameplayEffect> HitReactionEffect;
+
+	/** Optional camera shake on landed hit (instigator camera). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Feel")
+	TSubclassOf<UCameraShakeBase> HitCameraShake;
+
+	/** Window in seconds after montage play during which queueing the next input chains smoothly.
+	 *  Starts when a montage hits its cancel-window notify (see AnimNotifyState_SFMeleeCancel). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Combo", meta = (ClampMin = "0.0"))
+	float InputBufferSeconds = 0.25f;
+
+	/** Seconds of idle (no attack input, no hit) before combo step resets to 0. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Combo", meta = (ClampMin = "0.1"))
+	float ComboResetSeconds = 1.0f;
+
+	/** Cue executed when a swing lands on a valid target. Param Location = hit point, Normal = surface. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Feedback|Cues", meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag HitCueOverride;
+
+	/** Cue executed when a swing's window closes without hitting anything (whiff swoosh). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Feedback|Cues", meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag WhiffCueOverride;
+};
+
 /** Combat tuning very similar to Narrative's AttackDamage + multipliers. */
 USTRUCT(BlueprintType)
 struct SIGNALFORGERPG_API FSFWeaponCombatTuning
@@ -459,6 +544,58 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Beam",
 		meta = (EditCondition = "RangedConfig.FireMode == ESFWeaponFireMode::Beam"))
 	FSFBeamWeaponConfig BeamConfig;
+
+	/**
+	 * Melee tuning. Consulted when the granted primary fire ability is USFGameplayAbility_WeaponMelee
+	 * (i.e. swords, axes, batons, energy blades). Ranged config is ignored for melee weapons; melee
+	 * has its own animation-driven cadence rather than RPM-based timing.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Melee")
+	FSFMeleeWeaponConfig MeleeConfig;
+
+	/**
+	 * Two-handed weapons (greatswords, heavy rifles) occupy both hands. While a two-handed weapon
+	 * is active, the equipment component refuses to spawn an offhand weapon, and the anim system
+	 * uses the two-handed overlay (typically via FormSpecificOverlayLayers keyed off a form tag).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding")
+	bool bIsTwoHanded = false;
+
+	/**
+	 * Paired weapons (dual pistols, dual swords) spawn two ASFWeaponActor instances on a single
+	 * equip. Primary fire alternates between the two muzzles/swing arcs each activation. The
+	 * offhand actor is attached to OffhandAttachSocketName on the same character mesh.
+	 *
+	 * Cannot be combined with bIsTwoHanded -- the validator will flag this.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired")
+	bool bIsPairedWeapon = false;
+
+	/** Actor class for the offhand. If null, falls back to WeaponActorClass (most common case:
+	 *  identical pair of pistols). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
+		meta = (EditCondition = "bIsPairedWeapon"))
+	TSubclassOf<ASFWeaponActor> OffhandWeaponActorClass;
+
+	/** Hand socket for the offhand weapon while active. Defaults to a sensible left-hand grip name. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
+		meta = (EditCondition = "bIsPairedWeapon"))
+	FName OffhandAttachSocketName = TEXT("hand_l_socket");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
+		meta = (EditCondition = "bIsPairedWeapon"))
+	FTransform OffhandRelativeAttachTransform = FTransform::Identity;
+
+	/** Holster socket for the offhand weapon when this slot is not the active one. Falls back to
+	 *  OffhandAttachSocketName (offhand stays in hand) if unset -- match HolsteredAttachSocketName
+	 *  for parity with the primary actor. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
+		meta = (EditCondition = "bIsPairedWeapon"))
+	FName OffhandHolsteredAttachSocketName = NAME_None;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
+		meta = (EditCondition = "bIsPairedWeapon"))
+	FTransform OffhandHolsteredRelativeAttachTransform = FTransform::Identity;
 
 	/** Primary fire ability granted while this weapon is equipped (e.g. WeaponFire). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Abilities")

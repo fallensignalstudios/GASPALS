@@ -292,6 +292,14 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("Ability.Weapon.BeamFire"),
 		TEXT("Continuous-beam weapon fire (held trigger, per-tick hitscan)"));
 
+	GameplayTags.Ability_Weapon_MeleeLight = TagManager.AddNativeGameplayTag(
+		FName("Ability.Weapon.MeleeLight"),
+		TEXT("Light melee swing (combo lane 0). Tagged with PrimaryFire so reload/ADS-blocks still apply."));
+
+	GameplayTags.Ability_Weapon_MeleeHeavy = TagManager.AddNativeGameplayTag(
+		FName("Ability.Weapon.MeleeHeavy"),
+		TEXT("Heavy melee swing (combo lane 1). Higher damage, higher stamina cost, longer recovery."));
+
 	GameplayTags.Ability_Grenade_Throw = TagManager.AddNativeGameplayTag(
 		FName("Ability.Grenade.Throw"),
 		TEXT("Throw grenade ability"));
@@ -320,6 +328,14 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.State_Weapon_Switching = TagManager.AddNativeGameplayTag(
 		FName("State.Weapon.Switching"),
 		TEXT("Character is in the middle of a weapon swap / holster / draw"));
+
+	GameplayTags.State_Weapon_MeleeSwinging = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.MeleeSwinging"),
+		TEXT("Melee montage is playing -- damage window may or may not be open"));
+
+	GameplayTags.State_Weapon_MeleeCancelWindow = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.MeleeCancelWindow"),
+		TEXT("Inside the late-montage window where the next swing can chain smoothly"));
 
 	GameplayTags.State_Grenade_Cooking = TagManager.AddNativeGameplayTag(
 		FName("State.Grenade.Cooking"),
@@ -373,6 +389,14 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.Cue_Weapon_BeamOverheat = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Weapon.BeamOverheat"),
 		TEXT("Battery depleted, weapon overheats (vent steam + warning audio)"));
+
+	GameplayTags.Cue_Weapon_MeleeHit = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.MeleeHit"),
+		TEXT("Melee impact: blood/sparks/decal at hit point. Params.Location, Params.Normal."));
+
+	GameplayTags.Cue_Weapon_MeleeWhiff = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.MeleeWhiff"),
+		TEXT("Melee swing closed without hitting anything (swoosh audio + optional motion-blur burst)"));
 
 	GameplayTags.Cue_Grenade_Explode = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Grenade.Explode"),
