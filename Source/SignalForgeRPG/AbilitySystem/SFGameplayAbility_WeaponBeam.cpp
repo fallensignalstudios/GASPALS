@@ -269,7 +269,7 @@ void USFGameplayAbility_WeaponBeam::BeginBeam()
 	const FGameplayTag StartTag = BeamConfig.BeamStartCueOverride.IsValid()
 		? BeamConfig.BeamStartCueOverride
 		: Tags.Cue_Weapon_BeamStart;
-	DispatchBeamCue(StartTag, MuzzleLocation, MuzzleRotation.Vector());
+	DispatchBeamCue(StartTag, MuzzleLocation, MuzzleRotation.Vector(), WeaponActor);
 
 	// Optional looping fire montage. Kept local-only (no replication); the GameplayCue handles cosmetic sync.
 	if (BeamConfig.BeamLoopMontage)
@@ -397,12 +397,12 @@ void USFGameplayAbility_WeaponBeam::BeamTick()
 	const FGameplayTag TickTag = BeamConfig.BeamTickCueOverride.IsValid()
 		? BeamConfig.BeamTickCueOverride
 		: Tags.Cue_Weapon_BeamTick;
-	DispatchBeamCue(TickTag, EndLocation, ImpactNormal);
+	DispatchBeamCue(TickTag, EndLocation, ImpactNormal, WeaponActor);
 
 	// Optional separate impact cue (sparks / decals). Only when we actually hit something.
 	if (bDidHit && Tags.Cue_Weapon_BeamImpact.IsValid())
 	{
-		DispatchBeamCue(Tags.Cue_Weapon_BeamImpact, EndLocation, ImpactNormal);
+		DispatchBeamCue(Tags.Cue_Weapon_BeamImpact, EndLocation, ImpactNormal, WeaponActor);
 	}
 
 	// Recoil: scaled per-tick so DPS-equivalent climb matches bullet weapons of the same RPM.
@@ -415,7 +415,7 @@ void USFGameplayAbility_WeaponBeam::BeamTick()
 		// Overheat cue + sound.
 		if (Tags.Cue_Weapon_BeamOverheat.IsValid())
 		{
-			DispatchBeamCue(Tags.Cue_Weapon_BeamOverheat, MuzzleLocation, AimRotation.Vector());
+			DispatchBeamCue(Tags.Cue_Weapon_BeamOverheat, MuzzleLocation, AimRotation.Vector(), WeaponActor);
 		}
 		if (BeamConfig.OverheatSound)
 		{
@@ -477,7 +477,7 @@ void USFGameplayAbility_WeaponBeam::StopBeam(bool bOverheated)
 					const FGameplayTag StopTag = WeaponData->BeamConfig.BeamStopCueOverride.IsValid()
 						? WeaponData->BeamConfig.BeamStopCueOverride
 						: Tags.Cue_Weapon_BeamStop;
-					DispatchBeamCue(StopTag, MuzzleLocation, MuzzleRotation.Vector());
+					DispatchBeamCue(StopTag, MuzzleLocation, MuzzleRotation.Vector(), WeaponActor);
 				}
 			}
 		}
@@ -627,7 +627,8 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamRecoilForTick(
 void USFGameplayAbility_WeaponBeam::DispatchBeamCue(
 	const FGameplayTag& Tag,
 	const FVector& Location,
-	const FVector& Normal)
+	const FVector& Normal,
+	ASFWeaponActor* WeaponActor)
 {
 	if (!Tag.IsValid() || !CachedActorInfo)
 	{
@@ -646,6 +647,14 @@ void USFGameplayAbility_WeaponBeam::DispatchBeamCue(
 	Params.Location = Location;
 	Params.Normal = Normal;
 	Params.RawMagnitude = 1.0f;
+
+	// Pass the weapon actor through SourceObject so cue notify Blueprints can
+	// attach Niagara directly to the weapon's muzzle socket. Read in BP via
+	// `Parameters -> SourceObject` and cast to ASFWeaponActor.
+	if (WeaponActor)
+	{
+		Params.SourceObject = WeaponActor;
+	}
 
 	if (UAbilitySystemComponent* ASC = CachedActorInfo->AbilitySystemComponent.Get())
 	{
