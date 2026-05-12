@@ -827,6 +827,13 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 	// If this weapon is paired (dual-wield), spawn the offhand actor too. Two-handed weapons
 	// explicitly refuse an offhand spawn -- bIsTwoHanded and bIsPairedWeapon are mutually
 	// exclusive (the data-validator on USFWeaponData flags any DA that sets both).
+	if (WeaponData->bIsTwoHanded && WeaponData->bIsPairedWeapon)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("SFEquipment: '%s' has BOTH bIsTwoHanded=true and bIsPairedWeapon=true. These are mutually exclusive -- treating as two-handed and skipping offhand spawn. Untick one of the flags on the Weapon DA."),
+			*WeaponData->GetName());
+	}
+
 	UE_LOG(LogTemp, Log,
 		TEXT("SFEquipment: mainhand spawned for '%s' (slot %d). bIsPairedWeapon=%d bIsTwoHanded=%d -- %s"),
 		*WeaponData->GetName(), static_cast<int32>(Slot),
