@@ -42,6 +42,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	void InitializeFromWeaponInstance(const FSFWeaponInstanceData& InInstanceData);
 
+	/** Call AFTER InitializeFromWeaponData on an offhand actor to swap its visuals to the
+	 *  OffhandSkeletalWeaponMesh / OffhandStaticWeaponMesh on the supplied data. If both offhand
+	 *  mesh slots are null, this is a no-op and the actor keeps the mainhand mesh (symmetric pair). */
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void ApplyOffhandMeshOverride(USFWeaponData* InWeaponData);
+
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	USFWeaponData* GetWeaponData() const
 	{

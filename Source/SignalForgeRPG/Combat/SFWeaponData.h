@@ -577,6 +577,26 @@ public:
 		meta = (EditCondition = "bIsPairedWeapon"))
 	TSubclassOf<ASFWeaponActor> OffhandWeaponActorClass;
 
+	/** Skeletal mesh used by the offhand weapon actor. If null, the offhand falls back to the
+	 *  mainhand SkeletalWeaponMesh (useful for symmetric pairs like matching dual swords).
+	 *  Set this for asymmetric pairs (katana + wakizashi, mismatched pistols, etc.). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
+		meta = (EditCondition = "bIsPairedWeapon"))
+	TObjectPtr<USkeletalMesh> OffhandSkeletalWeaponMesh = nullptr;
+
+	/** Static mesh used by the offhand weapon actor. Same fallback rules as the skeletal slot. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
+		meta = (EditCondition = "bIsPairedWeapon"))
+	TObjectPtr<UStaticMesh> OffhandStaticWeaponMesh = nullptr;
+
+	/** Relative transform applied to the offhand mesh component. Falls back to the mainhand
+	 *  RelativeAttachTransform if left at identity. Use this to mirror the offhand mesh
+	 *  (typically a -1 X scale or a 180-degree yaw rotation) so a one-handed sword reads as a
+	 *  left-hand sword instead of a clipped right-hand sword. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
+		meta = (EditCondition = "bIsPairedWeapon"))
+	FTransform OffhandMeshRelativeTransform = FTransform::Identity;
+
 	/** Hand socket for the offhand weapon while active. Defaults to a sensible left-hand grip name. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Wielding|Paired",
 		meta = (EditCondition = "bIsPairedWeapon"))

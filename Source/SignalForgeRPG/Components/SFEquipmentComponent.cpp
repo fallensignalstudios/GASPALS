@@ -883,10 +883,23 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 
 	if (!OffhandActor)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFEquipment: failed to spawn offhand actor for paired weapon '%s' (class=%s)."),
+			*WeaponData->GetName(), *GetNameSafe(OffhandClass));
 		return;
 	}
 
 	OffhandActor->InitializeFromWeaponData(WeaponData);
+	// Swap to the offhand-specific mesh / transform if the DA has them; otherwise the offhand
+	// keeps the mainhand mesh (symmetric dual swords / pistols).
+	OffhandActor->ApplyOffhandMeshOverride(WeaponData);
+
+	UE_LOG(LogTemp, Log,
+		TEXT("SFEquipment: spawned offhand actor '%s' for paired weapon '%s' (mainSkel=%s, offSkel=%s, offStatic=%s)."),
+		*OffhandActor->GetName(), *WeaponData->GetName(),
+		*GetNameSafe(WeaponData->SkeletalWeaponMesh),
+		*GetNameSafe(WeaponData->OffhandSkeletalWeaponMesh),
+		*GetNameSafe(WeaponData->OffhandStaticWeaponMesh));
 
 	if (USkeletalMeshComponent* OwnerMesh = GetOwnerSkeletalMesh())
 	{
