@@ -105,7 +105,6 @@ private:
 	TWeakObjectPtr<USFEquipmentComponent> CachedEquipment;
 	TWeakObjectPtr<USFCombatComponent> CachedCombat;
 	TWeakObjectPtr<UAnimMontage> CurrentMontage;
-	FDelegateHandle OnHitDeliveredHandle;
 	int32 ChosenComboStep = 0;
 	bool bHitLandedThisSwing = false;
 	bool bAppliedSwingingTag = false;
