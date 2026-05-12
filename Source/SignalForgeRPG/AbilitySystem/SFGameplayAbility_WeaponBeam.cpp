@@ -464,13 +464,11 @@ void USFGameplayAbility_WeaponBeam::StopBeam(bool bOverheated)
 			FRotator MuzzleRotation = Character->GetActorRotation();
 			if (USFEquipmentComponent* Equipment = Character->GetEquipmentComponent())
 			{
-				if (ASFWeaponActor* WeaponActor = Equipment->GetEquippedWeaponActor())
+				ASFWeaponActor* WeaponActor = Equipment->GetEquippedWeaponActor();
+				if (WeaponActor && WeaponActor->HasValidMuzzleSocket())
 				{
-					if (WeaponActor->HasValidMuzzleSocket())
-					{
-						MuzzleLocation = WeaponActor->GetMuzzleLocation();
-						MuzzleRotation = WeaponActor->GetMuzzleRotation();
-					}
+					MuzzleLocation = WeaponActor->GetMuzzleLocation();
+					MuzzleRotation = WeaponActor->GetMuzzleRotation();
 				}
 
 				if (USFWeaponData* WeaponData = Equipment->GetCurrentWeaponData())

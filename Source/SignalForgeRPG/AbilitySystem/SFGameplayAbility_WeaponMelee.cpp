@@ -98,10 +98,10 @@ bool USFGameplayAbility_WeaponMelee::CanActivateAbility(
 	// actually want melee on this input -- e.g. a rifle DA accidentally pointed PrimaryFire
 	// at WeaponMelee. Failing CanActivate keeps WeaponFire / WeaponBeam free to handle it.
 	const FSFMeleeWeaponConfig& Cfg = WeaponData->MeleeConfig;
-	const TArray<TObjectPtr<UAnimMontage>>& Lane =
+	const TArray<TObjectPtr<UAnimMontage>>& LaneMontages =
 		(this->Lane == ESFMeleeLane::Heavy) ? Cfg.HeavyComboMontages : Cfg.LightComboMontages;
 
-	return Lane.Num() > 0;
+	return LaneMontages.Num() > 0;
 }
 
 void USFGameplayAbility_WeaponMelee::ActivateAbility(
@@ -294,16 +294,16 @@ bool USFGameplayAbility_WeaponMelee::ResolveContext(
 UAnimMontage* USFGameplayAbility_WeaponMelee::PickMontageForStep(
 	const FSFMeleeWeaponConfig& MeleeConfig, int32 Step) const
 {
-	const TArray<TObjectPtr<UAnimMontage>>& Lane =
+	const TArray<TObjectPtr<UAnimMontage>>& LaneMontages =
 		(this->Lane == ESFMeleeLane::Heavy) ? MeleeConfig.HeavyComboMontages : MeleeConfig.LightComboMontages;
 
-	if (Lane.Num() == 0)
+	if (LaneMontages.Num() == 0)
 	{
 		return nullptr;
 	}
 
-	const int32 Clamped = FMath::Clamp(Step, 0, Lane.Num() - 1);
-	return Lane[Clamped].Get();
+	const int32 Clamped = FMath::Clamp(Step, 0, LaneMontages.Num() - 1);
+	return LaneMontages[Clamped].Get();
 }
 
 void USFGameplayAbility_WeaponMelee::ApplyStaminaCost(ASFCharacterBase* Character, const USFWeaponData* WeaponData)
@@ -382,7 +382,8 @@ void USFGameplayAbility_WeaponMelee::BindHitDelegate(USFCombatComponent* Combat)
 		return;
 	}
 
-	OnHitDeliveredHandle = Combat->OnHitDelivered.AddDynamic(this, &USFGameplayAbility_WeaponMelee::OnHitDelivered);
+	// FScriptMulticastDelegate::AddDynamic returns void; cleanup is by RemoveDynamic(this, &Fn).
+	Combat->OnHitDelivered.AddDynamic(this, &USFGameplayAbility_WeaponMelee::OnHitDelivered);
 }
 
 void USFGameplayAbility_WeaponMelee::UnbindHitDelegate()
@@ -391,7 +392,6 @@ void USFGameplayAbility_WeaponMelee::UnbindHitDelegate()
 	{
 		Combat->OnHitDelivered.RemoveDynamic(this, &USFGameplayAbility_WeaponMelee::OnHitDelivered);
 	}
-	OnHitDeliveredHandle.Reset();
 }
 
 void USFGameplayAbility_WeaponMelee::OnHitDelivered(const FSFHitData& HitData, const FSFResolvedHit& ResolvedHit)
@@ -445,20 +445,10 @@ void USFGameplayAbility_WeaponMelee::OnHitDelivered(const FSFHitData& HitData, c
 		ASC->ExecuteGameplayCue(CueTag, Params);
 	}
 
-	// Apply local hitstop to the instigator for impact feel. Disabled if HitstopSeconds == 0
-	// or HitstopTimeDilation >= 1.0.
-	if (Cfg.HitstopSeconds > 0.0f && Cfg.HitstopTimeDilation < 1.0f)
-	{
-		FSFCinematicFeedback Feedback;
-		Feedback.HitStopDuration = Cfg.HitstopSeconds;
-		Feedback.HitStopTimeDilation = Cfg.HitstopTimeDilation;
-		Feedback.CameraShakeScale = 1.0f;
-
-		if (USFCombatComponent* Combat = CachedCombat.Get())
-		{
-			Combat->ApplyHitStop(Character, Feedback, /*IntensityScale=*/1.0f);
-		}
-	}
+	// NOTE: USFCombatComponent::TriggerHitFeedback (called internally during hit resolution)
+	// already drives hitstop via its per-attack-type feedback profile. We intentionally don't
+	// re-apply hitstop here -- MeleeConfig.HitstopSeconds / HitstopTimeDilation are kept as
+	// weapon-data hints so designers can author per-weapon feedback profiles on CombatComponent.
 
 	// Camera shake (instigator only).
 	if (Cfg.HitCameraShake)
