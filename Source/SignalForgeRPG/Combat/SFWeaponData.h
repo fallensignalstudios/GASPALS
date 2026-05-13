@@ -22,6 +22,7 @@ class UGameplayAbility;
 class UGameplayEffect;
 class USoundBase;
 class UCameraShakeBase;
+class UNiagaraSystem;
 class UCurveFloat;
 class USFAmmoType;
 
@@ -374,6 +375,137 @@ struct SIGNALFORGERPG_API FSFMeleeWeaponConfig
 	FGameplayTag WhiffCueOverride;
 };
 
+/**
+ * Tuning for caster-style weapons (staffs, focus crystals, gauntlets, casters that fling
+ * projectiles via an animation-driven release rather than instant trace-on-press).
+ *
+ * Workflow at runtime (USFGameplayAbility_WeaponCast):
+ *  - Activation plays CastMontage (or its charge-loop section if bSupportsCharge).
+ *  - When charging, the ability listens for input-release; on release the montage jumps to its
+ *    "Release" section. When not charging, the entire CastMontage plays through.
+ *  - The cast montage MUST contain a SFAnimNotify_CastRelease one-shot notify on the frame
+ *    the projectile should leave the character. That notify sends GameplayEvent.Cast.Release.
+ *  - The ability spawns ProjectileClass at SpawnSocketName (resolved on the mainhand weapon
+ *    actor if bSpawnFromWeaponActor, else on the character mesh) aimed along the camera vector.
+ *
+ * Charge tiers scale damage / projectile speed / VFX scalar by held duration. Tier 0 is "minimum
+ * charge" (a tap-fire), Tier N is the cap. Held duration is clamped to MaxChargeSeconds.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFCasterChargeTier
+{
+	GENERATED_BODY()
+
+	/** Seconds the player must hold input to reach this tier. Tiers should be sorted ascending. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Charge", meta = (ClampMin = "0.0"))
+	float HoldSeconds = 0.0f;
+
+	/** Damage multiplier applied to the projectile's base damage at this tier (1.0 = no change). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Charge", meta = (ClampMin = "0.0"))
+	float DamageMultiplier = 1.0f;
+
+	/** Projectile speed multiplier at this tier. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Charge", meta = (ClampMin = "0.0"))
+	float SpeedMultiplier = 1.0f;
+
+	/** Uniform scale applied to the projectile actor at spawn. Use for "bigger fireball at full charge". */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Charge", meta = (ClampMin = "0.05"))
+	float ProjectileScale = 1.0f;
+
+	/** Additional mana cost surcharge for casting at this tier (added on top of base ManaCost). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Charge", meta = (ClampMin = "0.0"))
+	float ExtraManaCost = 0.0f;
+};
+
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFCasterWeaponConfig
+{
+	GENERATED_BODY()
+
+	/** Projectile actor spawned on cast release. Required; the validator errors if null. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Projectile")
+	TSubclassOf<ASFProjectileBase> ProjectileClass;
+
+	/** Single montage played from cast-start to recovery. For charged weapons this montage must
+	 *  contain a "Charge" loop section and a "Release" section -- the ability jumps sections on
+	 *  input release. For instant casts a single linear montage with one CastRelease notify is
+	 *  enough. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Animation")
+	TObjectPtr<UAnimMontage> CastMontage;
+
+	/** Section name on CastMontage that loops while the player holds the input. Only consulted
+	 *  when bSupportsCharge. Convention: "Charge". */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Animation",
+		meta = (EditCondition = "bSupportsCharge"))
+	FName ChargeLoopSectionName = TEXT("Charge");
+
+	/** Section name to jump to when the player releases input (or hits MaxChargeSeconds). The
+	 *  Release section must contain an SFAnimNotify_CastRelease one-shot notify on the frame
+	 *  the projectile should leave the character. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Animation",
+		meta = (EditCondition = "bSupportsCharge"))
+	FName ReleaseSectionName = TEXT("Release");
+
+	/** Socket to spawn the projectile from. Resolved on the mainhand ASFWeaponActor's primary mesh
+	 *  when bSpawnFromWeaponActor is true, otherwise on the character skeletal mesh (hand_r_socket,
+	 *  etc.). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Spawn")
+	FName SpawnSocketName = TEXT("CastSocket");
+
+	/** True = resolve SpawnSocketName on the weapon mesh (staff tip). False = on the character mesh. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Spawn")
+	bool bSpawnFromWeaponActor = true;
+
+	/** Base mana cost (applied via ManaCostEffect on the ability). Charge tiers add ExtraManaCost. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Cost", meta = (ClampMin = "0.0"))
+	float ManaCost = 15.0f;
+
+	/** GE applied on cast release to consume mana. Designer-authored; uses Data.ManaCost SetByCaller.
+	 *  If null, the cast still goes off but no resource is charged (free cast). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Cost")
+	TSubclassOf<UGameplayEffect> ManaCostEffect;
+
+	/** SetByCaller tag for the mana-cost magnitude (matches your GE). Default: Data.ManaCost. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Cost")
+	FGameplayTag ManaCostSetByCallerTag;
+
+	/** When true the ability supports hold-to-charge. CastMontage must define ChargeLoopSectionName
+	 *  and ReleaseSectionName. When false the cast is one-shot: the ability plays the full montage
+	 *  and waits for the CastRelease notify. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Charge")
+	bool bSupportsCharge = false;
+
+	/** Charge tiers in ascending HoldSeconds order. Empty = no scaling even if bSupportsCharge. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Charge",
+		meta = (EditCondition = "bSupportsCharge"))
+	TArray<FSFCasterChargeTier> ChargeTiers;
+
+	/** Hard cap on charge time. Holding longer auto-releases. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Charge",
+		meta = (EditCondition = "bSupportsCharge", ClampMin = "0.1"))
+	float MaxChargeSeconds = 2.0f;
+
+	/** Niagara system attached at SpawnSocketName while charging (orb growing in the palm).
+	 *  Auto-cleaned on release / cancel. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|FX",
+		meta = (EditCondition = "bSupportsCharge"))
+	TObjectPtr<UNiagaraSystem> ChargeLoopVFX;
+
+	/** Cue executed on cast release (muzzle flash analog). Params.Location = spawn point. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|FX",
+		meta = (Categories = "SignalForge.Cue"))
+	FGameplayTag CastReleaseCueOverride;
+
+	/** Cue executed while charging (looping audio + VFX driver). Params.Magnitude = charge fraction. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|FX",
+		meta = (EditCondition = "bSupportsCharge", Categories = "SignalForge.Cue"))
+	FGameplayTag CastChargeCueOverride;
+
+	/** Optional camera shake on cast release. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|FX")
+	TSubclassOf<UCameraShakeBase> CastCameraShake;
+};
+
 /** Combat tuning very similar to Narrative's AttackDamage + multipliers. */
 USTRUCT(BlueprintType)
 struct SIGNALFORGERPG_API FSFWeaponCombatTuning
@@ -552,6 +684,13 @@ public:
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Melee")
 	FSFMeleeWeaponConfig MeleeConfig;
+
+	/**
+	 * Caster tuning. Consulted when the granted primary fire ability is USFGameplayAbility_WeaponCast
+	 * (staffs, focus crystals, gauntlets). The cast ability ignores RangedConfig/MeleeConfig.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon|Caster")
+	FSFCasterWeaponConfig CasterConfig;
 
 	/**
 	 * Two-handed weapons (greatswords, heavy rifles) occupy both hands. While a two-handed weapon
@@ -786,6 +925,20 @@ public:
 		if (CombatTuning.AttacksPerSecond <= 0.0f)
 		{
 			Context.AddError(NSLOCTEXT("SFWeaponData", "InvalidAttackRate", "AttacksPerSecond must be greater than 0."));
+			bHasErrors = true;
+		}
+
+		if (CasterConfig.CastMontage && !CasterConfig.ProjectileClass)
+		{
+			Context.AddError(NSLOCTEXT("SFWeaponData", "CasterMissingProjectile",
+				"CasterConfig.CastMontage is set but ProjectileClass is null. A caster weapon must define a projectile to spawn on release."));
+			bHasErrors = true;
+		}
+
+		if (CasterConfig.bSupportsCharge && CasterConfig.ChargeTiers.Num() == 0)
+		{
+			Context.AddError(NSLOCTEXT("SFWeaponData", "CasterChargeNoTiers",
+				"CasterConfig.bSupportsCharge is true but ChargeTiers is empty -- charge would do nothing. Add at least a Tier 0 entry (HoldSeconds=0) or set bSupportsCharge=false."));
 			bHasErrors = true;
 		}
 

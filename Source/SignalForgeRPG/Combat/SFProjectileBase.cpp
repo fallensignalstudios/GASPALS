@@ -101,6 +101,19 @@ void ASFProjectileBase::BeginPlay()
 	}
 }
 
+void ASFProjectileBase::SetSpeedMultiplier(float Multiplier)
+{
+	if (Multiplier <= 0.0f || FMath::IsNearlyEqual(Multiplier, 1.0f))
+	{
+		return;
+	}
+	InitialSpeed *= Multiplier;
+	if (MaxSpeed > 0.0f && MaxSpeed < InitialSpeed)
+	{
+		MaxSpeed = InitialSpeed;
+	}
+}
+
 void ASFProjectileBase::SetSourceActor(AActor* InSourceActor)
 {
 	SourceActor = InSourceActor;

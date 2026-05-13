@@ -46,6 +46,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Projectile")
 	AActor* GetSourceActor() const { return SourceActor; }
 
+	/** Multiply the projectile's InitialSpeed (and MaxSpeed if needed) by Multiplier. Must be
+	 *  called before BeginPlay finishes -- use SpawnActorDeferred + this + FinishSpawning. */
+	UFUNCTION(BlueprintCallable, Category = "Projectile|Movement")
+	void SetSpeedMultiplier(float Multiplier);
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Projectile")
 	TObjectPtr<USphereComponent> CollisionSphere;
