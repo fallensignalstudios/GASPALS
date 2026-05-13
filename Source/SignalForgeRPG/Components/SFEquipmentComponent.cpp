@@ -1267,7 +1267,7 @@ bool USFEquipmentComponent::UpdateActiveWeaponInstance(const FSFWeaponInstanceDa
 // Weapon switching + holstering
 // ============================================================================
 
-void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot Slot, bool bIsActive)
+void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot Slot, bool bIsActiveSlot)
 {
 	if (Slot == ESFEquipmentSlot::None)
 	{
@@ -1302,10 +1302,10 @@ void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot 
 	}
 
 	const bool bHasHolsterSocket = WeaponData->HolsteredAttachSocketName != NAME_None;
-	const FName SocketName = (!bIsActive && bHasHolsterSocket)
+	const FName SocketName = (!bIsActiveSlot && bHasHolsterSocket)
 		? WeaponData->HolsteredAttachSocketName
 		: WeaponData->AttachSocketName;
-	const FTransform& RelativeXform = (!bIsActive && bHasHolsterSocket)
+	const FTransform& RelativeXform = (!bIsActiveSlot && bHasHolsterSocket)
 		? WeaponData->HolsteredRelativeAttachTransform
 		: WeaponData->RelativeAttachTransform;
 
@@ -1322,10 +1322,10 @@ void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot 
 		if (OffhandActor)
 		{
 			const bool bOffhandHasHolsterSocket = WeaponData->OffhandHolsteredAttachSocketName != NAME_None;
-			const FName OffhandSocketName = (!bIsActive && bOffhandHasHolsterSocket)
+			const FName OffhandSocketName = (!bIsActiveSlot && bOffhandHasHolsterSocket)
 				? WeaponData->OffhandHolsteredAttachSocketName
 				: WeaponData->OffhandAttachSocketName;
-			const FTransform& OffhandRelativeXform = (!bIsActive && bOffhandHasHolsterSocket)
+			const FTransform& OffhandRelativeXform = (!bIsActiveSlot && bOffhandHasHolsterSocket)
 				? WeaponData->OffhandHolsteredRelativeAttachTransform
 				: WeaponData->OffhandRelativeAttachTransform;
 
@@ -1333,9 +1333,9 @@ void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot 
 			OffhandActor->SetActorRelativeTransform(OffhandRelativeXform);
 
 			UE_LOG(LogTemp, Log,
-				TEXT("SFEquipment: offhand re-attached on draw/sheathe for '%s' -> socket '%s' (bIsActive=%d, hasOffhandHolster=%d)."),
+				TEXT("SFEquipment: offhand re-attached on draw/sheathe for '%s' -> socket '%s' (bIsActiveSlot=%d, hasOffhandHolster=%d)."),
 				*WeaponData->GetName(), *OffhandSocketName.ToString(),
-				bIsActive ? 1 : 0, bOffhandHasHolsterSocket ? 1 : 0);
+				bIsActiveSlot ? 1 : 0, bOffhandHasHolsterSocket ? 1 : 0);
 		}
 	}
 }
