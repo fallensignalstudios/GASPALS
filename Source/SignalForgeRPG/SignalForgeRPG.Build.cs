@@ -18,6 +18,7 @@ public class SignalForgeRPG : ModuleRules
             "GameplayTasks",
             "GameplayAbilities",
             "AIModule",
+            "NavigationSystem",
             "Niagara",
             "UMG",
             "Slate",
