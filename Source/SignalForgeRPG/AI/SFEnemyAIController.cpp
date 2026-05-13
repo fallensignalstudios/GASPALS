@@ -49,9 +49,19 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
+	if (!InPawn)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFAI] OnPossess: InPawn is null on %s -- BT will not start."), *GetNameSafe(this));
+		return;
+	}
+
 	ControlledEnemy = Cast<ASFEnemyCharacter>(InPawn);
 	if (!ControlledEnemy)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SFAI] OnPossess: pawn '%s' is class '%s' which is NOT an ASFEnemyCharacter. "
+			     "Reparent the BP to BP_EnemyCharacter (or ASFEnemyCharacter) so the controller can fetch its BehaviorTreeAsset."),
+			*GetNameSafe(InPawn), *GetNameSafe(InPawn->GetClass()));
 		return;
 	}
 
@@ -62,14 +72,27 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 	}
 
 	UBehaviorTree* BehaviorTree = ControlledEnemy->GetBehaviorTreeAsset();
-	if (!BehaviorTree || !BehaviorTree->BlackboardAsset)
+	if (!BehaviorTree)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SFAI] OnPossess: pawn '%s' has no BehaviorTreeAsset assigned. "
+			     "Open the BP, find Class Defaults -> AI -> Behavior Tree Asset and assign BT_NPC (or your tree)."),
+			*GetNameSafe(InPawn));
+		return;
+	}
+	if (!BehaviorTree->BlackboardAsset)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SFAI] OnPossess: BehaviorTree '%s' has no BlackboardAsset set. "
+			     "Open BT_NPC and assign BB_NPC in the asset details."),
+			*GetNameSafe(BehaviorTree));
 		return;
 	}
 
 	UBlackboardComponent* BlackboardComp = nullptr;
 	if (!UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFAI] OnPossess: UseBlackboard failed for '%s'."), *GetNameSafe(BehaviorTree->BlackboardAsset));
 		return;
 	}
 
@@ -77,15 +100,21 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 
 	if (!RunBehaviorTree(BehaviorTree))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFAI] OnPossess: RunBehaviorTree failed for '%s'."), *GetNameSafe(BehaviorTree));
 		return;
 	}
 
 	// Anchor patrol / return-home behavior at the pawn's spawn point. The
 	// SFBTService_PatrolPoint reads this key to pick reachable patrol points.
-	if (BlackboardComponent && !HomeLocationKeyName.IsNone() && InPawn)
+	if (BlackboardComponent && !HomeLocationKeyName.IsNone())
 	{
 		BlackboardComponent->SetValueAsVector(HomeLocationKeyName, InPawn->GetActorLocation());
 	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[SFAI] OnPossess SUCCESS: pawn '%s' running BT '%s' with BB '%s'. HomeLocation = %s."),
+		*GetNameSafe(InPawn), *GetNameSafe(BehaviorTree), *GetNameSafe(BehaviorTree->BlackboardAsset),
+		*InPawn->GetActorLocation().ToString());
 }
 
 void ASFEnemyAIController::OnUnPossess()
