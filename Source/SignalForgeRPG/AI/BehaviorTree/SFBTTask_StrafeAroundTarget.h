@@ -4,6 +4,14 @@
 #include "BehaviorTree/Tasks/BTTask_BlackboardBase.h"
 #include "SFBTTask_StrafeAroundTarget.generated.h"
 
+UENUM()
+enum class ESFBTStrafeDirection : uint8
+{
+	Auto,
+	Left,
+	Right,
+};
+
 /**
  * Picks a navigable point lateral to the target stored in the BB Actor key
  * (alternating left / right per call) at roughly the AI's current engagement
@@ -32,16 +40,8 @@ public:
 	virtual FString GetStaticDescription() const override;
 
 protected:
-	UENUM()
-	enum class EStrafeDirection : uint8
-	{
-		Auto,
-		Left,
-		Right,
-	};
-
 	UPROPERTY(EditAnywhere, Category = "Strafe")
-	EStrafeDirection Direction = EStrafeDirection::Auto;
+	ESFBTStrafeDirection Direction = ESFBTStrafeDirection::Auto;
 
 	/** Lateral offset along the strafe axis (cm). */
 	UPROPERTY(EditAnywhere, Category = "Strafe", meta = (ClampMin = "50.0"))

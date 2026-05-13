@@ -43,9 +43,9 @@ EBTNodeResult::Type USFBTTask_StrafeAroundTarget::ExecuteTask(UBehaviorTreeCompo
 	bool bGoRight = false;
 	switch (Direction)
 	{
-		case EStrafeDirection::Right: bGoRight = true; break;
-		case EStrafeDirection::Left:  bGoRight = false; break;
-		case EStrafeDirection::Auto:
+		case ESFBTStrafeDirection::Right: bGoRight = true; break;
+		case ESFBTStrafeDirection::Left:  bGoRight = false; break;
+		case ESFBTStrafeDirection::Auto:
 		default:
 			bGoRight = !bLastWentRight;
 			bLastWentRight = bGoRight;
@@ -138,8 +138,8 @@ FString USFBTTask_StrafeAroundTarget::GetStaticDescription() const
 	const TCHAR* DirText = TEXT("Auto");
 	switch (Direction)
 	{
-		case EStrafeDirection::Left:  DirText = TEXT("Left"); break;
-		case EStrafeDirection::Right: DirText = TEXT("Right"); break;
+		case ESFBTStrafeDirection::Left:  DirText = TEXT("Left"); break;
+		case ESFBTStrafeDirection::Right: DirText = TEXT("Right"); break;
 		default: break;
 	}
 	return FString::Printf(TEXT("Strafe %s around %s (%.0fcm)"),
