@@ -122,6 +122,18 @@ struct SIGNALFORGERPG_API FSFWeaponInstanceData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Melee|Paired")
 	int32 LastSwingHandIndex = 1;
 
+	/**
+	 * Current cast combo step index. Mirrors MeleeLightComboStep but for FSFCasterWeaponConfig
+	 * cast combos. Advances each release, wraps modulo combo length, resets to 0 after
+	 * CasterConfig.CastComboResetSeconds of idle.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Caster")
+	int32 CasterComboStep = 0;
+
+	/** World time of the last cast activation. Drives caster combo reset. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Caster")
+	float LastCastWorldTime = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Progression", meta = (ClampMin = "0"))
 	int32 EnhancementLevel = 0;
 
