@@ -298,7 +298,11 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 
 	GameplayTags.Ability_Weapon_MeleeHeavy = TagManager.AddNativeGameplayTag(
 		FName("Ability.Weapon.MeleeHeavy"),
-		TEXT("Heavy melee swing (combo lane 1). Higher damage, higher stamina cost, longer recovery."));
+		TEXT("Heavy attack combo step (windup, bigger swing, higher stamina/damage)."));
+
+	GameplayTags.Ability_Weapon_Cast = TagManager.AddNativeGameplayTag(
+		FName("Ability.Weapon.Cast"),
+		TEXT("Caster weapon primary: plays cast montage, optionally charges, spawns projectile on Cast.Release event."));
 
 	GameplayTags.Ability_Grenade_Throw = TagManager.AddNativeGameplayTag(
 		FName("Ability.Grenade.Throw"),
@@ -332,6 +336,18 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.State_Weapon_MeleeSwinging = TagManager.AddNativeGameplayTag(
 		FName("State.Weapon.MeleeSwinging"),
 		TEXT("Melee montage is playing -- damage window may or may not be open"));
+
+	GameplayTags.State_Weapon_Casting = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.Casting"),
+		TEXT("WeaponCast ability is active (montage playing). Other primary fire is blocked."));
+
+	GameplayTags.State_Weapon_Charging = TagManager.AddNativeGameplayTag(
+		FName("State.Weapon.Charging"),
+		TEXT("Caster is in the hold-to-charge loop (between cast start and release)."));
+
+	GameplayTags.Event_Cast_Release = TagManager.AddNativeGameplayTag(
+		FName("GameplayEvent.Cast.Release"),
+		TEXT("Anim notify fires this when the projectile should leave the character (mid-montage)."));
 
 	GameplayTags.State_Weapon_MeleeCancelWindow = TagManager.AddNativeGameplayTag(
 		FName("State.Weapon.MeleeCancelWindow"),
@@ -397,6 +413,18 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.Cue_Weapon_MeleeWhiff = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Weapon.MeleeWhiff"),
 		TEXT("Melee swing closed without hitting anything (swoosh audio + optional motion-blur burst)"));
+
+	GameplayTags.Cue_Weapon_CastCharge = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.CastCharge"),
+		TEXT("Caster charge-up loop (looping audio + VFX in the hand/staff tip). Params.Magnitude = 0..1 charge fraction."));
+
+	GameplayTags.Cue_Weapon_CastRelease = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.CastRelease"),
+		TEXT("Caster release flash + audio. Params.Location = projectile spawn point, Params.Normal = aim direction."));
+
+	GameplayTags.Cue_Weapon_CastImpact = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Weapon.CastImpact"),
+		TEXT("Caster projectile impact (sparks/explosion/etc). Params.Location, Params.Normal."));
 
 	GameplayTags.Cue_Grenade_Explode = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Grenade.Explode"),

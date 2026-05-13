@@ -99,6 +99,7 @@ public:
 	FGameplayTag Ability_Weapon_BeamFire;
 	FGameplayTag Ability_Weapon_MeleeLight;
 	FGameplayTag Ability_Weapon_MeleeHeavy;
+	FGameplayTag Ability_Weapon_Cast;
 	FGameplayTag Ability_Grenade_Throw;
 
 	/** Ranged weapon state */
@@ -110,6 +111,11 @@ public:
 	FGameplayTag State_Weapon_Switching;
 	FGameplayTag State_Weapon_MeleeSwinging;
 	FGameplayTag State_Weapon_MeleeCancelWindow;
+	FGameplayTag State_Weapon_Casting;
+	FGameplayTag State_Weapon_Charging;
+
+	/** Caster GameplayEvents (sent from AnimNotifies into the WeaponCast ability) */
+	FGameplayTag Event_Cast_Release;
 	FGameplayTag State_Grenade_Cooking;
 
 	/** Weapon / grenade GameplayCues */
@@ -127,6 +133,9 @@ public:
 	FGameplayTag Cue_Weapon_BeamOverheat;
 	FGameplayTag Cue_Weapon_MeleeHit;
 	FGameplayTag Cue_Weapon_MeleeWhiff;
+	FGameplayTag Cue_Weapon_CastCharge;
+	FGameplayTag Cue_Weapon_CastRelease;
+	FGameplayTag Cue_Weapon_CastImpact;
 	FGameplayTag Cue_Grenade_Explode;
 	FGameplayTag Cue_Grenade_Bounce;
 
