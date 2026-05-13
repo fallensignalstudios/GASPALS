@@ -28,8 +28,13 @@ public:
 	USFBTService_PatrolPoint();
 
 	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
+	virtual void OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 	virtual uint16 GetInstanceMemorySize() const override { return sizeof(FMemory); }
 	virtual FString GetStaticDescription() const override;
+
+private:
+	/** Shared logic between OnBecomeRelevant and TickNode. Returns true if a new point was written. */
+	bool TryRollPatrolPoint(UBehaviorTreeComponent& OwnerComp, FMemory* Mem, bool bForceReroll) const;
 
 protected:
 	UPROPERTY(EditAnywhere, Category = "Keys")

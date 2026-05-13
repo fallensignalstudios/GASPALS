@@ -14,6 +14,7 @@ USFBTService_PatrolPoint::USFBTService_PatrolPoint()
 	Interval = 0.5f;
 	RandomDeviation = 0.1f;
 	bNotifyTick = true;
+	bNotifyBecomeRelevant = true;
 
 	HomeLocationKey.AddVectorFilter(this, GET_MEMBER_NAME_CHECKED(USFBTService_PatrolPoint, HomeLocationKey));
 	PatrolPointKey.AddVectorFilter(this, GET_MEMBER_NAME_CHECKED(USFBTService_PatrolPoint, PatrolPointKey));
@@ -29,22 +30,45 @@ void USFBTService_PatrolPoint::InitializeFromAsset(UBehaviorTree& Asset)
 	}
 }
 
+void USFBTService_PatrolPoint::OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+{
+	Super::OnBecomeRelevant(OwnerComp, NodeMemory);
+
+	FMemory* Mem = reinterpret_cast<FMemory*>(NodeMemory);
+	if (!Mem)
+	{
+		return;
+	}
+	*Mem = FMemory();
+
+	// Immediately roll a point so Move To has a valid target on its first tick.
+	TryRollPatrolPoint(OwnerComp, Mem, /*bForceReroll*/ true);
+}
+
 void USFBTService_PatrolPoint::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
 	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
 
 	FMemory* Mem = reinterpret_cast<FMemory*>(NodeMemory);
+	if (!Mem)
+	{
+		return;
+	}
+	Mem->SecondsSinceLastRoll += DeltaSeconds;
+	TryRollPatrolPoint(OwnerComp, Mem, /*bForceReroll*/ false);
+}
+
+bool USFBTService_PatrolPoint::TryRollPatrolPoint(UBehaviorTreeComponent& OwnerComp, FMemory* Mem, bool bForceReroll) const
+{
 	AAIController* AI = OwnerComp.GetAIOwner();
 	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
 	ASFCharacterBase* Self = SFBTHelpers::GetControlledCharacter(AI);
 	if (!Mem || !AI || !BB || !Self || PatrolPointKey.SelectedKeyName == NAME_None)
 	{
-		return;
+		UE_LOG(LogTemp, Verbose, TEXT("[SFAI Patrol] Missing AI/BB/Self/key; skipping roll."));
+		return false;
 	}
 
-	Mem->SecondsSinceLastRoll += DeltaSeconds;
-
-	// Resolve the anchor (HomeLocation, with current location as fallback).
 	FVector Anchor = FVector::ZeroVector;
 	if (HomeLocationKey.SelectedKeyName != NAME_None)
 	{
@@ -54,7 +78,8 @@ void USFBTService_PatrolPoint::TickNode(UBehaviorTreeComponent& OwnerComp, uint8
 	{
 		if (!bFallbackToCurrentLocation)
 		{
-			return;
+			UE_LOG(LogTemp, Verbose, TEXT("[SFAI Patrol] HomeLocation empty and fallback disabled; skipping roll."));
+			return false;
 		}
 		Anchor = Self->GetActorLocation();
 	}
@@ -64,19 +89,21 @@ void USFBTService_PatrolPoint::TickNode(UBehaviorTreeComponent& OwnerComp, uint8
 	const float DistToCurrent = FVector::Dist(SelfLoc, CurrentPoint);
 
 	const bool bNeedsReroll =
-		CurrentPoint.IsNearlyZero()
+		bForceReroll
+		|| CurrentPoint.IsNearlyZero()
 		|| DistToCurrent <= ArrivalDistance
 		|| Mem->SecondsSinceLastRoll >= StuckTimeout;
 
 	if (!bNeedsReroll)
 	{
-		return;
+		return false;
 	}
 
 	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(Self->GetWorld());
 	if (!NavSys)
 	{
-		return;
+		UE_LOG(LogTemp, Warning, TEXT("[SFAI Patrol] No NavigationSystemV1 in world for '%s' -- patrol cannot pick points."), *GetNameSafe(Self));
+		return false;
 	}
 
 	FNavLocation NavPt;
@@ -86,9 +113,17 @@ void USFBTService_PatrolPoint::TickNode(UBehaviorTreeComponent& OwnerComp, uint8
 		{
 			BB->SetValueAsVector(PatrolPointKey.SelectedKeyName, NavPt.Location);
 			Mem->SecondsSinceLastRoll = 0.0f;
-			return;
+			UE_LOG(LogTemp, Verbose, TEXT("[SFAI Patrol] '%s' rolled patrol point %s (anchor %s)."),
+				*GetNameSafe(Self), *NavPt.Location.ToString(), *Anchor.ToString());
+			return true;
 		}
 	}
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("[SFAI Patrol] '%s' could not find a reachable point within %.0fcm of %s after %d attempts. "
+		     "Check that a NavMeshBoundsVolume covers this area and that Anchor sits on or near the navmesh."),
+		*GetNameSafe(Self), PatrolRadius, *Anchor.ToString(), MaxAttempts);
+	return false;
 }
 
 FString USFBTService_PatrolPoint::GetStaticDescription() const
