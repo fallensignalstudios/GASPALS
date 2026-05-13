@@ -30,16 +30,16 @@ EBTNodeResult::Type USFBTTask_FireWeapon::ExecuteTask(UBehaviorTreeComponent& Ow
 
 	switch (FireMode)
 	{
-	case EFireMode::Tap:
+	case ESFBTFireMode::Tap:
 		SendReleased(OwnerComp);
 		Mem->bPressed = false;
 		return EBTNodeResult::Succeeded;
 
-	case EFireMode::PressOnly:
+	case ESFBTFireMode::PressOnly:
 		// Caller is responsible for releasing via SFBTTask_StopFiring.
 		return EBTNodeResult::Succeeded;
 
-	case EFireMode::Hold:
+	case ESFBTFireMode::Hold:
 	default:
 		// Tick until HoldDuration elapses, then release.
 		return EBTNodeResult::InProgress;
@@ -48,7 +48,7 @@ EBTNodeResult::Type USFBTTask_FireWeapon::ExecuteTask(UBehaviorTreeComponent& Ow
 
 void USFBTTask_FireWeapon::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
-	if (FireMode != EFireMode::Hold)
+	if (FireMode != ESFBTFireMode::Hold)
 	{
 		return;
 	}
@@ -80,11 +80,11 @@ FString USFBTTask_FireWeapon::GetStaticDescription() const
 	const TCHAR* ModeStr = TEXT("Tap");
 	switch (FireMode)
 	{
-	case EFireMode::Hold:      ModeStr = TEXT("Hold"); break;
-	case EFireMode::PressOnly: ModeStr = TEXT("PressOnly"); break;
+	case ESFBTFireMode::Hold:      ModeStr = TEXT("Hold"); break;
+	case ESFBTFireMode::PressOnly: ModeStr = TEXT("PressOnly"); break;
 	default: break;
 	}
-	if (FireMode == EFireMode::Hold)
+	if (FireMode == ESFBTFireMode::Hold)
 	{
 		return FString::Printf(TEXT("Fire (%s, %.2fs)"), ModeStr, HoldDuration);
 	}

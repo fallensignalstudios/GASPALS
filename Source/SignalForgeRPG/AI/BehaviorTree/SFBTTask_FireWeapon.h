@@ -5,6 +5,14 @@
 #include "GameplayTagContainer.h"
 #include "SFBTTask_FireWeapon.generated.h"
 
+UENUM()
+enum class ESFBTFireMode : uint8
+{
+	Tap,
+	Hold,
+	PressOnly,
+};
+
 /**
  * Activate the currently-equipped weapon's primary fire by pressing the
  * Input.PrimaryFire input tag on the AI's ability system. Works uniformly
@@ -37,19 +45,11 @@ public:
 	virtual FString GetStaticDescription() const override;
 
 protected:
-	UENUM()
-	enum class EFireMode : uint8
-	{
-		Tap,
-		Hold,
-		PressOnly,
-	};
-
 	UPROPERTY(EditAnywhere, Category = "Fire")
-	EFireMode FireMode = EFireMode::Tap;
+	ESFBTFireMode FireMode = ESFBTFireMode::Tap;
 
 	/** Seconds to hold input for Hold mode. Ignored in Tap / PressOnly. */
-	UPROPERTY(EditAnywhere, Category = "Fire", meta = (ClampMin = "0.0", EditCondition = "FireMode == EFireMode::Hold"))
+	UPROPERTY(EditAnywhere, Category = "Fire", meta = (ClampMin = "0.0", EditCondition = "FireMode == ESFBTFireMode::Hold"))
 	float HoldDuration = 0.5f;
 
 	struct FMemory
