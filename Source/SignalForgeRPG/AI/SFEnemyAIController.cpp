@@ -16,28 +16,30 @@ ASFEnemyAIController::ASFEnemyAIController()
 
 	Perception = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception"));
 
-	// Sight: only fire perception events for actors the faction system
-	// considers hostile to us. Friendlies / neutrals are ignored at the
-	// engine layer so the BT never has to filter them.
+	// Sight: detect everyone at the engine layer. We deliberately do NOT rely
+	// on UE's affiliation flags (GenericTeamAgentInterface team IDs), because
+	// our faction system is the source of truth -- HandlePerceptionUpdated
+	// re-filters every stimulus through USFFactionStatics::AreHostile, and
+	// SF Sense Update on the BT side does the same. Filtering here would
+	// silently drop the player unless every BP correctly sets a team ID.
 	if (UAISenseConfig_Sight* Sight = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig")))
 	{
 		Sight->SightRadius = 1500.0f;
 		Sight->LoseSightRadius = 1800.0f;
 		Sight->PeripheralVisionAngleDegrees = 70.0f;
 		Sight->DetectionByAffiliation.bDetectEnemies = true;
-		Sight->DetectionByAffiliation.bDetectFriendlies = false;
-		Sight->DetectionByAffiliation.bDetectNeutrals = false;
+		Sight->DetectionByAffiliation.bDetectFriendlies = true;
+		Sight->DetectionByAffiliation.bDetectNeutrals = true;
 		Perception->ConfigureSense(*Sight);
 		Perception->SetDominantSense(Sight->GetSenseImplementation());
 	}
 
-	// Hearing: still pick up neutrals (someone breaking nearby) but never
-	// chase allies on hearing alone. Designers can flip this in BPs.
+	// Hearing: same policy -- detect everything, let the faction system decide.
 	if (UAISenseConfig_Hearing* Hearing = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingConfig")))
 	{
 		Hearing->HearingRange = 1200.0f;
 		Hearing->DetectionByAffiliation.bDetectEnemies = true;
-		Hearing->DetectionByAffiliation.bDetectFriendlies = false;
+		Hearing->DetectionByAffiliation.bDetectFriendlies = true;
 		Hearing->DetectionByAffiliation.bDetectNeutrals = true;
 		Perception->ConfigureSense(*Hearing);
 	}
@@ -76,6 +78,13 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 	if (!RunBehaviorTree(BehaviorTree))
 	{
 		return;
+	}
+
+	// Anchor patrol / return-home behavior at the pawn's spawn point. The
+	// SFBTService_PatrolPoint reads this key to pick reachable patrol points.
+	if (BlackboardComponent && !HomeLocationKeyName.IsNone() && InPawn)
+	{
+		BlackboardComponent->SetValueAsVector(HomeLocationKeyName, InPawn->GetActorLocation());
 	}
 }
 
