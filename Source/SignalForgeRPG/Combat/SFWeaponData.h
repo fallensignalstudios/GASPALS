@@ -8,6 +8,7 @@
 #include "Combat/SFWeaponActor.h"
 #include "Misc/DataValidation.h"
 #include "Combat/SFWeaponAnimationSet.h"
+#include "Combat/SFProjectileBase.h"
 #include "SFWeaponData.generated.h"
 
 class UTexture2D;
