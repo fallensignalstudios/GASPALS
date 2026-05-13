@@ -9,6 +9,7 @@
 #include "Characters/SFEnemyCharacter.h"
 #include "Combat/SFWeaponActor.h"
 #include "Components/SFEquipmentComponent.h"
+#include "Faction/SFFactionStatics.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Core/SFAttributeSetBase.h"
 #include "Core/SignalForgeGameplayTags.h"
@@ -157,13 +158,23 @@ void USFCombatComponent::HandleAttackHitInternal(ESFAttackType AttackType)
 			continue;
 		}
 
-		// Skip dead characters
+		// Skip dead characters and non-hostile targets (friend-foe gate).
 		if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(HitActor))
 		{
 			if (HitCharacter->IsDead())
 			{
 				continue;
 			}
+
+			// Faction friend-foe check: only damage hostile characters. Self-hits
+			// are also rejected here (faction statics returns Friendly for self).
+			if (OwnerCharacter && !USFFactionStatics::AreHostile(OwnerCharacter, HitCharacter))
+			{
+				continue;
+			}
+
+			// Attribute the eventual kill to OwnerCharacter so HandleDeath grants XP.
+			HitCharacter->SetLastDamagingCharacter(OwnerCharacter);
 		}
 
 		FSFHitData HitData = BuildHitDataFromResult(HitActor, HitResult, AttackType);
@@ -375,12 +386,16 @@ void USFCombatComponent::ApplyResolvedHitWithGAS(const FSFHitData& HitData, cons
 
 	SourceASC->ApplyGameplayEffectSpecToTarget(*Spec, TargetASC);
 
-	// Track enemy for lock-on / camera logic
+	// Track enemy for lock-on / camera logic. Only lock onto hostile targets so
+	// allies / civilians don't get framed as enemies in the player's camera.
 	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(HitData.TargetActor))
 	{
-		if (ASFPlayerController* PlayerController = Cast<ASFPlayerController>(OwnerCharacter->GetController()))
+		if (OwnerCharacter && USFFactionStatics::AreHostile(OwnerCharacter, HitCharacter))
 		{
-			PlayerController->SetTrackedEnemy(HitCharacter);
+			if (ASFPlayerController* PlayerController = Cast<ASFPlayerController>(OwnerCharacter->GetController()))
+			{
+				PlayerController->SetTrackedEnemy(HitCharacter);
+			}
 		}
 	}
 

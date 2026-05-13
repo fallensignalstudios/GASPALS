@@ -103,6 +103,14 @@ struct SIGNALFORGERPG_API FSFRangedWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", meta = (ClampMin = "1.0"))
 	float HeadshotMultiplier = 2.0f;
 
+	/**
+	 * If true, this weapon bypasses the global friend-foe gate and can damage non-hostile
+	 * targets (allies, neutrals, etc.). Off by default per project policy; enable per-weapon
+	 * for designs that intentionally need friendly fire (training rifles, beam-cutters, etc.).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
+	bool bAllowFriendlyFire = false;
+
 	/** Pellets per shot: 1 for rifles/pistols, 8+ for shotguns. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Spread", meta = (ClampMin = "1", ClampMax = "32"))
 	int32 PelletsPerShot = 1;

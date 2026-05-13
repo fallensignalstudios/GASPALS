@@ -1,6 +1,8 @@
 #include "Characters/SFEnemyCharacter.h"
+
 #include "AI/SFEnemyAIController.h"
-#include "Components/SFProgressionComponent.h"
+#include "Core/SignalForgeGameplayTags.h"
+#include "Faction/SFFactionComponent.h"
 
 ASFEnemyCharacter::ASFEnemyCharacter()
 {
@@ -11,43 +13,16 @@ ASFEnemyCharacter::ASFEnemyCharacter()
 void ASFEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-}
 
-void ASFEnemyCharacter::SetLastDamagingCharacter(ASFCharacterBase* InCharacter)
-{
-	LastDamagingCharacter = InCharacter;
-}
-
-int32 ASFEnemyCharacter::GetXPReward() const
-{
-	if (const USFProgressionComponent* Progression = GetProgressionComponent())
+	// Default enemy faction to Faction.Bandit if BP didn't set anything.
+	if (HasAuthority())
 	{
-		return Progression->GetEnemyXPRewardForCurrentLevel();
-	}
-
-	return 0;
-}
-
-void ASFEnemyCharacter::HandleDeath()
-{
-	if (bIsDead)
-	{
-		return;
-	}
-
-	Super::HandleDeath();
-
-	if (!LastDamagingCharacter)
-	{
-		return;
-	}
-
-	if (USFProgressionComponent* Progression = LastDamagingCharacter->GetProgressionComponent())
-	{
-		const int32 XPReward = GetXPReward();
-		if (XPReward > 0)
+		if (USFFactionComponent* Faction = GetFactionComponent())
 		{
-			Progression->AddXP(XPReward);
+			if (!Faction->GetFactionTag().IsValid())
+			{
+				Faction->SetFactionTag(FSignalForgeGameplayTags::Get().Faction_Bandit);
+			}
 		}
 	}
 }

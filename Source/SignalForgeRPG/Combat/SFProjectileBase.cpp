@@ -17,6 +17,7 @@
 #include "Characters/SFEnemyCharacter.h"
 #include "Core/SignalForgeGameplayTags.h"
 #include "Engine/OverlapResult.h"
+#include "Faction/SFFactionStatics.h"
 
 ASFProjectileBase::ASFProjectileBase()
 {
@@ -192,6 +193,23 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 {
 	const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
 
+	// Friend-foe gate: if the projectile hit a non-hostile character, suppress
+	// damage but still play the impact cue (so allies still see the shot land
+	// in world without being harmed). The projectile will still detonate per
+	// its normal lifecycle (radial impact + cleanup are handled by the caller).
+	bool bSuppressDamage = false;
+	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(OtherActor))
+	{
+		if (HitCharacter->IsDead())
+		{
+			bSuppressDamage = true;
+		}
+		else if (!bAllowFriendlyFire && !USFFactionStatics::AreHostile(SourceActor, HitCharacter))
+		{
+			bSuppressDamage = true;
+		}
+	}
+
 	// VFX
 	if (ImpactNiagara)
 	{
@@ -208,8 +226,8 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 		UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, Hit.ImpactPoint);
 	}
 
-	// Damage attribution
-	if (DamageEffectClass && SourceActor && OtherActor)
+	// Damage attribution -- gated by friend-foe.
+	if (DamageEffectClass && SourceActor && OtherActor && !bSuppressDamage)
 	{
 		UAbilitySystemComponent* SourceASC =
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(SourceActor);
@@ -240,11 +258,14 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 					SpecHandle.Data->SetSetByCallerMagnitude(SFTags.Data_FalloffMultiplier, FalloffMult);
 				}
 
+				// Attribute the kill to the shooter on ANY character that we damage,
+				// not just ASFEnemyCharacter. Faction hostility was already verified
+				// above, so this is the right place to record attribution.
 				if (ASFCharacterBase* SourceCharacter = Cast<ASFCharacterBase>(SourceActor))
 				{
-					if (ASFEnemyCharacter* HitEnemy = Cast<ASFEnemyCharacter>(OtherActor))
+					if (ASFCharacterBase* HitCharacterAttribute = Cast<ASFCharacterBase>(OtherActor))
 					{
-						HitEnemy->SetLastDamagingCharacter(SourceCharacter);
+						HitCharacterAttribute->SetLastDamagingCharacter(SourceCharacter);
 					}
 				}
 
@@ -279,13 +300,17 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 	}
 
 	// Track last-hit enemy on the source player controller for camera lock-on flow.
+	// Only lock onto hostile targets so friendly fire doesn't hijack the camera.
 	if (ASFCharacterBase* SourceCharacter = Cast<ASFCharacterBase>(SourceActor))
 	{
 		if (ASFPlayerController* PC = Cast<ASFPlayerController>(SourceCharacter->GetController()))
 		{
 			if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(OtherActor))
 			{
-				PC->SetTrackedEnemy(HitCharacter);
+				if (USFFactionStatics::AreHostile(SourceCharacter, HitCharacter))
+				{
+					PC->SetTrackedEnemy(HitCharacter);
+				}
 			}
 		}
 	}

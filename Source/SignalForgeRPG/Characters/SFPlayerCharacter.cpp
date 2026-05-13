@@ -10,6 +10,7 @@
 #include "Dialogue/Data/SFDialogueComponent.h"
 #include "Dialogue/SFDialogueCameraComponent.h"
 #include "Engine/LocalPlayer.h"
+#include "Faction/SFFactionComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -99,6 +100,15 @@ void ASFPlayerCharacter::BeginPlay()
 			PlayerClassComponent->AssignClass(DefaultClassDefinition, /*bIsFirstTimeSetup=*/true);
 		}
 
+		// Default player faction to Faction.Hero if it wasn't explicitly set
+		// on the BP. Designers can still override in the FactionComponent.
+		if (USFFactionComponent* Faction = GetFactionComponent())
+		{
+			if (!Faction->GetFactionTag().IsValid())
+			{
+				Faction->SetFactionTag(FSignalForgeGameplayTags::Get().Faction_Hero);
+			}
+		}
 	}
 
 	PortraitRenderTarget = NewObject<UTextureRenderTarget2D>(this);

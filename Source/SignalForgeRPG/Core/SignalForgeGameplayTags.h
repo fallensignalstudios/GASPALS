@@ -164,6 +164,14 @@ public:
 	FGameplayTag Input_Ability_10;
 	FGameplayTag Input_Ability_Block;
 
+	/** Faction identity */
+	FGameplayTag Faction_Hero;
+	FGameplayTag Faction_Civilian;
+	FGameplayTag Faction_Bandit;
+	FGameplayTag Faction_Beast;
+	FGameplayTag Faction_Corporate;
+	FGameplayTag Faction_Cult;
+
 	/** Equipment slots */
 	FGameplayTag Equipment_Slot_Head;
 	FGameplayTag Equipment_Slot_Chest;

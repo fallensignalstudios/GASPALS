@@ -7,7 +7,6 @@
 #include "Animation/AnimMontage.h"
 #include "Camera/CameraShakeBase.h"
 #include "Characters/SFCharacterBase.h"
-#include "Characters/SFEnemyCharacter.h"
 #include "Characters/SFPlayerCharacter.h"
 #include "Combat/SFProjectileBase.h"
 #include "Combat/SFWeaponActor.h"
@@ -489,6 +488,7 @@ void USFGameplayAbility_WeaponFire::FireProjectilePellet(
 	Projectile->SetSourceActor(Character);
 	Projectile->SetBaseDamage(Config.BaseDamage);
 	Projectile->SetDamageFalloff(Config.FalloffStartDistance, Config.FalloffEndDistance, Config.MinFalloffMultiplier);
+	Projectile->SetAllowFriendlyFire(Config.bAllowFriendlyFire);
 
 	TSubclassOf<UGameplayEffect> EffectClass = Config.DamageEffectClass
 		? Config.DamageEffectClass
@@ -506,6 +506,22 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 	if (!TargetActor)
 	{
 		return;
+	}
+
+	// Friend-foe gate: if we shot a non-hostile character, do not apply damage.
+	// (Allies, civilians, and ourselves all flow through here.) Weapons can opt-in to friendly
+	// fire via FSFRangedWeaponConfig::bAllowFriendlyFire, in which case the hostility check is
+	// skipped (we still skip dead characters so corpses don't soak shots).
+	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(TargetActor))
+	{
+		if (HitCharacter->IsDead())
+		{
+			return;
+		}
+		if (!Config.bAllowFriendlyFire && !USFFactionStatics::AreHostile(Character, HitCharacter))
+		{
+			return;
+		}
 	}
 
 	UAbilitySystemComponent* SourceASC = Character->GetAbilitySystemComponent();
@@ -569,10 +585,10 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 		}
 	}
 
-	// Last-damaging-character attribution for enemies.
-	if (ASFEnemyCharacter* HitEnemy = Cast<ASFEnemyCharacter>(TargetActor))
+	// Last-damaging-character attribution -- now generalized to any character.
+	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(TargetActor))
 	{
-		HitEnemy->SetLastDamagingCharacter(Character);
+		HitCharacter->SetLastDamagingCharacter(Character);
 	}
 
 	// Hit cue on target ASC so the cinematic combat layer reacts (sparks, blood, etc.).

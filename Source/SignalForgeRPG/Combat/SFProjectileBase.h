@@ -43,6 +43,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Projectile|Falloff")
 	void SetDamageFalloff(float InStart, float InEnd, float InMinMultiplier);
 
+	/** Per-shot opt-in: when true, this projectile bypasses the friend-foe gate at impact. */
+	UFUNCTION(BlueprintCallable, Category = "Projectile")
+	void SetAllowFriendlyFire(bool bInAllow) { bAllowFriendlyFire = bInAllow; }
+
 	UFUNCTION(BlueprintPure, Category = "Projectile")
 	AActor* GetSourceActor() const { return SourceActor; }
 
@@ -129,6 +133,13 @@ protected:
 
 	UPROPERTY()
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
+
+	/**
+	 * If true, hits on non-hostile characters still deal damage. Off by default; weapons opt in
+	 * via FSFRangedWeaponConfig::bAllowFriendlyFire and propagate the flag at spawn time.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Projectile|Damage")
+	bool bAllowFriendlyFire = false;
 
 	/** Tracks where we spawned so damage falloff can be applied. */
 	FVector SpawnLocation = FVector::ZeroVector;
