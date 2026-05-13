@@ -527,10 +527,24 @@ void USFGameplayAbility_WeaponCast::SpawnProjectile(
 	float StepScaleMul)
 {
 	const TSubclassOf<ASFProjectileBase> ResolvedProjectileClass = ProjectileOverride ? ProjectileOverride : Config.ProjectileClass;
-	if (!Character || !ResolvedProjectileClass)
+	if (!Character)
 	{
+		UE_LOG(LogSFWeaponCast, Warning, TEXT("WeaponCast::SpawnProjectile: Character is null, aborting."));
 		return;
 	}
+	if (!ResolvedProjectileClass)
+	{
+		UE_LOG(LogSFWeaponCast, Warning,
+			TEXT("WeaponCast::SpawnProjectile: no projectile class resolved. ")
+			TEXT("Check FSFCasterWeaponConfig::ProjectileClass on the weapon DA, or set ")
+			TEXT("FSFCasterMontageStep::ProjectileOverride on combo step %d."),
+			ActiveStepIndex);
+		return;
+	}
+
+	UE_LOG(LogSFWeaponCast, Verbose,
+		TEXT("WeaponCast::SpawnProjectile: spawning %s (tier=%d, step=%d)"),
+		*ResolvedProjectileClass->GetName(), TierIndex, ActiveStepIndex);
 
 	UWorld* World = Character->GetWorld();
 	if (!World)
@@ -793,13 +807,39 @@ void USFGameplayAbility_WeaponCast::RemoveStateTag(const FGameplayTag& Tag, bool
 
 void USFGameplayAbility_WeaponCast::OnMontageCompleted()
 {
+	// Graceful fallback: if the release notify never fired during the montage (designer forgot to
+	// place SFAnimNotify_CastRelease, or the montage was authored before the system existed) we
+	// still want a projectile to come out. Synthesize the release here once the montage finishes.
+	if (!bReleaseFired)
+	{
+		UE_LOG(LogSFWeaponCast, Warning,
+			TEXT("WeaponCast: montage completed without an SFAnimNotify_CastRelease firing on '%s'. ")
+			TEXT("Spawning projectile as a fallback -- add the Cast Release notify to the montage ")
+			TEXT("on the frame the projectile should leave the character to control timing."),
+			CachedMontage.IsValid() ? *CachedMontage->GetName() : TEXT("<null>"));
+
+		FGameplayEventData EmptyPayload;
+		OnReleaseEventReceived(EmptyPayload);
+	}
 	FinishAbility(false);
 }
 
 void USFGameplayAbility_WeaponCast::OnMontageBlendOut()
 {
 	// Treat blend-out the same as completion (the release notify has already fired by the time
-	// the montage blends out).
+	// the montage blends out in well-authored cases; if not, OnMontageCompleted's fallback runs
+	// on the subsequent Completed callback).
+	if (!bReleaseFired)
+	{
+		UE_LOG(LogSFWeaponCast, Warning,
+			TEXT("WeaponCast: montage blending out without an SFAnimNotify_CastRelease firing on '%s'. ")
+			TEXT("Spawning projectile as a fallback -- add the Cast Release notify before blend-out ")
+			TEXT("to control spawn timing."),
+			CachedMontage.IsValid() ? *CachedMontage->GetName() : TEXT("<null>"));
+
+		FGameplayEventData EmptyPayload;
+		OnReleaseEventReceived(EmptyPayload);
+	}
 	FinishAbility(false);
 }
 
