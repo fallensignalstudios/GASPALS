@@ -63,6 +63,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI")
 	FName TargetActorKeyName = TEXT("TargetActor");
 
+	/** Blackboard Vector key written once on possess so patrol/return-home logic has an anchor. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI")
+	FName HomeLocationKeyName = TEXT("HomeLocation");
+
 	UFUNCTION()
 	void HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 };
