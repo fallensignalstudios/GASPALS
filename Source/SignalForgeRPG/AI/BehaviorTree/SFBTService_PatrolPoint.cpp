@@ -74,23 +74,51 @@ bool USFBTService_PatrolPoint::TryRollPatrolPoint(UBehaviorTreeComponent& OwnerC
 	{
 		Anchor = BB->GetValueAsVector(HomeLocationKey.SelectedKeyName);
 	}
-	if (Anchor.IsNearlyZero())
+
+	// UE leaves unset Vector blackboard keys at FVector(FLT_MAX) (~3.4e38), not
+	// zero, so a NearlyZero check alone silently lets that sentinel through and
+	// NavSystem then tries to find points at the edge of float-space (we saw
+	// ~120 'no reachable point' warnings around X=3.4e38 in the field). Treat
+	// any anchor with NaN or any component beyond a sane world bound as invalid
+	// and fall back to the pawn's current location instead.
+	const float kSaneWorldBound = 1.0e6f; // 10 km in UE units; far beyond any real level.
+	const bool bAnchorInvalid =
+		Anchor.ContainsNaN() ||
+		Anchor.IsNearlyZero() ||
+		FMath::Abs(Anchor.X) > kSaneWorldBound ||
+		FMath::Abs(Anchor.Y) > kSaneWorldBound ||
+		FMath::Abs(Anchor.Z) > kSaneWorldBound;
+	if (bAnchorInvalid)
 	{
 		if (!bFallbackToCurrentLocation)
 		{
-			UE_LOG(LogTemp, Verbose, TEXT("[SFAI Patrol] HomeLocation empty and fallback disabled; skipping roll."));
+			UE_LOG(LogTemp, Verbose,
+				TEXT("[SFAI Patrol] '%s' HomeLocation key invalid (%s) and fallback disabled; skipping roll."),
+				*GetNameSafe(Self), *Anchor.ToString());
 			return false;
 		}
+		UE_LOG(LogTemp, Verbose,
+			TEXT("[SFAI Patrol] '%s' HomeLocation key invalid (%s); falling back to current location."),
+			*GetNameSafe(Self), *Anchor.ToString());
 		Anchor = Self->GetActorLocation();
 	}
 
 	const FVector CurrentPoint = BB->GetValueAsVector(PatrolPointKey.SelectedKeyName);
 	const FVector SelfLoc = Self->GetActorLocation();
-	const float DistToCurrent = FVector::Dist(SelfLoc, CurrentPoint);
+
+	// PatrolPoint may also be FLT_MAX on first tick (UE default for unset Vector
+	// keys). Guard the same way so we always reroll into a real value.
+	const bool bCurrentPointInvalid =
+		CurrentPoint.ContainsNaN() ||
+		CurrentPoint.IsNearlyZero() ||
+		FMath::Abs(CurrentPoint.X) > kSaneWorldBound ||
+		FMath::Abs(CurrentPoint.Y) > kSaneWorldBound ||
+		FMath::Abs(CurrentPoint.Z) > kSaneWorldBound;
+	const float DistToCurrent = bCurrentPointInvalid ? FLT_MAX : FVector::Dist(SelfLoc, CurrentPoint);
 
 	const bool bNeedsReroll =
 		bForceReroll
-		|| CurrentPoint.IsNearlyZero()
+		|| bCurrentPointInvalid
 		|| DistToCurrent <= ArrivalDistance
 		|| Mem->SecondsSinceLastRoll >= StuckTimeout;
 
