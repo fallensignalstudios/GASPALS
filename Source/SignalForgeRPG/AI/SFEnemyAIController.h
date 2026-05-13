@@ -2,12 +2,29 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
+#include "Perception/AIPerceptionTypes.h"
 #include "SFEnemyAIController.generated.h"
 
 class ASFEnemyCharacter;
 class UBlackboardComponent;
 class UBehaviorTreeComponent;
+class UAIPerceptionComponent;
 
+/**
+ * ASFEnemyAIController
+ *
+ * Combat AI controller. Now uses AI Perception (sight + hearing) with
+ * IGenericTeamAgentInterface-driven affiliation, so the behavior tree
+ * only receives perception updates for actors the faction system
+ * considers hostile to the controlled enemy.
+ *
+ * Wiring contract:
+ *   - Possessed pawn must be an ASFEnemyCharacter (or subclass) with a
+ *     BehaviorTreeAsset and a USFFactionComponent on its base.
+ *   - The BT is expected to have an Object blackboard key named
+ *     "TargetActor" -- the controller writes the most recently seen
+ *     hostile into it. Designers can rename the key in their BB asset.
+ */
 UCLASS()
 class SIGNALFORGERPG_API ASFEnemyAIController : public AAIController
 {
@@ -25,6 +42,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "AI")
 	UBlackboardComponent* GetBlackboardComponent() const { return BlackboardComponent; }
 
+	/** Renamed accessor to avoid hiding AAIController::GetPerceptionComponent() (non-const virtual). */
+	UFUNCTION(BlueprintPure, Category = "AI")
+	UAIPerceptionComponent* GetEnemyPerceptionComponent() const { return Perception; }
+
 protected:
 	UPROPERTY(Transient)
 	TObjectPtr<ASFEnemyCharacter> ControlledEnemy = nullptr;
@@ -34,4 +55,14 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 	TObjectPtr<UBehaviorTreeComponent> BehaviorTreeComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
+	TObjectPtr<UAIPerceptionComponent> Perception = nullptr;
+
+	/** Blackboard key the controller writes the perceived target into. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI")
+	FName TargetActorKeyName = TEXT("TargetActor");
+
+	UFUNCTION()
+	void HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
 };

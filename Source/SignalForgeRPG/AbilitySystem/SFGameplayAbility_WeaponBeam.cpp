@@ -7,13 +7,13 @@
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraShakeBase.h"
 #include "Characters/SFCharacterBase.h"
-#include "Characters/SFEnemyCharacter.h"
 #include "Characters/SFPlayerCharacter.h"
 #include "Combat/SFWeaponActor.h"
 #include "Combat/SFWeaponData.h"
 #include "Combat/SFWeaponInstanceTypes.h"
 #include "Components/SFEquipmentComponent.h"
 #include "Core/SignalForgeGameplayTags.h"
+#include "Faction/SFFactionStatics.h"
 #include "Engine/World.h"
 #include "GameplayCueManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -499,6 +499,21 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 		return;
 	}
 
+	// Friend-foe gate: skip non-hostile / dead characters unless the weapon opted into
+	// friendly fire via FSFRangedWeaponConfig::bAllowFriendlyFire. Beams tick frequently, so
+	// rejecting early keeps us from spamming GE specs into allied ASCs.
+	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(TargetActor))
+	{
+		if (HitCharacter->IsDead())
+		{
+			return;
+		}
+		if (!RangedConfig.bAllowFriendlyFire && !USFFactionStatics::AreHostile(Character, HitCharacter))
+		{
+			return;
+		}
+	}
+
 	UAbilitySystemComponent* SourceASC = Character->GetAbilitySystemComponent();
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(TargetActor);
 
@@ -559,9 +574,11 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 		}
 	}
 
-	if (ASFEnemyCharacter* HitEnemy = Cast<ASFEnemyCharacter>(TargetActor))
+	// Last-damaging-character attribution -- generalized to any ASFCharacterBase so XP/credit
+	// flows for any faction matchup, not just legacy enemy actors.
+	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(TargetActor))
 	{
-		HitEnemy->SetLastDamagingCharacter(Character);
+		HitCharacter->SetLastDamagingCharacter(Character);
 	}
 }
 

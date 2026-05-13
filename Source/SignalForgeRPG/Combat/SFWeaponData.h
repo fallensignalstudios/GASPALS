@@ -103,6 +103,14 @@ struct SIGNALFORGERPG_API FSFRangedWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", meta = (ClampMin = "1.0"))
 	float HeadshotMultiplier = 2.0f;
 
+	/**
+	 * If true, this weapon bypasses the global friend-foe gate and can damage non-hostile
+	 * targets (allies, neutrals, etc.). Off by default per project policy; enable per-weapon
+	 * for designs that intentionally need friendly fire (training rifles, beam-cutters, etc.).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage")
+	bool bAllowFriendlyFire = false;
+
 	/** Pellets per shot: 1 for rifles/pistols, 8+ for shotguns. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Spread", meta = (ClampMin = "1", ClampMax = "32"))
 	int32 PelletsPerShot = 1;
@@ -391,6 +399,12 @@ struct SIGNALFORGERPG_API FSFMeleeWeaponConfig
  *
  * Charge tiers scale damage / projectile speed / VFX scalar by held duration. Tier 0 is "minimum
  * charge" (a tap-fire), Tier N is the cap. Held duration is clamped to MaxChargeSeconds.
+ *
+ * Cast combos (CastComboSteps): mirror the WeaponMelee combo flow. Each cast activation picks the
+ * next step in the array, plays its montage (and uses its section/projectile overrides if set),
+ * then advances the persisted CasterComboStep on the weapon instance. After
+ * CastComboResetSeconds of cast-input idle, the chain resets to step 0. Leave CastComboSteps
+ * empty and fill CastMontage for legacy single-montage casts.
  */
 USTRUCT(BlueprintType)
 struct SIGNALFORGERPG_API FSFCasterChargeTier
@@ -418,6 +432,43 @@ struct SIGNALFORGERPG_API FSFCasterChargeTier
 	float ExtraManaCost = 0.0f;
 };
 
+/**
+ * One step of a cast combo. Steps are chained in order each time the cast ability re-activates
+ * (mirrors the melee LightComboMontages flow). Per-step overrides let designers vary the
+ * projectile, scale, or release section between combo beats (e.g. small bolt -> small bolt ->
+ * big slam projectile on step 3).
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFCasterMontageStep
+{
+	GENERATED_BODY()
+
+	/** Montage played for this step. Required; an empty entry invalidates the chain. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Combo")
+	TObjectPtr<UAnimMontage> Montage;
+
+	/** Override charge-loop section name for this step. Empty = use the config-level default. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Combo")
+	FName ChargeLoopSectionOverride = NAME_None;
+
+	/** Override release section name for this step. Empty = use the config-level default. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Combo")
+	FName ReleaseSectionOverride = NAME_None;
+
+	/** Optional per-step projectile override. Null = use config-level ProjectileClass. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Combo")
+	TSubclassOf<ASFProjectileBase> ProjectileOverride;
+
+	/** Multiplier applied on top of charge-tier ProjectileScale for this step. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Combo", meta = (ClampMin = "0.05"))
+	float ProjectileScaleMul = 1.0f;
+
+	/** Damage multiplier applied on top of tier multiplier for this step (informational until
+	 *  combat routes damage through USFCombatComponent::ProcessProjectileHit). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Combo", meta = (ClampMin = "0.0"))
+	float DamageMul = 1.0f;
+};
+
 USTRUCT(BlueprintType)
 struct SIGNALFORGERPG_API FSFCasterWeaponConfig
 {
@@ -433,6 +484,17 @@ struct SIGNALFORGERPG_API FSFCasterWeaponConfig
 	 *  enough. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Animation")
 	TObjectPtr<UAnimMontage> CastMontage;
+
+	/** Optional cast combo. If populated, each cast re-activation advances to the next step (like
+	 *  the melee light/heavy combo). When empty, every cast plays CastMontage above. Each entry
+	 *  must have a non-null Montage; the validator enforces this. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Combo")
+	TArray<FSFCasterMontageStep> CastComboSteps;
+
+	/** Seconds of cast-input idle after which the combo step resets to index 0. Mirrors
+	 *  FSFMeleeWeaponConfig::ComboResetSeconds. 0 = never reset (always sequential). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Caster|Combo", meta = (ClampMin = "0.0"))
+	float CastComboResetSeconds = 1.5f;
 
 	/** Section name on CastMontage that loops while the player holds the input. Only consulted
 	 *  when bSupportsCharge. Convention: "Charge". */
@@ -940,6 +1002,24 @@ public:
 		{
 			Context.AddError(NSLOCTEXT("SFWeaponData", "CasterChargeNoTiers",
 				"CasterConfig.bSupportsCharge is true but ChargeTiers is empty -- charge would do nothing. Add at least a Tier 0 entry (HoldSeconds=0) or set bSupportsCharge=false."));
+			bHasErrors = true;
+		}
+
+		for (int32 i = 0; i < CasterConfig.CastComboSteps.Num(); ++i)
+		{
+			if (!CasterConfig.CastComboSteps[i].Montage)
+			{
+				Context.AddError(FText::Format(NSLOCTEXT("SFWeaponData", "CasterComboStepMissingMontage",
+					"CasterConfig.CastComboSteps[{0}] has no Montage set. Every combo step must reference a montage, or remove the entry."),
+					FText::AsNumber(i)));
+				bHasErrors = true;
+			}
+		}
+
+		if (CasterConfig.CastComboSteps.Num() == 0 && !CasterConfig.CastMontage && CasterConfig.ProjectileClass)
+		{
+			Context.AddError(NSLOCTEXT("SFWeaponData", "CasterNoMontage",
+				"CasterConfig has ProjectileClass but neither CastMontage nor any CastComboSteps. Provide at least one montage."));
 			bHasErrors = true;
 		}
 

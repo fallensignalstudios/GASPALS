@@ -94,6 +94,16 @@ private:
 	TWeakObjectPtr<UAnimMontage> CachedMontage;
 	TWeakObjectPtr<UNiagaraComponent> ActiveChargeVFX;
 
+	/** Release section name resolved for the current activation (step override or config default). */
+	FName ActiveReleaseSection = NAME_None;
+
+	/** Per-step projectile override resolved at activation. */
+	UPROPERTY()
+	TSubclassOf<ASFProjectileBase> ActiveProjectileOverride = nullptr;
+
+	/** Per-step projectile scale multiplier resolved at activation. */
+	float ActiveStepScaleMul = 1.0f;
+
 	/** UPROPERTY so the GC keeps it alive. */
 	UPROPERTY()
 	TObjectPtr<UAbilityTask_PlayMontageAndWait> MontageTask = nullptr;
@@ -112,6 +122,9 @@ private:
 	bool bAppliedChargingTag = false;
 	FTimerHandle ChargeTimeoutHandle;
 
+	/** Combo step index resolved at activation. -1 when the weapon has no combo (single-montage mode). */
+	int32 ActiveStepIndex = INDEX_NONE;
+
 	// --- Helpers ---
 	bool ResolveContext(
 		ASFCharacterBase*& OutCharacter,
@@ -122,7 +135,20 @@ private:
 	bool ValidateCasterConfig(const FSFCasterWeaponConfig& Config) const;
 
 	/** Start the montage task. If charging, starts at ChargeLoopSection; else plays from the top. */
-	bool StartMontage(const FSFCasterWeaponConfig& Config, ASFCharacterBase* Character, bool bStartCharging);
+	/** Resolve which montage step to play this activation. Returns the step index (or INDEX_NONE for
+	 *  legacy single-montage mode) and writes the resolved montage + section overrides into OutMontage,
+	 *  OutChargeSection, OutReleaseSection. Also bumps the persisted CasterComboStep on the equipment
+	 *  instance so the next activation lands on the next step (mirrors melee). */
+	int32 ResolveAndCommitComboStep(
+		const FSFCasterWeaponConfig& Config,
+		USFEquipmentComponent* Equipment,
+		UAnimMontage*& OutMontage,
+		FName& OutChargeSection,
+		FName& OutReleaseSection,
+		TSubclassOf<ASFProjectileBase>& OutProjectileOverride,
+		float& OutScaleMul) const;
+
+	bool StartMontage(const FSFCasterWeaponConfig& Config, ASFCharacterBase* Character, bool bStartCharging, UAnimMontage* MontageToPlay, FName ChargeSection);
 
 	/** Subscribe to the Cast.Release gameplay event. */
 	void BindReleaseEvent();
@@ -137,7 +163,7 @@ private:
 	float GetChargeSeconds(const FSFCasterWeaponConfig& Config) const;
 
 	/** Jump to the release section. Idempotent. */
-	void TransitionToRelease(const FSFCasterWeaponConfig& Config);
+	void TransitionToRelease(const FSFCasterWeaponConfig& Config, FName ReleaseSection);
 
 	/** Spawn the projectile at the resolved socket aimed along the camera vector.
 	 *  Applies the tier multipliers (damage, speed, scale) and dispatches the release cue. */
@@ -146,7 +172,9 @@ private:
 		USFEquipmentComponent* Equipment,
 		const USFWeaponData* WeaponData,
 		const FSFCasterWeaponConfig& Config,
-		int32 TierIndex);
+		int32 TierIndex,
+		TSubclassOf<ASFProjectileBase> ProjectileOverride,
+		float StepScaleMul);
 
 	/** Commit the mana cost (base + tier surcharge). Pure GE application; never blocks. */
 	void ApplyManaCost(

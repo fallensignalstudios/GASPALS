@@ -513,6 +513,31 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("InputTag.Ability.Block"),
 		TEXT("Input tag for block ability"));
 
+	/** Faction identity (placeholder set -- designers can add additional Faction.* tags). */
+	GameplayTags.Faction_Hero = TagManager.AddNativeGameplayTag(
+		FName("Faction.Hero"),
+		TEXT("Player-aligned hero faction. Default for ASFPlayerCharacter."));
+
+	GameplayTags.Faction_Civilian = TagManager.AddNativeGameplayTag(
+		FName("Faction.Civilian"),
+		TEXT("Neutral civilian non-combatants."));
+
+	GameplayTags.Faction_Bandit = TagManager.AddNativeGameplayTag(
+		FName("Faction.Bandit"),
+		TEXT("Generic hostile-to-heroes faction used for early-game encounters."));
+
+	GameplayTags.Faction_Beast = TagManager.AddNativeGameplayTag(
+		FName("Faction.Beast"),
+		TEXT("Wild beasts. Typically hostile to everyone except other beasts."));
+
+	GameplayTags.Faction_Corporate = TagManager.AddNativeGameplayTag(
+		FName("Faction.Corporate"),
+		TEXT("Corporate security / mercenary faction."));
+
+	GameplayTags.Faction_Cult = TagManager.AddNativeGameplayTag(
+		FName("Faction.Cult"),
+		TEXT("Sci-fi cult faction."));
+
 	/** Equipment slots */
 	GameplayTags.Equipment_Slot_Head = TagManager.AddNativeGameplayTag(
 		FName("Equipment.Slot.Head"),

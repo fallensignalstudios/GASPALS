@@ -13,6 +13,8 @@
 #include "Components/SFInventoryComponent.h"
 #include "Components/SFProgressionComponent.h"
 #include "Components/SFStatRegenComponent.h"
+#include "Faction/SFFactionComponent.h"
+#include "Faction/SFFactionStatics.h"
 #include "Core/SFAttributeSetBase.h"
 #include "Core/SignalForgeGameplayTags.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -40,6 +42,7 @@ ASFCharacterBase::ASFCharacterBase()
 	AmmoReserveComponent = CreateDefaultSubobject<USFAmmoReserveComponent>(TEXT("AmmoReserveComponent"));
 	InventoryComponent = CreateDefaultSubobject<USFInventoryComponent>(TEXT("InventoryComponent"));
 	InteractionComponent = CreateDefaultSubobject<USFInteractionComponent>(TEXT("InteractionComponent"));
+	FactionComponent = CreateDefaultSubobject<USFFactionComponent>(TEXT("FactionComponent"));
 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
@@ -368,6 +371,46 @@ void ASFCharacterBase::HandleHitReact()
 // Death
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Faction / team interface
+// -----------------------------------------------------------------------------
+
+FGenericTeamId ASFCharacterBase::GetGenericTeamId() const
+{
+	if (FactionComponent)
+	{
+		return FactionComponent->GetTeamId();
+	}
+	return FGenericTeamId::NoTeam;
+}
+
+ETeamAttitude::Type ASFCharacterBase::GetTeamAttitudeTowards(const AActor& Other) const
+{
+	if (FactionComponent)
+	{
+		return FactionComponent->GetAttitudeTowardOther(Other);
+	}
+	return ETeamAttitude::Neutral;
+}
+
+// -----------------------------------------------------------------------------
+// XP / Death attribution
+// -----------------------------------------------------------------------------
+
+void ASFCharacterBase::SetLastDamagingCharacter(ASFCharacterBase* InCharacter)
+{
+	LastDamagingCharacter = InCharacter;
+}
+
+int32 ASFCharacterBase::GetXPReward() const
+{
+	if (const USFProgressionComponent* Progression = GetProgressionComponent())
+	{
+		return Progression->GetEnemyXPRewardForCurrentLevel();
+	}
+	return 0;
+}
+
 void ASFCharacterBase::HandleDeath()
 {
 	if (bIsDead)
@@ -377,6 +420,23 @@ void ASFCharacterBase::HandleDeath()
 
 	bIsDead = true;
 	StopCrouch();
+
+	// Generic XP grant: if our killer's faction was hostile to ours, reward them.
+	// This replaces ASFEnemyCharacter::HandleDeath's class-locked attribution.
+	if (LastDamagingCharacter && LastDamagingCharacter != this && !LastDamagingCharacter->IsDead())
+	{
+		if (USFFactionStatics::AreHostile(LastDamagingCharacter, this))
+		{
+			if (USFProgressionComponent* Progression = LastDamagingCharacter->GetProgressionComponent())
+			{
+				const int32 XPReward = GetXPReward();
+				if (XPReward > 0)
+				{
+					Progression->AddXP(XPReward);
+				}
+			}
+		}
+	}
 
 	UE_LOG(LogSFCharacter, Log, TEXT("%s has died."), *GetName());
 

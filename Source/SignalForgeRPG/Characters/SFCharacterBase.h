@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
+#include "GenericTeamAgentInterface.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayAbilitySpecHandle.h"
 #include "Animation/SFAnimInstanceBase.h"
@@ -20,6 +21,7 @@ class USFProgressionComponent;
 class USFEquipmentComponent;
 class USFAmmoReserveComponent;
 class USFInventoryComponent;
+class USFFactionComponent;
 class UGameplayEffect;
 class UGameplayAbility;
 class UAnimMontage;
@@ -33,7 +35,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	TSubclassOf<UAnimInstance>, PreviousLayerClass);
 
 UCLASS()
-class SIGNALFORGERPG_API ASFCharacterBase : public ACharacter, public IAbilitySystemInterface, public ISFHitResolverInterface
+class SIGNALFORGERPG_API ASFCharacterBase : public ACharacter, public IAbilitySystemInterface, public ISFHitResolverInterface, public IGenericTeamAgentInterface
 {
 	GENERATED_BODY()
 
@@ -75,6 +77,35 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USFInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Components")
+	USFFactionComponent* GetFactionComponent() const { return FactionComponent; }
+
+	// -------------------------------------------------------------------------
+	// IGenericTeamAgentInterface (delegates to FactionComponent)
+	// -------------------------------------------------------------------------
+	virtual FGenericTeamId GetGenericTeamId() const override;
+	virtual ETeamAttitude::Type GetTeamAttitudeTowards(const AActor& Other) const override;
+
+	// -------------------------------------------------------------------------
+	// XP / Death attribution (promoted from ASFEnemyCharacter so any character
+	// with a hostile faction relationship can grant XP on kill).
+	// -------------------------------------------------------------------------
+
+	/** Record who last damaged us. Combat / projectile paths call this. */
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	void SetLastDamagingCharacter(ASFCharacterBase* InCharacter);
+
+	UFUNCTION(BlueprintPure, Category = "Combat")
+	ASFCharacterBase* GetLastDamagingCharacter() const { return LastDamagingCharacter; }
+
+	/**
+	 * Virtual XP reward granted to the killer on death.
+	 * Base class returns the enemy-leveled XP if a ProgressionComponent
+	 * exists; subclasses (e.g. ASFEnemyCharacter, future Boss) can override.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	virtual int32 GetXPReward() const;
 
 	TSubclassOf<UGameplayEffect> GetLightAttackDamageEffect() const { return LightAttackDamageEffect; }
 	TSubclassOf<UGameplayEffect> GetHeavyAttackDamageEffect() const { return HeavyAttackDamageEffect; }
@@ -345,6 +376,13 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USFInteractionComponent> InteractionComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USFFactionComponent> FactionComponent;
+
+	/** Last character that damaged us; used for XP attribution on death. */
+	UPROPERTY(Transient)
+	TObjectPtr<ASFCharacterBase> LastDamagingCharacter;
 
 	// -------------------------------------------------------------------------
 	// GAS data

@@ -79,6 +79,10 @@ void USFGameplayAbility_WeaponCast::ActivateAbility(
 	bAppliedCastingTag = false;
 	bAppliedChargingTag = false;
 	ChargeStartSeconds = 0.0;
+	ActiveStepIndex = INDEX_NONE;
+	ActiveReleaseSection = NAME_None;
+	ActiveProjectileOverride = nullptr;
+	ActiveStepScaleMul = 1.0f;
 
 	ASFCharacterBase* Character = nullptr;
 	USFEquipmentComponent* Equipment = nullptr;
@@ -104,11 +108,31 @@ void USFGameplayAbility_WeaponCast::ActivateAbility(
 		return;
 	}
 
+	// Resolve which combo step we're playing. Falls back to single-montage mode when CastComboSteps
+	// is empty. Commit advance + LastCastWorldTime immediately so spam during cancel-windows still
+	// advances the chain (same pattern WeaponMelee uses for swings).
+	UAnimMontage* StepMontage = nullptr;
+	FName ChargeSection = Config.ChargeLoopSectionName;
+	FName ReleaseSection = Config.ReleaseSectionName;
+	TSubclassOf<ASFProjectileBase> StepProjectileOverride = nullptr;
+	float StepScaleMul = 1.0f;
+	ActiveStepIndex = ResolveAndCommitComboStep(Config, Equipment, StepMontage, ChargeSection, ReleaseSection, StepProjectileOverride, StepScaleMul);
+	ActiveReleaseSection = ReleaseSection;
+	ActiveProjectileOverride = StepProjectileOverride;
+	ActiveStepScaleMul = StepScaleMul;
+
+	if (!StepMontage)
+	{
+		UE_LOG(LogSFWeaponCast, Warning, TEXT("WeaponCast: no montage resolved (combo empty and CastMontage null?). Ending."));
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
 	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
 	AddStateTag(Tags.State_Weapon_Casting, bAppliedCastingTag);
 
 	const bool bStartCharging = Config.bSupportsCharge;
-	if (!StartMontage(Config, Character, bStartCharging))
+	if (!StartMontage(Config, Character, bStartCharging, StepMontage, ChargeSection))
 	{
 		UE_LOG(LogSFWeaponCast, Warning, TEXT("WeaponCast: StartMontage failed."));
 		FinishAbility(true);
@@ -162,6 +186,10 @@ void USFGameplayAbility_WeaponCast::EndAbility(
 	CachedEquipment.Reset();
 	CachedMontage.Reset();
 	CachedActorInfo = nullptr;
+	ActiveStepIndex = INDEX_NONE;
+	ActiveReleaseSection = NAME_None;
+	ActiveProjectileOverride = nullptr;
+	ActiveStepScaleMul = 1.0f;
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
@@ -203,25 +231,40 @@ bool USFGameplayAbility_WeaponCast::ResolveContext(
 
 bool USFGameplayAbility_WeaponCast::ValidateCasterConfig(const FSFCasterWeaponConfig& Config) const
 {
-	return Config.ProjectileClass != nullptr && Config.CastMontage != nullptr;
+	if (!Config.ProjectileClass)
+	{
+		return false;
+	}
+	// A caster weapon is valid if it has at least one montage source: a combo or a legacy single montage.
+	if (Config.CastComboSteps.Num() > 0)
+	{
+		for (const FSFCasterMontageStep& Step : Config.CastComboSteps)
+		{
+			if (!Step.Montage) { return false; }
+		}
+		return true;
+	}
+	return Config.CastMontage != nullptr;
 }
 
 bool USFGameplayAbility_WeaponCast::StartMontage(
 	const FSFCasterWeaponConfig& Config,
 	ASFCharacterBase* Character,
-	bool bStartCharging)
+	bool bStartCharging,
+	UAnimMontage* MontageToPlay,
+	FName ChargeSection)
 {
-	if (!Config.CastMontage || !Character)
+	if (!MontageToPlay || !Character)
 	{
 		return false;
 	}
 
-	const FName StartSection = bStartCharging ? Config.ChargeLoopSectionName : NAME_None;
+	const FName StartSection = bStartCharging ? ChargeSection : NAME_None;
 
 	MontageTask = UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 		this,
 		NAME_None,
-		Config.CastMontage,
+		MontageToPlay,
 		/*Rate=*/1.0f,
 		StartSection);
 
@@ -236,8 +279,77 @@ bool USFGameplayAbility_WeaponCast::StartMontage(
 	MontageTask->OnCancelled.AddDynamic(this, &USFGameplayAbility_WeaponCast::OnMontageCancelled);
 	MontageTask->ReadyForActivation();
 
-	CachedMontage = Config.CastMontage;
+	CachedMontage = MontageToPlay;
 	return true;
+}
+
+int32 USFGameplayAbility_WeaponCast::ResolveAndCommitComboStep(
+	const FSFCasterWeaponConfig& Config,
+	USFEquipmentComponent* Equipment,
+	UAnimMontage*& OutMontage,
+	FName& OutChargeSection,
+	FName& OutReleaseSection,
+	TSubclassOf<ASFProjectileBase>& OutProjectileOverride,
+	float& OutScaleMul) const
+{
+	OutMontage = nullptr;
+	OutChargeSection = Config.ChargeLoopSectionName;
+	OutReleaseSection = Config.ReleaseSectionName;
+	OutProjectileOverride = nullptr;
+	OutScaleMul = 1.0f;
+
+	// Single-montage mode (legacy) -- no combo array.
+	if (Config.CastComboSteps.Num() == 0)
+	{
+		OutMontage = Config.CastMontage;
+		return INDEX_NONE;
+	}
+
+	if (!Equipment)
+	{
+		OutMontage = Config.CastComboSteps[0].Montage;
+		return 0;
+	}
+
+	UWorld* World = Equipment->GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.0f;
+
+	FSFWeaponInstanceData Instance = Equipment->GetCurrentWeaponInstance();
+	int32 StoredStep = Instance.CasterComboStep;
+
+	// Idle-reset: if the player has been silent longer than ComboResetSeconds, restart from 0.
+	if (Config.CastComboResetSeconds > 0.0f && Instance.LastCastWorldTime > 0.0f
+		&& (Now - Instance.LastCastWorldTime) > Config.CastComboResetSeconds)
+	{
+		StoredStep = 0;
+	}
+
+	const int32 NumSteps = Config.CastComboSteps.Num();
+	const int32 ChosenStep = ((StoredStep % NumSteps) + NumSteps) % NumSteps;
+	const FSFCasterMontageStep& Step = Config.CastComboSteps[ChosenStep];
+
+	OutMontage = Step.Montage;
+	if (Step.ChargeLoopSectionOverride != NAME_None)
+	{
+		OutChargeSection = Step.ChargeLoopSectionOverride;
+	}
+	if (Step.ReleaseSectionOverride != NAME_None)
+	{
+		OutReleaseSection = Step.ReleaseSectionOverride;
+	}
+	OutProjectileOverride = Step.ProjectileOverride;
+	OutScaleMul = Step.ProjectileScaleMul;
+
+	// Commit advance + LastCastWorldTime NOW so a follow-up press lands on the next step even
+	// if this activation is later interrupted (mirrors WeaponMelee combo commit timing).
+	Instance.CasterComboStep = (ChosenStep + 1) % NumSteps;
+	Instance.LastCastWorldTime = Now;
+	Equipment->UpdateActiveWeaponInstance(Instance);
+
+	UE_LOG(LogSFWeaponCast, Verbose, TEXT("WeaponCast: combo step %d/%d montage=%s"),
+		ChosenStep, NumSteps, OutMontage ? *OutMontage->GetName() : TEXT("<null>"));
+
+	return ChosenStep;
 }
 
 void USFGameplayAbility_WeaponCast::BindReleaseEvent()
@@ -305,10 +417,11 @@ float USFGameplayAbility_WeaponCast::GetChargeSeconds(const FSFCasterWeaponConfi
 	return FMath::Clamp(static_cast<float>(Held), 0.0f, MaxClamp);
 }
 
-void USFGameplayAbility_WeaponCast::TransitionToRelease(const FSFCasterWeaponConfig& Config)
+void USFGameplayAbility_WeaponCast::TransitionToRelease(const FSFCasterWeaponConfig& Config, FName ReleaseSection)
 {
 	ASFCharacterBase* Character = CachedCharacter.Get();
-	if (!Character || !Config.CastMontage)
+	UAnimMontage* Montage = CachedMontage.Get();
+	if (!Character || !Montage)
 	{
 		return;
 	}
@@ -320,9 +433,9 @@ void USFGameplayAbility_WeaponCast::TransitionToRelease(const FSFCasterWeaponCon
 		return;
 	}
 
-	if (Config.ReleaseSectionName != NAME_None)
+	if (ReleaseSection != NAME_None)
 	{
-		AnimInstance->Montage_JumpToSection(Config.ReleaseSectionName, Config.CastMontage);
+		AnimInstance->Montage_JumpToSection(ReleaseSection, Montage);
 	}
 
 	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
@@ -409,9 +522,12 @@ void USFGameplayAbility_WeaponCast::SpawnProjectile(
 	USFEquipmentComponent* Equipment,
 	const USFWeaponData* WeaponData,
 	const FSFCasterWeaponConfig& Config,
-	int32 TierIndex)
+	int32 TierIndex,
+	TSubclassOf<ASFProjectileBase> ProjectileOverride,
+	float StepScaleMul)
 {
-	if (!Character || !Config.ProjectileClass)
+	const TSubclassOf<ASFProjectileBase> ResolvedProjectileClass = ProjectileOverride ? ProjectileOverride : Config.ProjectileClass;
+	if (!Character || !ResolvedProjectileClass)
 	{
 		return;
 	}
@@ -447,7 +563,7 @@ void USFGameplayAbility_WeaponCast::SpawnProjectile(
 
 	// SpawnActorDeferred so we can mutate InitialSpeed / scale before BeginPlay runs.
 	ASFProjectileBase* Projectile = World->SpawnActorDeferred<ASFProjectileBase>(
-		Config.ProjectileClass,
+		ResolvedProjectileClass,
 		FTransform(SpawnRotation, SpawnLocation),
 		Character,
 		Character,
@@ -468,11 +584,13 @@ void USFGameplayAbility_WeaponCast::SpawnProjectile(
 		Projectile->SetSpeedMultiplier(SpeedMul);
 	}
 
-	// Apply uniform scale at spawn (projectile mesh gets bigger at higher charge tiers).
+	// Apply uniform scale at spawn (projectile mesh gets bigger at higher charge tiers). Charge-tier
+	// scale and per-step combo scale stack multiplicatively.
+	const float FinalScale = ProjectileScale * StepScaleMul;
 	FTransform FinishTransform(SpawnRotation, SpawnLocation);
-	if (!FMath::IsNearlyEqual(ProjectileScale, 1.0f))
+	if (!FMath::IsNearlyEqual(FinalScale, 1.0f))
 	{
-		FinishTransform.SetScale3D(FVector(ProjectileScale));
+		FinishTransform.SetScale3D(FVector(FinalScale));
 	}
 
 	Projectile->FinishSpawning(FinishTransform);
@@ -514,8 +632,8 @@ void USFGameplayAbility_WeaponCast::SpawnProjectile(
 	}
 
 	UE_LOG(LogSFWeaponCast, Verbose,
-		TEXT("WeaponCast: spawned '%s' tier=%d speedMul=%.2f scale=%.2f at %s"),
-		*Projectile->GetName(), TierIndex, SpeedMul, ProjectileScale, *SpawnLocation.ToCompactString());
+		TEXT("WeaponCast: spawned '%s' step=%d tier=%d speedMul=%.2f scale=%.2f at %s"),
+		*Projectile->GetName(), ActiveStepIndex, TierIndex, SpeedMul, FinalScale, *SpawnLocation.ToCompactString());
 }
 
 void USFGameplayAbility_WeaponCast::ApplyManaCost(
@@ -725,7 +843,7 @@ void USFGameplayAbility_WeaponCast::OnReleaseEventReceived(FGameplayEventData Pa
 	// Commit the mana cost on release so cancelled casts cost nothing.
 	ApplyManaCost(Character, Config, TierIndex);
 
-	SpawnProjectile(Character, Equipment, WeaponData, Config, TierIndex);
+	SpawnProjectile(Character, Equipment, WeaponData, Config, TierIndex, ActiveProjectileOverride, ActiveStepScaleMul);
 
 	// Charging is over (release notify can fire from a non-charge cast too -- just a no-op here).
 	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
@@ -754,7 +872,7 @@ void USFGameplayAbility_WeaponCast::OnInputReleased(float TimeHeld)
 		return;
 	}
 
-	TransitionToRelease(WeaponData->CasterConfig);
+	TransitionToRelease(WeaponData->CasterConfig, ActiveReleaseSection);
 }
 
 void USFGameplayAbility_WeaponCast::OnChargeTimeoutFired()
@@ -775,7 +893,7 @@ void USFGameplayAbility_WeaponCast::OnChargeTimeoutFired()
 		return;
 	}
 
-	TransitionToRelease(WeaponData->CasterConfig);
+	TransitionToRelease(WeaponData->CasterConfig, ActiveReleaseSection);
 }
 
 void USFGameplayAbility_WeaponCast::FinishAbility(bool bWasCancelled)
