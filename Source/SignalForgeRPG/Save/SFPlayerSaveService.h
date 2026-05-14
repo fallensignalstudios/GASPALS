@@ -94,6 +94,35 @@ public:
 	USFPlayerSaveGame* PeekSlot(const FString& SlotName, int32 UserIndex = 0) const;
 
 	// -------------------------------------------------------------------------
+	// Slot enumeration (backed by USFPlayerSaveSlotManifest)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Names of every slot this user has written at least once and not since
+	 * deleted. Backed by a tiny manifest USaveGame (UE has no built-in disk
+	 * enumeration). Order is creation-order; sort in the UI if you want
+	 * recency.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Save")
+	TArray<FString> GetAllSlotNames(int32 UserIndex = 0) const;
+
+	/**
+	 * Load header metadata for every known slot. Each entry's bIsValid is
+	 * true if the slot loaded cleanly, false if missing/corrupt (in which
+	 * case only SlotName is meaningful). Use this to populate slot-browser
+	 * UI without forcing a full payload load per slot.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Save")
+	TArray<FSFPlayerSaveSlotInfo> GetAllSlotInfos(int32 UserIndex = 0) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Save")
+	FSFPlayerSaveSlotInfo GetSlotInfo(const FString& SlotName, int32 UserIndex = 0) const;
+
+	/** Broadcast whenever the known-slot list changes (save / delete). */
+	UPROPERTY(BlueprintAssignable, Category = "Save")
+	FSFOnPlayerSaveSlotEvent OnSlotListChanged;
+
+	// -------------------------------------------------------------------------
 	// Build / apply (exposed for testing + composition with future
 	// world-state save services that want to manage their own slot file)
 	// -------------------------------------------------------------------------
@@ -134,6 +163,21 @@ public:
 protected:
 	/** Resolve the player character, falling back to UGameplayStatics if null. */
 	ASFCharacterBase* ResolvePlayer(ASFCharacterBase* InPlayer, int32 UserIndex) const;
+
+	/** Reserved slot name used by the slot manifest. Never written by user code. */
+	static const FString ManifestSlotName;
+
+	/** Read the manifest off disk (or return a fresh empty one). */
+	class USFPlayerSaveSlotManifest* LoadOrCreateManifest(int32 UserIndex) const;
+
+	/** Write the manifest. Returns false on disk failure. */
+	bool WriteManifest(class USFPlayerSaveSlotManifest* Manifest, int32 UserIndex) const;
+
+	/** Add SlotName to the manifest if absent and write it back. */
+	void RegisterSlotInManifest(const FString& SlotName, int32 UserIndex);
+
+	/** Remove SlotName from the manifest if present and write it back. */
+	void DeregisterSlotFromManifest(const FString& SlotName, int32 UserIndex);
 
 	UPROPERTY(EditDefaultsOnly, Category = "Save")
 	int32 CurrentSchemaVersion = 1;

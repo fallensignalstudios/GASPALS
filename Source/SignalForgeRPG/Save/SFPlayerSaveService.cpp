@@ -1,6 +1,7 @@
 #include "Save/SFPlayerSaveService.h"
 
 #include "Save/SFPlayerSaveGame.h"
+#include "Save/SFPlayerSaveSlotManifest.h"
 #include "Characters/SFCharacterBase.h"
 #include "Components/SFInventoryComponent.h"
 #include "Components/SFAmmoReserveComponent.h"
@@ -21,6 +22,11 @@
 // =============================================================================
 
 DEFINE_LOG_CATEGORY_STATIC(LogSFPlayerSave, Log, All);
+
+// Reserved manifest slot. Reserves a slot name in the save dir; user code
+// must not collide with it. The leading underscore is illegal in many UI
+// flows so it stays out of accidental user-typed slot names.
+const FString USFPlayerSaveService::ManifestSlotName = TEXT("_SFPlayerSaveSlotManifest");
 
 // =============================================================================
 // Local helpers
@@ -175,6 +181,11 @@ bool USFPlayerSaveService::SaveToSlot(const FString& SlotName, ASFCharacterBase*
 	const bool bWrote = UGameplayStatics::SaveGameToSlot(SaveObject, SlotName, UserIndex);
 	UE_LOG(LogSFPlayerSave, Log, TEXT("SaveToSlot[%s]: %s"), *SlotName, bWrote ? TEXT("OK") : TEXT("FAILED"));
 
+	if (bWrote)
+	{
+		RegisterSlotInManifest(SlotName, UserIndex);
+	}
+
 	OnAfterSave.Broadcast(SlotName, bWrote);
 	return bWrote;
 }
@@ -226,11 +237,17 @@ bool USFPlayerSaveService::LoadFromSlot(const FString& SlotName, ASFCharacterBas
 
 bool USFPlayerSaveService::DeleteSlot(const FString& SlotName, int32 UserIndex)
 {
-	if (SlotName.IsEmpty())
+	if (SlotName.IsEmpty() || SlotName == ManifestSlotName)
 	{
 		return false;
 	}
-	return UGameplayStatics::DeleteGameInSlot(SlotName, UserIndex);
+
+	const bool bDeleted = UGameplayStatics::DeleteGameInSlot(SlotName, UserIndex);
+	if (bDeleted)
+	{
+		DeregisterSlotFromManifest(SlotName, UserIndex);
+	}
+	return bDeleted;
 }
 
 bool USFPlayerSaveService::DoesSlotExist(const FString& SlotName, int32 UserIndex) const
@@ -249,6 +266,154 @@ USFPlayerSaveGame* USFPlayerSaveService::PeekSlot(const FString& SlotName, int32
 		return nullptr;
 	}
 	return Cast<USFPlayerSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, UserIndex));
+}
+
+// =============================================================================
+// Slot enumeration
+// =============================================================================
+
+TArray<FString> USFPlayerSaveService::GetAllSlotNames(int32 UserIndex) const
+{
+	TArray<FString> Out;
+
+	USFPlayerSaveSlotManifest* Manifest = LoadOrCreateManifest(UserIndex);
+	if (!Manifest)
+	{
+		return Out;
+	}
+
+	Out.Reserve(Manifest->KnownSlotNames.Num());
+	for (const FString& Name : Manifest->KnownSlotNames)
+	{
+		// Filter out manifest-internal name and any slots that have been
+		// deleted out-of-band (file is gone but manifest is stale).
+		if (Name.IsEmpty() || Name == ManifestSlotName)
+		{
+			continue;
+		}
+		if (UGameplayStatics::DoesSaveGameExist(Name, UserIndex))
+		{
+			Out.Add(Name);
+		}
+	}
+
+	return Out;
+}
+
+TArray<FSFPlayerSaveSlotInfo> USFPlayerSaveService::GetAllSlotInfos(int32 UserIndex) const
+{
+	TArray<FSFPlayerSaveSlotInfo> Out;
+	const TArray<FString> Names = GetAllSlotNames(UserIndex);
+	Out.Reserve(Names.Num());
+	for (const FString& Name : Names)
+	{
+		Out.Add(GetSlotInfo(Name, UserIndex));
+	}
+	return Out;
+}
+
+FSFPlayerSaveSlotInfo USFPlayerSaveService::GetSlotInfo(const FString& SlotName, int32 UserIndex) const
+{
+	FSFPlayerSaveSlotInfo Info;
+	Info.SlotName = SlotName;
+
+	if (SlotName.IsEmpty() || !UGameplayStatics::DoesSaveGameExist(SlotName, UserIndex))
+	{
+		return Info;
+	}
+
+	USFPlayerSaveGame* SaveObject =
+		Cast<USFPlayerSaveGame>(UGameplayStatics::LoadGameFromSlot(SlotName, UserIndex));
+	if (!SaveObject)
+	{
+		return Info;
+	}
+
+	Info.FriendlyName = SaveObject->FriendlyName.IsEmpty() ? SaveObject->SlotName : SaveObject->FriendlyName;
+	Info.SaveTimestamp = SaveObject->SaveTimestamp;
+	Info.AccumulatedPlaytimeSeconds = SaveObject->AccumulatedPlaytimeSeconds;
+	Info.LevelName = SaveObject->PlayerData.LevelName;
+	Info.PlayerLevel = SaveObject->PlayerData.Level;
+	Info.PlayerXP = SaveObject->PlayerData.XP;
+	Info.SchemaVersion = SaveObject->PlayerData.SchemaVersion;
+	Info.bIsValid = true;
+	return Info;
+}
+
+// =============================================================================
+// Manifest helpers
+// =============================================================================
+
+USFPlayerSaveSlotManifest* USFPlayerSaveService::LoadOrCreateManifest(int32 UserIndex) const
+{
+	if (UGameplayStatics::DoesSaveGameExist(ManifestSlotName, UserIndex))
+	{
+		if (USFPlayerSaveSlotManifest* Existing =
+			Cast<USFPlayerSaveSlotManifest>(UGameplayStatics::LoadGameFromSlot(ManifestSlotName, UserIndex)))
+		{
+			return Existing;
+		}
+		UE_LOG(LogSFPlayerSave, Warning,
+			TEXT("Manifest slot exists but failed to deserialize; creating a fresh one."));
+	}
+
+	return Cast<USFPlayerSaveSlotManifest>(
+		UGameplayStatics::CreateSaveGameObject(USFPlayerSaveSlotManifest::StaticClass()));
+}
+
+bool USFPlayerSaveService::WriteManifest(USFPlayerSaveSlotManifest* Manifest, int32 UserIndex) const
+{
+	if (!Manifest)
+	{
+		return false;
+	}
+	return UGameplayStatics::SaveGameToSlot(Manifest, ManifestSlotName, UserIndex);
+}
+
+void USFPlayerSaveService::RegisterSlotInManifest(const FString& SlotName, int32 UserIndex)
+{
+	if (SlotName.IsEmpty() || SlotName == ManifestSlotName)
+	{
+		return;
+	}
+
+	USFPlayerSaveSlotManifest* Manifest = LoadOrCreateManifest(UserIndex);
+	if (!Manifest)
+	{
+		return;
+	}
+
+	if (!Manifest->KnownSlotNames.Contains(SlotName))
+	{
+		Manifest->KnownSlotNames.Add(SlotName);
+		if (WriteManifest(Manifest, UserIndex))
+		{
+			OnSlotListChanged.Broadcast(SlotName);
+		}
+	}
+}
+
+void USFPlayerSaveService::DeregisterSlotFromManifest(const FString& SlotName, int32 UserIndex)
+{
+	if (SlotName.IsEmpty() || SlotName == ManifestSlotName)
+	{
+		return;
+	}
+
+	USFPlayerSaveSlotManifest* Manifest = LoadOrCreateManifest(UserIndex);
+	if (!Manifest)
+	{
+		return;
+	}
+
+	const int32 RemovedCount = Manifest->KnownSlotNames.Remove(SlotName);
+	if (RemovedCount > 0)
+	{
+		if (WriteManifest(Manifest, UserIndex))
+		{
+			OnSlotListChanged.Broadcast(SlotName);
+		}
+	}
 }
 
 // =============================================================================

@@ -189,3 +189,48 @@ struct SIGNALFORGERPG_API FSFPlayerSaveData
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Save")
 	float SaveWorldTimeSeconds = 0.0f;
 };
+
+/**
+ * FSFPlayerSaveSlotInfo
+ *
+ * Display-friendly metadata bundle for a single save slot. Built by
+ * USFPlayerSaveService::GetSlotInfo by loading the slot just far enough
+ * to read its metadata header, NOT the full payload. UI widgets bind to
+ * arrays of this struct to render slot pickers.
+ *
+ * If bIsValid is false, the slot is missing or corrupt -- only SlotName
+ * is meaningful (caller may still want to render it as "<corrupt save>").
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFPlayerSaveSlotInfo
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	FString SlotName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	FString FriendlyName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	FDateTime SaveTimestamp;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	float AccumulatedPlaytimeSeconds = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	FName LevelName = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	int32 PlayerLevel = 1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	int32 PlayerXP = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	int32 SchemaVersion = 0;
+
+	/** False if the slot was missing, mistyped, or failed to load. */
+	UPROPERTY(BlueprintReadOnly, Category = "Save|Slot")
+	bool bIsValid = false;
+};
