@@ -13,6 +13,7 @@
 #include "Components/SFInventoryComponent.h"
 #include "Components/SFProgressionComponent.h"
 #include "Components/SFStatRegenComponent.h"
+#include "Combat/SFHitReactionComponent.h"
 #include "Faction/SFFactionComponent.h"
 #include "Faction/SFFactionStatics.h"
 #include "Core/SFAttributeSetBase.h"
@@ -43,6 +44,7 @@ ASFCharacterBase::ASFCharacterBase()
 	InventoryComponent = CreateDefaultSubobject<USFInventoryComponent>(TEXT("InventoryComponent"));
 	InteractionComponent = CreateDefaultSubobject<USFInteractionComponent>(TEXT("InteractionComponent"));
 	FactionComponent = CreateDefaultSubobject<USFFactionComponent>(TEXT("FactionComponent"));
+	HitReactionComponent = CreateDefaultSubobject<USFHitReactionComponent>(TEXT("HitReactionComponent"));
 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
