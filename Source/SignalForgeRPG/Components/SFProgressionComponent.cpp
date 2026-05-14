@@ -40,6 +40,22 @@ void USFProgressionComponent::AddXP(int32 XPAmount)
 	BroadcastXPState();
 }
 
+void USFProgressionComponent::RestoreFromSave(int32 InLevel, int32 InXP)
+{
+	// Save-restore path. We deliberately call SetLevel with bFullRefill=false
+	// because the save service applies the saved Health/Echo/etc. values
+	// AFTER this method -- a full refill here would be promptly overwritten.
+	// bApplyStats=true ensures the level's Max* baselines are correct so the
+	// subsequent attribute apply has the right ceilings to clamp against.
+	const int32 ClampedLevel = FMath::Clamp(InLevel, 1, MaxLevel);
+	SetLevel(ClampedLevel, /*bApplyStats=*/true, /*bFullRefill=*/false);
+
+	// SetLevel did not touch CurrentXP. Set it directly so we don't trigger
+	// AddXP's level-up checks (we already restored the correct level above).
+	CurrentXP = FMath::Max(0, InXP);
+	BroadcastXPState();
+}
+
 void USFProgressionComponent::SetLevel(int32 NewLevel, bool bApplyStats, bool bFullRefill)
 {
 	const int32 ClampedLevel = FMath::Clamp(NewLevel, 1, MaxLevel);

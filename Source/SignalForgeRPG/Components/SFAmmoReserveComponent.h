@@ -59,6 +59,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ammo")
 	void EnsureStartingAmmo(USFAmmoType* AmmoType);
 
+	/**
+	 * Direct read access to the underlying reserve map. Intended for
+	 * save/load, debug UI, and similar bulk iteration. Mutating the
+	 * returned reference is forbidden -- go through SetAmmoCount /
+	 * AddAmmo / ConsumeAmmo so OnAmmoReserveChanged stays accurate.
+	 */
+	const TMap<TObjectPtr<USFAmmoType>, int32>& GetReserves() const { return Reserves; }
+
 	/** Broadcast whenever a reserve count changes. UI binds here. */
 	UPROPERTY(BlueprintAssignable, Category = "Ammo")
 	FSFOnAmmoReserveChanged OnAmmoReserveChanged;

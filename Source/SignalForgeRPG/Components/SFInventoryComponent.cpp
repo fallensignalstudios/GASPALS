@@ -660,6 +660,45 @@ void USFInventoryComponent::ClearInventory()
 	BroadcastInventoryUpdated();
 }
 
+void USFInventoryComponent::SetInventoryEntriesFromSave(const TArray<FSFInventoryEntry>& InEntries)
+{
+	// Wipe in-place rather than calling ClearInventory(): we want a single
+	// OnInventoryUpdated broadcast at the END so listeners (UI, equipment)
+	// observe one coherent restored state instead of "empty, then full".
+	InventoryEntries.Reset();
+	InventoryEntries.Reserve(InEntries.Num());
+
+	for (const FSFInventoryEntry& IncomingEntry : InEntries)
+	{
+		// Skip rows whose item definition failed to resolve at load time --
+		// the service is responsible for soft-pointer resolution, so a null
+		// definition here means "asset is gone", not "caller passed garbage".
+		if (!IncomingEntry.ItemDefinition)
+		{
+			continue;
+		}
+
+		FSFInventoryEntry NewEntry = IncomingEntry;
+
+		// Normalize() is intentionally NOT called: it clamps durability and
+		// reseeds defaults, which would clobber saved per-entry state.
+		// We trust the save author and only enforce minimum invariants.
+		NewEntry.EnsureEntryId();
+		if (NewEntry.Quantity < 1)
+		{
+			NewEntry.Quantity = 1;
+		}
+		if (NewEntry.ItemLevel < 1)
+		{
+			NewEntry.ItemLevel = 1;
+		}
+
+		InventoryEntries.Add(MoveTemp(NewEntry));
+	}
+
+	BroadcastInventoryUpdated();
+}
+
 void USFInventoryComponent::BroadcastInventoryUpdated()
 {
 	OnInventoryUpdated.Broadcast();
