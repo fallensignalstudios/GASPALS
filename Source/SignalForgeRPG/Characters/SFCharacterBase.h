@@ -27,6 +27,7 @@ class UGameplayEffect;
 class UGameplayAbility;
 class UAnimMontage;
 class USFInteractionComponent;
+class ASFCharacterBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSFAttributeChangedSignature, float, NewValue, float, MaxValue);
 
@@ -34,6 +35,14 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	FOnOverlayLinkedAnimLayerChangedSignature,
 	TSubclassOf<UAnimInstance>, NewLayerClass,
 	TSubclassOf<UAnimInstance>, PreviousLayerClass);
+
+// Broadcast once at the top of HandleDeath(). Listeners receive the
+// character that died and the character that dealt the killing blow
+// (Killer may be null for environmental / scripted deaths).
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
+	FOnSFCharacterDiedSignature,
+	ASFCharacterBase*, DeadCharacter,
+	ASFCharacterBase*, Killer);
 
 UCLASS()
 class SIGNALFORGERPG_API ASFCharacterBase : public ACharacter, public IAbilitySystemInterface, public ISFHitResolverInterface, public IGenericTeamAgentInterface
