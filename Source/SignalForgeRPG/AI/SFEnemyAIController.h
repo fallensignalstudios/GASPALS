@@ -69,4 +69,13 @@ protected:
 
 	UFUNCTION()
 	void HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+
+private:
+	/**
+	 * Per-actor record of the last perception-update verdict we logged for them
+	 * (0 = none/cleared, 1 = sensed-not-hostile, 2 = sensed-hostile-written).
+	 * Used so the warnings in HandlePerceptionUpdated fire on edges only and
+	 * don't spam the log while an enemy continuously sees the same actor.
+	 */
+	TMap<uint32, uint8> PerceptionLogStatePerActor;
 };
