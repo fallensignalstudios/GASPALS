@@ -1,6 +1,14 @@
 ﻿#include "Components/SFInventoryComponent.h"
 #include "Inventory/SFItemDefinition.h"
+#include "Inventory/SFConsumableItemDefinition.h"
 #include "Components/SFEquipmentComponent.h"
+
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemInterface.h"
+#include "Core/SFAttributeSetBase.h"
+#include "Core/SignalForgeGameplayTags.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
 
 #define LOCTEXT_NAMESPACE "SFInventory"
 
@@ -873,6 +881,259 @@ bool USFInventoryComponent::DropEntryById(const FGuid& EntryId)
 	// TODO: spawn pickup actor using Entry info here
 
 	return RemoveEntryById(EntryId);
+}
+
+// ============================================================================
+// Consumable use
+// ============================================================================
+
+namespace
+{
+	/**
+	 * Resolve the owner's AbilitySystemComponent. Most owners (Character base)
+	 * implement IAbilitySystemInterface, but we also try a direct component
+	 * lookup as a fallback for any non-interface actors a designer might attach
+	 * an inventory to (chest, vendor, etc.).
+	 */
+	UAbilitySystemComponent* GetOwnerASC(const UActorComponent* Component)
+	{
+		AActor* Owner = Component ? Component->GetOwner() : nullptr;
+		if (!Owner)
+		{
+			return nullptr;
+		}
+
+		if (IAbilitySystemInterface* AsiOwner = Cast<IAbilitySystemInterface>(Owner))
+		{
+			return AsiOwner->GetAbilitySystemComponent();
+		}
+		return Owner->FindComponentByClass<UAbilitySystemComponent>();
+	}
+
+	/**
+	 * Return true if the owner's attribute identified by RestoredAttributeTag
+	 * is already at its max. Used by the bRefuseWhenAtFull gate so designers
+	 * don't have to wire per-item logic.
+	 *
+	 * Only Health and Echo are recognized today -- adding more is one line in
+	 * each branch. Unknown tags return false (use is allowed).
+	 */
+	bool IsResourceAtFullForTag(const UAbilitySystemComponent* ASC, FGameplayTag RestoredAttributeTag)
+	{
+		if (!ASC || !RestoredAttributeTag.IsValid())
+		{
+			return false;
+		}
+
+		const USFAttributeSetBase* Attributes = Cast<USFAttributeSetBase>(
+			ASC->GetAttributeSet(USFAttributeSetBase::StaticClass()));
+		if (!Attributes)
+		{
+			return false;
+		}
+
+		const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+
+		if (RestoredAttributeTag == Tags.Attribute_Health)
+		{
+			return Attributes->GetHealth() >= Attributes->GetMaxHealth() - KINDA_SMALL_NUMBER;
+		}
+		if (RestoredAttributeTag == Tags.Attribute_Echo)
+		{
+			return Attributes->GetEcho() >= Attributes->GetMaxEcho() - KINDA_SMALL_NUMBER;
+		}
+
+		return false;
+	}
+}
+
+FSFItemUseResult USFInventoryComponent::UseItem(const FGuid& EntryId)
+{
+	FSFItemUseResult Out;
+	Out.EntryId = EntryId;
+
+	// ---- 1. Look up the entry by GUID --------------------------------------
+	const int32 Index = FindEntryIndexById(EntryId);
+	if (!InventoryEntries.IsValidIndex(Index))
+	{
+		Out.Result = ESFItemUseResult::EntryNotFound;
+		Out.ErrorText = LOCTEXT("Use_EntryNotFound", "That item is no longer in the inventory.");
+		OnItemUsed.Broadcast(Out);
+		return Out;
+	}
+
+	FSFInventoryEntry& Entry = InventoryEntries[Index];
+	Out.ItemDefinition = Entry.ItemDefinition;
+
+	// ---- 2. Confirm this is a consumable definition ------------------------
+	USFConsumableItemDefinition* Consumable = Cast<USFConsumableItemDefinition>(Entry.ItemDefinition);
+	if (!Consumable)
+	{
+		Out.Result = ESFItemUseResult::NotConsumable;
+		Out.ErrorText = LOCTEXT("Use_NotConsumable", "This item cannot be used.");
+		OnItemUsed.Broadcast(Out);
+		return Out;
+	}
+
+	// ---- 3. Make sure there's actually an effect to apply ------------------
+	if (!Consumable->ConsumeEffect)
+	{
+		Out.Result = ESFItemUseResult::NoEffect;
+		Out.ErrorText = LOCTEXT("Use_NoEffect", "This item has no effect configured.");
+		OnItemUsed.Broadcast(Out);
+		return Out;
+	}
+
+	// ---- 4. Cooldown check (per-entry, not global) -------------------------
+	const UWorld* World = GetWorld();
+	const float Now = World ? World->GetTimeSeconds() : 0.f;
+
+	if (Consumable->UseCooldownSeconds > 0.f && Entry.LastUseTime > -FLT_MAX / 2.f)
+	{
+		const float Elapsed = Now - Entry.LastUseTime;
+		if (Elapsed < Consumable->UseCooldownSeconds)
+		{
+			Out.Result = ESFItemUseResult::OnCooldown;
+			Out.ErrorText = FText::Format(
+				LOCTEXT("Use_OnCooldown", "On cooldown ({0}s)."),
+				FText::AsNumber(FMath::CeilToInt(Consumable->UseCooldownSeconds - Elapsed)));
+			OnItemUsed.Broadcast(Out);
+			return Out;
+		}
+	}
+
+	// ---- 5. Resolve the ASC ------------------------------------------------
+	UAbilitySystemComponent* ASC = GetOwnerASC(this);
+	if (!ASC)
+	{
+		Out.Result = ESFItemUseResult::NoAbilitySystem;
+		Out.ErrorText = LOCTEXT("Use_NoASC", "This actor cannot use consumables.");
+		OnItemUsed.Broadcast(Out);
+		return Out;
+	}
+
+	// ---- 6. "Already at full" gate -----------------------------------------
+	if (Consumable->bRefuseWhenAtFull && IsResourceAtFullForTag(ASC, Consumable->PrimaryRestoredAttributeTag))
+	{
+		Out.Result = ESFItemUseResult::AlreadyAtFull;
+		Out.ErrorText = LOCTEXT("Use_AlreadyAtFull", "Already at maximum.");
+		OnItemUsed.Broadcast(Out);
+		return Out;
+	}
+
+	// ---- 7. Apply the GE ---------------------------------------------------
+	FGameplayEffectContextHandle Context = ASC->MakeEffectContext();
+	Context.AddSourceObject(Consumable);
+
+	const FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(
+		Consumable->ConsumeEffect,
+		Consumable->ConsumeEffectLevel,
+		Context);
+
+	if (!Spec.IsValid())
+	{
+		Out.Result = ESFItemUseResult::EffectApplyFailed;
+		Out.ErrorText = LOCTEXT("Use_SpecInvalid", "Failed to build effect spec.");
+		OnItemUsed.Broadcast(Out);
+		return Out;
+	}
+
+	const FActiveGameplayEffectHandle Applied = ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	if (!Applied.IsValid())
+	{
+		// Spec was valid but the ASC refused (immunity, blocking tags, etc.).
+		// We treat this as failure -- no decrement, no cooldown stamp -- so the
+		// player isn't punished for an effect that didn't actually land.
+		Out.Result = ESFItemUseResult::EffectApplyFailed;
+		Out.ErrorText = LOCTEXT("Use_ApplyFailed", "Effect was blocked.");
+		OnItemUsed.Broadcast(Out);
+		return Out;
+	}
+
+	// ---- 8. Stamp cooldown + decrement quantity ----------------------------
+	// Stamp the cooldown BEFORE the decrement so even instant-consumed (last)
+	// stacks have a recorded use-time -- some UI bindings reuse the same
+	// EntryId until the next tick and would happily double-fire otherwise.
+	Entry.LastUseTime = Now;
+
+	const int32 ToConsume = FMath::Min(Consumable->AmountConsumedPerUse, Entry.Quantity);
+	Entry.Quantity -= ToConsume;
+	Entry.Normalize();
+
+	Out.ConsumedQuantity = ToConsume;
+	Out.RemainingQuantity = Entry.Quantity;
+
+	if (Entry.Quantity > 0)
+	{
+		OnInventoryEntryChanged.Broadcast(Entry, Index, -ToConsume);
+	}
+	else
+	{
+		const FSFInventoryEntry RemovedEntry = Entry;
+		InventoryEntries.RemoveAt(Index);
+		OnInventoryEntryRemoved.Broadcast(RemovedEntry, Index);
+		CompactInventory();
+	}
+
+	Out.Result = ESFItemUseResult::Success;
+	OnItemUsed.Broadcast(Out);
+
+	if (bAutoSortOnChange)
+	{
+		SortInventory();
+	}
+	else
+	{
+		BroadcastInventoryUpdated();
+	}
+
+	return Out;
+}
+
+FSFItemUseResult USFInventoryComponent::UseFirstItemOfDefinition(USFItemDefinition* ItemDefinition)
+{
+	FSFItemUseResult Out;
+	Out.ItemDefinition = ItemDefinition;
+
+	if (!ItemDefinition)
+	{
+		Out.Result = ESFItemUseResult::EntryNotFound;
+		Out.ErrorText = LOCTEXT("Use_NullDef", "No item definition provided.");
+		OnItemUsed.Broadcast(Out);
+		return Out;
+	}
+
+	// Iterate matching entries and try them in order. Skip OnCooldown +
+	// AlreadyAtFull failures so a hotbar press will land on the next
+	// usable stack instead of dead-stopping on a cooling-down one.
+	FSFItemUseResult LastResult = Out;
+	for (const FSFInventoryEntry& Entry : InventoryEntries)
+	{
+		if (Entry.ItemDefinition != ItemDefinition)
+		{
+			continue;
+		}
+
+		FSFItemUseResult Attempt = UseItem(Entry.EntryId);
+		if (Attempt.WasSuccessful())
+		{
+			return Attempt;
+		}
+
+		LastResult = Attempt;
+
+		// Don't bother trying further entries if the failure is something a
+		// different entry can't fix (e.g. no ASC, no effect on the def).
+		if (Attempt.Result == ESFItemUseResult::NoAbilitySystem ||
+			Attempt.Result == ESFItemUseResult::NoEffect ||
+			Attempt.Result == ESFItemUseResult::NotConsumable ||
+			Attempt.Result == ESFItemUseResult::AlreadyAtFull)
+		{
+			break;
+		}
+	}
+
+	return LastResult;
 }
 
 #undef LOCTEXT_NAMESPACE
