@@ -7,9 +7,11 @@
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
 #include "Core/SFPlayerState.h"
+#include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/PlayerState.h"
 #include "Narrative/SFNarrativeComponent.h"
+#include "TimerManager.h"
 #include "UI/SFQuestEntryWidget.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSFQuestLogWidget, Log, All);
@@ -45,7 +47,20 @@ void USFPlayerQuestLogWidget::NativeConstruct()
 	// the widget still populates if/when the menu re-opens after a quest exists.
 	if (WidgetController && !WidgetController->GetNarrativeComponent())
 	{
-		TryAutoResolveNarrativeComponent();
+		if (!TryAutoResolveNarrativeComponent())
+		{
+			// PlayerState/NarrativeComponent likely hasn't replicated yet — keep
+			// retrying on a low-frequency timer so we light up the panel the
+			// moment it becomes available.
+			StartAutoResolveRetryTimer();
+		}
+	}
+	else if (WidgetController && WidgetController->GetNarrativeComponent())
+	{
+		// We already have a component but the panel may still be showing the
+		// pre-init empty broadcast. Force a fresh broadcast so any rows that
+		// already exist appear.
+		WidgetController->RefreshQuestLogDisplayData();
 	}
 
 	UpdateButtonLabels();
@@ -60,6 +75,7 @@ void USFPlayerQuestLogWidget::NativeConstruct()
 
 void USFPlayerQuestLogWidget::NativeDestruct()
 {
+	StopAutoResolveRetryTimer();
 	DeinitializeQuestLogWidget();
 	UnbindFromController();
 
@@ -104,10 +120,14 @@ void USFPlayerQuestLogWidget::InitializeQuestLogWidget(USFNarrativeComponent* In
 
 		if (!ResolvedComponent)
 		{
-			TryAutoResolveNarrativeComponent();
+			if (!TryAutoResolveNarrativeComponent())
+			{
+				StartAutoResolveRetryTimer();
+			}
 		}
 		else
 		{
+			StopAutoResolveRetryTimer();
 			WidgetController->RefreshQuestLogDisplayData();
 		}
 	}
@@ -202,11 +222,65 @@ bool USFPlayerQuestLogWidget::TryAutoResolveNarrativeComponent()
 	WidgetController->Initialize(NC);
 	WidgetController->RefreshQuestLogDisplayData();
 
+	// Successful resolve — stop the retry pump if it was running.
+	StopAutoResolveRetryTimer();
+
 	UE_LOG(LogSFQuestLogWidget, Log,
 		TEXT("[QuestLog] Auto-resolved NarrativeComponent from %s. Entries=%d."),
 		*GetNameSafe(SFPS),
 		WidgetController->GetCurrentDisplayEntries().Num());
 	return true;
+}
+
+void USFPlayerQuestLogWidget::StartAutoResolveRetryTimer()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (World->GetTimerManager().IsTimerActive(AutoResolveRetryHandle))
+	{
+		return;
+	}
+
+	AutoResolveRetryElapsedSeconds = 0.0f;
+	const float Period = FMath::Max(0.1f, AutoResolveRetryPeriodSeconds);
+	World->GetTimerManager().SetTimer(
+		AutoResolveRetryHandle,
+		this,
+		&USFPlayerQuestLogWidget::TickAutoResolveRetry,
+		Period,
+		/*bLoop=*/true);
+}
+
+void USFPlayerQuestLogWidget::StopAutoResolveRetryTimer()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(AutoResolveRetryHandle);
+	}
+	AutoResolveRetryElapsedSeconds = 0.0f;
+}
+
+void USFPlayerQuestLogWidget::TickAutoResolveRetry()
+{
+	// Success path: stop and refresh.
+	if (TryAutoResolveNarrativeComponent())
+	{
+		StopAutoResolveRetryTimer();
+		return;
+	}
+
+	AutoResolveRetryElapsedSeconds += FMath::Max(0.1f, AutoResolveRetryPeriodSeconds);
+	if (AutoResolveRetryElapsedSeconds >= MaxAutoResolveRetrySeconds)
+	{
+		UE_LOG(LogSFQuestLogWidget, Warning,
+			TEXT("[QuestLog] Gave up auto-resolving NarrativeComponent after %.1fs. ")
+			TEXT("Quest panel will stay empty. Confirm GameMode->PlayerStateClass is ASFPlayerState (or a subclass) and that the player has a USFNarrativeComponent."),
+			AutoResolveRetryElapsedSeconds);
+		StopAutoResolveRetryTimer();
+	}
 }
 
 void USFPlayerQuestLogWidget::UnbindFromController()

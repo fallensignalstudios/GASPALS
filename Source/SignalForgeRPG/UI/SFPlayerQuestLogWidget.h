@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
 #include "UI/SFUserWidgetBase.h"
 #include "Narrative/SFQuestDisplayTypes.h"
 #include "Narrative/SFQuestLogWidgetController.h"
@@ -138,6 +139,30 @@ protected:
 	 * the controller is now wired to a non-null narrative component.
 	 */
 	bool TryAutoResolveNarrativeComponent();
+
+	/**
+	 * If auto-resolve fails on NativeConstruct (e.g. PlayerState hasn't
+	 * replicated yet, or the player just travelled into the level), keep
+	 * retrying on a low-frequency timer so the panel populates as soon as the
+	 * narrative component becomes available. The timer self-cancels on first
+	 * success or after MaxAutoResolveRetrySeconds, whichever comes first.
+	 */
+	UFUNCTION()
+	void TickAutoResolveRetry();
+
+	void StartAutoResolveRetryTimer();
+	void StopAutoResolveRetryTimer();
+
+	/** Period between retry attempts. Short enough to feel snappy, long enough not to spam logs. */
+	UPROPERTY(EditDefaultsOnly, Category = "Narrative|Quest|UI", meta = (ClampMin = "0.1", ClampMax = "5.0"))
+	float AutoResolveRetryPeriodSeconds = 0.5f;
+
+	/** Total time we'll keep retrying before giving up. */
+	UPROPERTY(EditDefaultsOnly, Category = "Narrative|Quest|UI", meta = (ClampMin = "0.5", ClampMax = "60.0"))
+	float MaxAutoResolveRetrySeconds = 10.0f;
+
+	FTimerHandle AutoResolveRetryHandle;
+	float AutoResolveRetryElapsedSeconds = 0.0f;
 
 	const FSFQuestDisplayEntry* GetSelectedEntry() const;
 	USFQuestEntryWidget* FindEntryWidgetById(FName QuestId) const;
