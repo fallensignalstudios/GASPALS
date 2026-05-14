@@ -46,6 +46,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Progression")
 	int32 GetEnemyXPRewardForCurrentLevel() const;
 
+	/**
+	 * Restore Level + XP from a save payload, applying level stats and
+	 * firing the standard delegates. Bypasses the AddXP code path so we
+	 * don't accidentally re-trigger "level up" effects (fanfare, VFX) when
+	 * silently loading a save. Caller is responsible for clamping XP into
+	 * the valid range for the restored level if desired -- this method
+	 * accepts whatever values the save contains.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Progression")
+	void RestoreFromSave(int32 InLevel, int32 InXP);
+
 protected:
 	virtual void BeginPlay() override;
 

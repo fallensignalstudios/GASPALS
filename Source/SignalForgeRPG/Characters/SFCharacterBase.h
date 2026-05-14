@@ -191,6 +191,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "State")
 	virtual void StartDeathCleanupTimer();
 
+	/**
+	 * Fires once at the top of HandleDeath(), before ragdoll / cleanup.
+	 * Use this from loot droppers, quest objectives, kill-feed UI, etc.
+	 * Single-fire: re-entry into HandleDeath after bIsDead is set is a
+	 * no-op so this delegate cannot double-broadcast.
+	 */
+	UPROPERTY(BlueprintAssignable, Category = "State")
+	FOnSFCharacterDiedSignature OnCharacterDied;
+
 	// -------------------------------------------------------------------------
 	// UI delegates
 	// -------------------------------------------------------------------------

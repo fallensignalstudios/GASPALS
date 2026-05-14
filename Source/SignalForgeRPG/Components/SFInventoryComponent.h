@@ -267,6 +267,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void ClearInventory();
 
+	/**
+	 * Replace the entire inventory with the supplied entries verbatim.
+	 *
+	 * Unlike AddItem, this PRESERVES per-entry runtime state (EntryId,
+	 * LastUseTime, durability, item level, favorite/equipped flags,
+	 * instance tags, weapon roll data) so a loaded save reconstructs the
+	 * inventory bit-for-bit -- including consumable cooldowns and the
+	 * equipped weapon's stable GUID.
+	 *
+	 * Invalid entries (null definition, broken state) are silently
+	 * dropped. OnInventoryUpdated is broadcast exactly once on completion.
+	 * Intended for the save/load system; not a general-purpose API.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Save")
+	void SetInventoryEntriesFromSave(const TArray<FSFInventoryEntry>& InEntries);
+
 	// New convenience APIs by EntryId (optional, but nice for UI/equipment)
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
