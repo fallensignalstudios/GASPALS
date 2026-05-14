@@ -131,6 +131,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Save|UI")
 	ESFSaveSlotListSortMode SortMode = ESFSaveSlotListSortMode::NewestFirst;
 
+	/**
+	 * When true, Load row buttons route through USFPlayerSaveService::BeginLoadFromSlot
+	 * (travel-then-apply), suitable for main-menu / no-pawn contexts. When false
+	 * (default), Load uses the synchronous LoadFromSlot path, which requires the
+	 * player pawn to already exist in the current map (in-game Load Game menu).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Save|UI")
+	bool bUseBeginLoadForLoadButton = false;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Save|UI")
 	FString SelectedSlotName;
 

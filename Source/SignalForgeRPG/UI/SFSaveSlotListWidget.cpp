@@ -93,6 +93,14 @@ bool USFSaveSlotListWidget::LoadSlot(const FString& SlotName)
 		return false;
 	}
 	UpdateStatus(FText::Format(LOCTEXT("Loading", "Loading {0}..."), FText::FromString(SlotName)));
+
+	// Main-menu hosts switch this to true so Load routes through the
+	// travel-then-apply path; the destination map's GameMode/PC then calls
+	// ConsumePendingLoadAndApply on BeginPlay.
+	if (bUseBeginLoadForLoadButton)
+	{
+		return Service->BeginLoadFromSlot(SlotName, UserIndex);
+	}
 	return Service->LoadFromSlot(SlotName, nullptr, UserIndex);
 }
 

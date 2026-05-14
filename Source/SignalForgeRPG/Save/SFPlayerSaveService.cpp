@@ -2,6 +2,7 @@
 
 #include "Save/SFPlayerSaveGame.h"
 #include "Save/SFPlayerSaveSlotManifest.h"
+#include "Core/SignalForgeGameInstance.h"
 #include "Characters/SFCharacterBase.h"
 #include "Components/SFInventoryComponent.h"
 #include "Components/SFAmmoReserveComponent.h"
@@ -233,6 +234,66 @@ bool USFPlayerSaveService::LoadFromSlot(const FString& SlotName, ASFCharacterBas
 
 	OnAfterLoad.Broadcast(SlotName, bApplied);
 	return bApplied;
+}
+
+bool USFPlayerSaveService::BeginLoadFromSlot(const FString& SlotName, int32 UserIndex)
+{
+	// Travel-then-apply path. Used from contexts where the player pawn does
+	// not exist yet (main menu, level-select). Peek the slot to learn the
+	// destination map, park the request on the GameInstance, and OpenLevel.
+	// The destination map's GameMode/PC calls ConsumePendingLoadAndApply on
+	// BeginPlay to finish the job.
+	if (SlotName.IsEmpty() || !DoesSlotExist(SlotName, UserIndex))
+	{
+		UE_LOG(LogSFPlayerSave, Warning, TEXT("BeginLoadFromSlot[%s]: slot missing."), *SlotName);
+		return false;
+	}
+
+	USFPlayerSaveGame* SaveObject = PeekSlot(SlotName, UserIndex);
+	if (!SaveObject || SaveObject->PlayerData.LevelName.IsNone())
+	{
+		UE_LOG(LogSFPlayerSave, Warning,
+			TEXT("BeginLoadFromSlot[%s]: missing or empty LevelName; refusing to travel."), *SlotName);
+		return false;
+	}
+
+	USignalForgeGameInstance* GI = Cast<USignalForgeGameInstance>(GetGameInstance());
+	if (!GI)
+	{
+		UE_LOG(LogSFPlayerSave, Warning,
+			TEXT("BeginLoadFromSlot[%s]: owning GameInstance is not USignalForgeGameInstance."), *SlotName);
+		return false;
+	}
+
+	const FName DestLevel = SaveObject->PlayerData.LevelName;
+	GI->SetPendingLoad(SlotName, UserIndex);
+
+	UE_LOG(LogSFPlayerSave, Log,
+		TEXT("BeginLoadFromSlot[%s]: parking request and opening level %s."),
+		*SlotName, *DestLevel.ToString());
+
+	UGameplayStatics::OpenLevel(this, DestLevel);
+	return true;
+}
+
+bool USFPlayerSaveService::ConsumePendingLoadAndApply(ASFCharacterBase* InPlayer)
+{
+	USignalForgeGameInstance* GI = Cast<USignalForgeGameInstance>(GetGameInstance());
+	if (!GI || !GI->HasPendingLoad())
+	{
+		return false;
+	}
+
+	// Snapshot, then clear FIRST so a failure can't loop us back on the next
+	// BeginPlay. The slot's level might be the same level we're already in.
+	const FString SlotName = GI->PendingLoadSlotName;
+	const int32 UserIndex = GI->PendingLoadUserIndex;
+	GI->ClearPendingLoad();
+
+	UE_LOG(LogSFPlayerSave, Log,
+		TEXT("ConsumePendingLoadAndApply[%s]: applying parked load."), *SlotName);
+
+	return LoadFromSlot(SlotName, InPlayer, UserIndex);
 }
 
 bool USFPlayerSaveService::DeleteSlot(const FString& SlotName, int32 UserIndex)
