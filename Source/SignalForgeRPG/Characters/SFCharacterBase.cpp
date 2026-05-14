@@ -423,6 +423,13 @@ void ASFCharacterBase::HandleDeath()
 	bIsDead = true;
 	StopCrouch();
 
+	// Broadcast death AS EARLY AS POSSIBLE -- listeners (loot droppers,
+	// quest objectives, kill feeds, achievements) typically want the dying
+	// actor still fully present (location, mesh, transform) when they run.
+	// We're past the bIsDead guard so this can never double-fire even if
+	// HandleDeath is re-entered from a listener.
+	OnCharacterDied.Broadcast(this, LastDamagingCharacter);
+
 	// Generic XP grant: if our killer's faction was hostile to ours, reward them.
 	// This replaces ASFEnemyCharacter::HandleDeath's class-locked attribution.
 	if (LastDamagingCharacter && LastDamagingCharacter != this && !LastDamagingCharacter->IsDead())
