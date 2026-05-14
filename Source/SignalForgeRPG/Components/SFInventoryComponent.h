@@ -6,7 +6,10 @@
 #include "SFInventoryComponent.generated.h"
 
 class USFItemDefinition;
+class USFConsumableItemDefinition;
 class USFEquipmentComponent;
+class UGameplayEffect;
+struct FActiveGameplayEffectHandle;
 
 UENUM(BlueprintType)
 enum class ESFInventoryOpResult : uint8
@@ -19,6 +22,48 @@ enum class ESFInventoryOpResult : uint8
 	ItemNotFound,
 	InsufficientQuantity,
 	BlockedByRules
+};
+
+UENUM(BlueprintType)
+enum class ESFItemUseResult : uint8
+{
+	Success,            // Effect applied + quantity decremented.
+	EntryNotFound,      // No entry with that GUID exists in this inventory.
+	NotConsumable,      // Definition is not a USFConsumableItemDefinition.
+	OnCooldown,         // Within UseCooldownSeconds since the entry's last use.
+	NoEffect,           // ConsumeEffect was unset on the definition.
+	NoAbilitySystem,    // Owner has no AbilitySystemComponent.
+	AlreadyAtFull,      // bRefuseWhenAtFull blocked the use.
+	DisallowedByRules,  // Future-proof: rule layer rejected the use.
+	EffectApplyFailed   // ASC accepted the spec but returned an invalid handle.
+};
+
+USTRUCT(BlueprintType)
+struct FSFItemUseResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	ESFItemUseResult Result = ESFItemUseResult::EntryNotFound;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	FGuid EntryId;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	TObjectPtr<USFItemDefinition> ItemDefinition = nullptr;
+
+	/** Quantity decremented from the stack. 0 if the use failed. */
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	int32 ConsumedQuantity = 0;
+
+	/** Quantity left on the stack after the use, or 0 if the entry was removed. */
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	int32 RemainingQuantity = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	FText ErrorText = FText::GetEmpty();
+
+	bool WasSuccessful() const { return Result == ESFItemUseResult::Success; }
 };
 
 USTRUCT(BlueprintType)
@@ -134,6 +179,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInventoryEntryAddedSignature, 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnInventoryEntryChangedSignature, FSFInventoryEntry, Entry, int32, SlotIndex, int32, DeltaQuantity);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnInventoryEntryRemovedSignature, FSFInventoryEntry, Entry, int32, FormerSlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryClearedSignature);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInventoryItemUsedSignature, const FSFItemUseResult&, UseResult);
 
 UCLASS(ClassGroup = (Custom), BlueprintType, Blueprintable, meta = (BlueprintSpawnableComponent))
 class SIGNALFORGERPG_API USFInventoryComponent : public UActorComponent
@@ -238,6 +284,31 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool DamageEntryDurability(const FGuid& EntryId, int32 Amount);
 
+	// -------------------------------------------------------------------------
+	// Consumable use
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Use the consumable entry identified by EntryId on the owning character.
+	 * Validates the entry is a USFConsumableItemDefinition, respects per-entry
+	 * cooldown and the bRefuseWhenAtFull check, applies ConsumeEffect through
+	 * the owner's ASC, then decrements the stack by AmountConsumedPerUse.
+	 *
+	 * Returns a structured result so UI can show a localized failure reason
+	 * ("on cooldown", "already at full", etc.) without parsing log lines.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Use")
+	FSFItemUseResult UseItem(const FGuid& EntryId);
+
+	/**
+	 * Convenience helper for hotbars / quick-use buttons: finds the FIRST
+	 * entry whose definition matches and uses it. Skips entries on cooldown
+	 * or that fail other gates so a hotbar can immediately try the next
+	 * stack instead of getting stuck on one slot.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Use")
+	FSFItemUseResult UseFirstItemOfDefinition(USFItemDefinition* ItemDefinition);
+
 	// Events
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
@@ -260,6 +331,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnInventoryClearedSignature OnInventoryCleared;
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory|Use")
+	FOnInventoryItemUsedSignature OnItemUsed;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Debug")
 	TObjectPtr<USFItemDefinition> DebugItemDefinition = nullptr;
