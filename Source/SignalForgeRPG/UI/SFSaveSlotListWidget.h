@@ -3,13 +3,17 @@
 #include "CoreMinimal.h"
 #include "UI/SFUserWidgetBase.h"
 #include "Save/SFPlayerSaveTypes.h"
+// Pulled in for the FSFOnPlayerSaveSlotEvent delegate type used by
+// OnSelectionChanged / OnSlotLoaded below. Forward-declaring the service
+// class is not enough -- the delegate is declared at file scope in the
+// service header and must be fully visible for UHT and the compiler.
+#include "Save/SFPlayerSaveService.h"
 #include "SFSaveSlotListWidget.generated.h"
 
 class UButton;
 class UEditableTextBox;
 class UPanelWidget;
 class UTextBlock;
-class USFPlayerSaveService;
 class USFSaveSlotEntryWidget;
 
 UENUM(BlueprintType)
