@@ -7,6 +7,7 @@
 #include "GameFramework/Character.h"
 #include "Characters/SFCharacterBase.h"
 #include "Characters/SFEnemyCharacter.h"
+#include "Combat/SFHitReactionComponent.h"
 #include "Combat/SFWeaponActor.h"
 #include "Components/SFEquipmentComponent.h"
 #include "Faction/SFFactionStatics.h"
@@ -211,6 +212,18 @@ void USFCombatComponent::HandleAttackHitInternal(ESFAttackType AttackType)
 		TriggerHitFeedback(HitData, ResolvedHit);
 
 		OnHitDelivered.Broadcast(HitData, ResolvedHit);
+
+		// Drive the procedural hit reaction on the TARGET (not us, the attacker).
+		// We do this *after* GAS application + feedback so any state tags applied
+		// by the resolver (HitReact.Direction.*, State.Stagger, etc.) are already
+		// live on the target's ASC when the component reads them.
+		if (HitActor)
+		{
+			if (USFHitReactionComponent* HRC = HitActor->FindComponentByClass<USFHitReactionComponent>())
+			{
+				HRC->HandleIncomingHit(HitData, ResolvedHit);
+			}
+		}
 	}
 }
 

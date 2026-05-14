@@ -22,6 +22,7 @@ class USFEquipmentComponent;
 class USFAmmoReserveComponent;
 class USFInventoryComponent;
 class USFFactionComponent;
+class USFHitReactionComponent;
 class UGameplayEffect;
 class UGameplayAbility;
 class UAnimMontage;
@@ -80,6 +81,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USFFactionComponent* GetFactionComponent() const { return FactionComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Components")
+	USFHitReactionComponent* GetHitReactionComponent() const { return HitReactionComponent; }
 
 	// -------------------------------------------------------------------------
 	// IGenericTeamAgentInterface (delegates to FactionComponent)
@@ -379,6 +383,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USFFactionComponent> FactionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USFHitReactionComponent> HitReactionComponent;
 
 	/** Last character that damaged us; used for XP attribution on death. */
 	UPROPERTY(Transient)

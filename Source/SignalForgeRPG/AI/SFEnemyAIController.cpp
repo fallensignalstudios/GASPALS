@@ -5,6 +5,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/SFEnemyCharacter.h"
 #include "Faction/SFFactionStatics.h"
+#include "GameplayTagContainer.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Hearing.h"
@@ -131,21 +132,70 @@ void ASFEnemyAIController::OnUnPossess()
 
 void ASFEnemyAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	if (!Stimulus.WasSuccessfullySensed() || !ControlledEnemy || !Actor)
+	if (!ControlledEnemy || !Actor)
 	{
 		return;
 	}
 
-	// Double-check faction hostility at the controller layer. Perception
-	// affiliation flags already filter at the engine level, but a designer
-	// could relax those flags per-BP; this check keeps the contract solid.
-	if (!USFFactionStatics::AreHostile(ControlledEnemy, Actor))
+	// Throttle per-actor logs so spamming the player into the cone for a few
+	// seconds doesn't flood the log -- one diagnostic line per perceived actor
+	// per stimulus state change is enough to debug the wiring.
+	const uint32 ActorKey = Actor->GetUniqueID();
+	uint8& LastLogState = PerceptionLogStatePerActor.FindOrAdd(ActorKey);
+
+	if (!Stimulus.WasSuccessfullySensed())
 	{
+		// Lost sight / sound -- clear our log state so the next acquisition logs again.
+		LastLogState = 0;
+		return;
+	}
+
+	// Build a small state code so we only log when the chain's verdict changes.
+	// 1 = sensed-but-not-hostile, 2 = sensed-and-hostile-written.
+	const bool bHostile = USFFactionStatics::AreHostile(ControlledEnemy, Actor);
+	const uint8 NewLogState = bHostile ? 2 : 1;
+
+	if (!bHostile)
+	{
+		if (LastLogState != NewLogState)
+		{
+			// Surface every reason this perception update was dropped so designers can
+			// fix faction setup without guessing. Most common failure: the player has
+			// no FactionTag set, or the relationship asset is missing a Hostile entry.
+			const FGameplayTag FromTag = USFFactionStatics::GetFactionTag(ControlledEnemy);
+			const FGameplayTag ToTag = USFFactionStatics::GetFactionTag(Actor);
+			UE_LOG(LogTemp, Warning,
+				TEXT("[SFAI Perception] '%s' SAW '%s' but faction system says NOT hostile -- TargetActor not written. "
+				     "FromFaction='%s' ToFaction='%s'. "
+				     "Check: (1) both actors have a USFFactionComponent with a Faction.* tag set, "
+				     "(2) DeveloperSettings -> SignalForge -> DefaultFactionRelationships asset is assigned, "
+				     "(3) the relationship asset has a row for FromFaction with a Hostile entry toward ToFaction."),
+				*GetNameSafe(ControlledEnemy), *GetNameSafe(Actor),
+				*FromTag.ToString(), *ToTag.ToString());
+			LastLogState = NewLogState;
+		}
 		return;
 	}
 
 	if (BlackboardComponent && !TargetActorKeyName.IsNone())
 	{
 		BlackboardComponent->SetValueAsObject(TargetActorKeyName, Actor);
+		if (LastLogState != NewLogState)
+		{
+			UE_LOG(LogTemp, Log,
+				TEXT("[SFAI Perception] '%s' acquired hostile target '%s' (key '%s')."),
+				*GetNameSafe(ControlledEnemy), *GetNameSafe(Actor), *TargetActorKeyName.ToString());
+			LastLogState = NewLogState;
+		}
+	}
+	else if (LastLogState != NewLogState)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SFAI Perception] '%s' saw hostile '%s' but cannot write TargetActor: "
+			     "BlackboardComponent=%s, TargetActorKeyName='%s'."),
+			*GetNameSafe(ControlledEnemy), *GetNameSafe(Actor),
+			BlackboardComponent ? TEXT("valid") : TEXT("NULL"),
+			*TargetActorKeyName.ToString());
+		LastLogState = NewLogState;
 	}
 }
