@@ -78,6 +78,30 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Save")
 	bool LoadFromSlot(const FString& SlotName, ASFCharacterBase* InPlayer = nullptr, int32 UserIndex = 0);
 
+	/**
+	 * Begin a save load from a context where the player pawn does NOT yet
+	 * exist (main menu, level transition). Reads the saved LevelName, parks
+	 * the slot name on the GameInstance, and issues OpenLevel. The
+	 * destination map's GameMode (or PlayerController) then completes the
+	 * load on BeginPlay by calling ConsumePendingLoadAndApply.
+	 *
+	 * Returns false if the slot is missing, corrupt, or its LevelName is
+	 * empty (in which case nothing is parked and no travel occurs).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Save")
+	bool BeginLoadFromSlot(const FString& SlotName, int32 UserIndex = 0);
+
+	/**
+	 * Apply a previously-parked load request to the resolved player. Call
+	 * this from the destination map's GameMode or PlayerController BeginPlay
+	 * after a BeginLoadFromSlot-driven map transition. Returns true if a
+	 * pending load was found and successfully applied; false otherwise
+	 * (no pending request, or apply failed). Always clears the pending
+	 * request, even on failure, so a failed load doesn't loop.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Save")
+	bool ConsumePendingLoadAndApply(ASFCharacterBase* InPlayer = nullptr);
+
 	UFUNCTION(BlueprintCallable, Category = "Save")
 	bool DeleteSlot(const FString& SlotName, int32 UserIndex = 0);
 
