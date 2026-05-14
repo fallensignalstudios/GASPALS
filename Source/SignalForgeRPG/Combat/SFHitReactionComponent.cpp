@@ -158,9 +158,12 @@ void USFHitReactionComponent::HandleIncomingHit(const FSFHitData& HitData, const
 				Mesh->SetAllBodiesBelowSimulatePhysics(SimBone, true, /*bIncludeSelf=*/true);
 				Mesh->SetAllBodiesBelowPhysicsBlendWeight(SimBone, PhysicsBlendWeight, /*bSkipCustomPhysicsType=*/false, /*bIncludeSelf=*/true);
 
-				const FVector ImpactPoint = HitData.HitResult.ImpactPoint.IsNearlyZero()
+				// HitResult.ImpactPoint is FVector_NetQuantize; convert to plain FVector
+				// explicitly so the ternary's branches agree on type.
+				const FVector RawImpact = FVector(HitData.HitResult.ImpactPoint);
+				const FVector ImpactPoint = RawImpact.IsNearlyZero()
 					? Mesh->GetBoneLocation(ImpactBoneRaw)
-					: HitData.HitResult.ImpactPoint;
+					: RawImpact;
 
 				Mesh->AddImpulseAtLocation(Direction * Magnitude, ImpactPoint, ImpactBoneRaw);
 
