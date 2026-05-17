@@ -4,6 +4,8 @@
 
 #include "Narrative/SFNarrativeComponent.h"
 #include "Narrative/SFQuestDefinition.h"
+#include "Narrative/SFQuestInstance.h"
+#include "Narrative/SFQuestRuntime.h"
 #include "Characters/SFPlayerCharacter.h"
 #include "Dialogue/Data/SFConversationDataAsset.h"
 #include "Components/SphereComponent.h"
@@ -248,29 +250,55 @@ bool ASFNarrativeTriggerSphere::ApplyActionsTo(AActor* TargetActor, USFNarrative
         }
         else
         {
-            const FPrimaryAssetId QuestId = QuestDef->GetPrimaryAssetId();
-            if (!QuestId.IsValid())
+            // Prefer the definition-based runtime API over StartQuestByAssetId
+            // because the latter goes through the Asset Manager / quest
+            // database lookup, which silently returns null when the quest
+            // hasn't been registered in either. We already hold the resolved
+            // definition from LoadSynchronous() above, so push it through
+            // QuestRuntime directly. Falls back to the asset-id path if the
+            // runtime accessor isn't available, just to be safe.
+            USFQuestInstance* StartedInstance = nullptr;
+            if (USFQuestRuntime* Runtime = Narrative->GetQuestRuntime())
             {
-                UE_LOG(LogSFNarrativeTrigger, Warning,
-                    TEXT("%s: quest asset '%s' has no PrimaryAssetId; cannot start. Set 'AssetRegistrySearchable' Primary Asset Type/Name on the quest definition or expose it via the Asset Manager."),
-                    *GetName(), *QuestDef->GetName());
-            }
-            else
-            {
-                USFQuestInstance* StartedInstance = Narrative->StartQuestByAssetId(QuestId, QuestStartStateId);
+                StartedInstance = Runtime->StartQuestByDefinition(QuestDef, QuestStartStateId);
                 if (StartedInstance)
                 {
                     bDidAnything = true;
                     UE_LOG(LogSFNarrativeTrigger, Log,
-                        TEXT("%s: StartQuestByAssetId(%s) succeeded -> %s."),
-                        *GetName(), *QuestId.ToString(), *GetNameSafe(StartedInstance));
+                        TEXT("%s: StartQuestByDefinition(%s) succeeded -> %s."),
+                        *GetName(), *QuestDef->GetName(), *GetNameSafe(StartedInstance));
                 }
                 else
                 {
                     UE_LOG(LogSFNarrativeTrigger, Warning,
-                        TEXT("%s: StartQuestByAssetId(%s) returned null. Likely: no authority over narrative, QuestRuntime not initialized, quest already exists in runtime, or quest definition rejected. HasAuth=%d."),
-                        *GetName(), *QuestId.ToString(),
-                        (int32)Narrative->HasAuthorityOverNarrative());
+                        TEXT("%s: StartQuestByDefinition(%s) returned null. Likely: quest already in runtime, or definition rejected during instance init."),
+                        *GetName(), *QuestDef->GetName());
+                }
+            }
+            else
+            {
+                // Fallback path for the (unusual) case where the runtime
+                // hasn't been instantiated yet.
+                const FPrimaryAssetId QuestId = QuestDef->GetPrimaryAssetId();
+                if (QuestId.IsValid())
+                {
+                    StartedInstance = Narrative->StartQuestByAssetId(QuestId, QuestStartStateId);
+                    if (StartedInstance)
+                    {
+                        bDidAnything = true;
+                    }
+                    else
+                    {
+                        UE_LOG(LogSFNarrativeTrigger, Warning,
+                            TEXT("%s: fallback StartQuestByAssetId(%s) also returned null. QuestRuntime missing AND asset-id lookup failed."),
+                            *GetName(), *QuestId.ToString());
+                    }
+                }
+                else
+                {
+                    UE_LOG(LogSFNarrativeTrigger, Warning,
+                        TEXT("%s: QuestRuntime missing and quest '%s' has no PrimaryAssetId. Cannot start."),
+                        *GetName(), *QuestDef->GetName());
                 }
             }
         }
