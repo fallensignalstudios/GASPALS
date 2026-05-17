@@ -106,10 +106,13 @@ protected:
 	 * quests just spawned!" floods immediately after a load when the
 	 * narrative component replays its state.
 	 *
-	 * Set to 0 to fire toasts for every started quest, even on initial bind.
+	 * Default is 0 (off). Quest events from a save replay travel through a
+	 * different code path (the replicator delta apply, not the runtime's
+	 * OnQuestStarted broadcast), so this debounce is rarely needed. Raise
+	 * if you see duplicate toasts on level travel.
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Quest|UI", meta = (ClampMin = "0.0", ClampMax = "10.0"))
-	float SuppressInitialBroadcastsForSeconds = 0.5f;
+	float SuppressInitialBroadcastsForSeconds = 0.0f;
 
 	// --- Internals ---
 

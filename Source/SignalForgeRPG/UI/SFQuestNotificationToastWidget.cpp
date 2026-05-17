@@ -139,8 +139,8 @@ bool USFQuestNotificationToastWidget::TryAutoResolveNarrativeComponent()
 	BindToNarrativeComponent();
 
 	UE_LOG(LogSFQuestToast, Log,
-		TEXT("[QuestToast] Auto-resolved NarrativeComponent from %s."),
-		*GetNameSafe(SFPS));
+		TEXT("[QuestToast] Auto-resolved NarrativeComponent %s from %s. Bound to OnQuestStarted."),
+		*GetNameSafe(NC), *GetNameSafe(SFPS));
 	return true;
 }
 
@@ -230,6 +230,10 @@ void USFQuestNotificationToastWidget::UnbindFromNarrativeComponent()
 
 void USFQuestNotificationToastWidget::HandleQuestStarted(USFQuestInstance* QuestInstance)
 {
+	UE_LOG(LogSFQuestToast, Log,
+		TEXT("[QuestToast] HandleQuestStarted fired. QuestInstance=%s."),
+		*GetNameSafe(QuestInstance));
+
 	if (!QuestInstance)
 	{
 		return;
@@ -244,6 +248,9 @@ void USFQuestNotificationToastWidget::HandleQuestStarted(USFQuestInstance* Quest
 			const double Now = World->GetTimeSeconds();
 			if (Now - BindTimestampSeconds < SuppressInitialBroadcastsForSeconds)
 			{
+				UE_LOG(LogSFQuestToast, Verbose,
+					TEXT("[QuestToast] Suppressed within %.2fs of bind (debounce window)."),
+					SuppressInitialBroadcastsForSeconds);
 				return;
 			}
 		}
@@ -252,6 +259,9 @@ void USFQuestNotificationToastWidget::HandleQuestStarted(USFQuestInstance* Quest
 	FSFQuestDisplayEntry Entry;
 	if (!BuildEntryForInstance(QuestInstance, Entry))
 	{
+		UE_LOG(LogSFQuestToast, Warning,
+			TEXT("[QuestToast] BuildEntryForInstance failed for %s (missing definition?). Toast skipped."),
+			*GetNameSafe(QuestInstance));
 		return;
 	}
 
@@ -319,6 +329,12 @@ void USFQuestNotificationToastWidget::ShowEntry(const FSFQuestDisplayEntry& Entr
 {
 	CurrentEntry = Entry;
 	bIsShowingToast = true;
+
+	UE_LOG(LogSFQuestToast, Log,
+		TEXT("[QuestToast] ShowEntry: '%s' (state '%s'). RootContainer=%s."),
+		*Entry.DisplayName.ToString(),
+		*Entry.CurrentStateDisplayName.ToString(),
+		RootContainer ? *RootContainer->GetName() : TEXT("<unbound>"));
 
 	if (HeaderText)
 	{

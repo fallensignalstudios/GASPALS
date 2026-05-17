@@ -113,7 +113,19 @@ void ASFNarrativeTriggerSphere::HandleSphereBeginOverlap(
         return;
     }
 
-    if (ApplyActionsTo(Player, Narrative))
+    UE_LOG(LogSFNarrativeTrigger, Log,
+        TEXT("[Trigger] %s: applying actions for player %s. NarrativeComp=%s, HasAuth=%d, QuestToStart=%s, ConvoToStart=%s, FactWrites=%d."),
+        *GetName(), *Player->GetName(), *GetNameSafe(Narrative),
+        Narrative ? (int32)Narrative->HasAuthorityOverNarrative() : 0,
+        *QuestToStart.ToString(),
+        *ConversationToStart.ToString(),
+        FactsToWriteOnFire.Num());
+
+    const bool bApplied = ApplyActionsTo(Player, Narrative);
+    UE_LOG(LogSFNarrativeTrigger, Log,
+        TEXT("[Trigger] %s: ApplyActionsTo returned %d."), *GetName(), bApplied ? 1 : 0);
+
+    if (bApplied)
     {
         bHasFiredThisSession = true;
         StampPersistedFiredState(Narrative);
@@ -228,20 +240,38 @@ bool ASFNarrativeTriggerSphere::ApplyActionsTo(AActor* TargetActor, USFNarrative
         // quest payload is small. Async would buy us nothing and complicate
         // the "did we actually start?" return path.
         USFQuestDefinition* QuestDef = Cast<USFQuestDefinition>(QuestToStart.LoadSynchronous());
-        if (QuestDef)
+        if (!QuestDef)
+        {
+            UE_LOG(LogSFNarrativeTrigger, Warning,
+                TEXT("%s: QuestToStart soft pointer (%s) did not resolve to a USFQuestDefinition."),
+                *GetName(), *QuestToStart.ToString());
+        }
+        else
         {
             const FPrimaryAssetId QuestId = QuestDef->GetPrimaryAssetId();
-            if (QuestId.IsValid())
+            if (!QuestId.IsValid())
             {
-                if (Narrative->StartQuestByAssetId(QuestId, QuestStartStateId))
-                {
-                    bDidAnything = true;
-                }
+                UE_LOG(LogSFNarrativeTrigger, Warning,
+                    TEXT("%s: quest asset '%s' has no PrimaryAssetId; cannot start. Set 'AssetRegistrySearchable' Primary Asset Type/Name on the quest definition or expose it via the Asset Manager."),
+                    *GetName(), *QuestDef->GetName());
             }
             else
             {
-                UE_LOG(LogSFNarrativeTrigger, Warning,
-                    TEXT("%s: quest asset has no PrimaryAssetId; cannot start."), *GetName());
+                USFQuestInstance* StartedInstance = Narrative->StartQuestByAssetId(QuestId, QuestStartStateId);
+                if (StartedInstance)
+                {
+                    bDidAnything = true;
+                    UE_LOG(LogSFNarrativeTrigger, Log,
+                        TEXT("%s: StartQuestByAssetId(%s) succeeded -> %s."),
+                        *GetName(), *QuestId.ToString(), *GetNameSafe(StartedInstance));
+                }
+                else
+                {
+                    UE_LOG(LogSFNarrativeTrigger, Warning,
+                        TEXT("%s: StartQuestByAssetId(%s) returned null. Likely: no authority over narrative, QuestRuntime not initialized, quest already exists in runtime, or quest definition rejected. HasAuth=%d."),
+                        *GetName(), *QuestId.ToString(),
+                        (int32)Narrative->HasAuthorityOverNarrative());
+                }
             }
         }
     }
