@@ -10,8 +10,6 @@
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
-#include "Components/PanelSlot.h"
-#include "Components/PanelWidget.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Engine/World.h"
@@ -92,40 +90,44 @@ void USFCompassHUDWidget::BuildVisualTree()
 		return;
 	}
 
-	// If the blueprint placed something at the root (it shouldn't — designers
-	// inherit this class and leave the Designer tab empty), wrap our tree
-	// underneath that root instead of yanking it out. RemoveWidget on the
-	// active root mid-compile crashes the editor.
-	UPanelWidget* InsertParent = nullptr;
-	if (UPanelWidget* ExistingRootPanel = Cast<UPanelWidget>(Tree->RootWidget))
+	// We always want our own fullscreen CanvasPanel as the root so the compass
+	// can anchor to top-center of the viewport. NativeConstruct runs at runtime
+	// (PIE / packaged), NOT during BP compile or asset save, so it is safe to
+	// mutate WidgetTree here. (Doing the same in RebuildWidget would crash the
+	// editor on save — that's what the previous regression was.)
+	if (UWidget* OldRoot = Tree->RootWidget)
 	{
-		InsertParent = ExistingRootPanel;
-		RootCanvas = nullptr; // we'll just add children to the existing root.
+		// Reuse the existing root if it is already a CanvasPanel — avoids
+		// churning slate state when the designer-provided stub canvas is
+		// suitable. We still want fullscreen behaviour for it, which is the
+		// default when a CanvasPanel is a UserWidget root.
+		if (UCanvasPanel* ExistingCanvas = Cast<UCanvasPanel>(OldRoot))
+		{
+			RootCanvas = ExistingCanvas;
+		}
+		else
+		{
+			Tree->RemoveWidget(OldRoot);
+			RootCanvas = nullptr;
+		}
 	}
-	else
+
+	if (!RootCanvas)
 	{
 		RootCanvas = Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("CompassRootCanvas"));
 		Tree->RootWidget = RootCanvas;
-		InsertParent = RootCanvas;
 	}
 
 	CompassSizeBox = Tree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("CompassSizeBox"));
 	CompassSizeBox->SetWidthOverride(StripPixelWidth);
 	CompassSizeBox->SetHeightOverride(StripPixelHeight);
 
-	// Slot the size box into whatever root we resolved. AddChild returns the
-	// panel-specific slot (UCanvasPanelSlot when InsertParent is a canvas,
-	// otherwise a generic UPanelSlot). Cast and apply canvas-only props
-	// conditionally so we work under any container.
-	if (UPanelSlot* AddedSlot = InsertParent->AddChild(CompassSizeBox))
+	if (UCanvasPanelSlot* SizeSlot = RootCanvas->AddChildToCanvas(CompassSizeBox))
 	{
-		if (UCanvasPanelSlot* SizeSlot = Cast<UCanvasPanelSlot>(AddedSlot))
-		{
-			SizeSlot->SetAnchors(FAnchors(0.5f, 0.0f, 0.5f, 0.0f));
-			SizeSlot->SetAlignment(FVector2D(0.5f, 0.0f));
-			SizeSlot->SetAutoSize(true);
-			SizeSlot->SetPosition(FVector2D(0.0f, 0.0f));
-		}
+		SizeSlot->SetAnchors(FAnchors(0.5f, 0.0f, 0.5f, 0.0f));
+		SizeSlot->SetAlignment(FVector2D(0.5f, 0.0f));
+		SizeSlot->SetAutoSize(true);
+		SizeSlot->SetPosition(FVector2D(0.0f, CompassTopOffsetPixels));
 	}
 
 	CompassOverlay = Tree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("CompassOverlay"));
