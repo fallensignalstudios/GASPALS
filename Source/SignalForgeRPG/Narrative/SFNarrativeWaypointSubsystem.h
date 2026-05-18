@@ -6,6 +6,7 @@
 #include "Engine/EngineTypes.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Narrative/SFWaypointTypes.h"
+#include "Narrative/SFQuestDisplayTypes.h"
 #include "SFNarrativeWaypointSubsystem.generated.h"
 
 class APlayerController;
