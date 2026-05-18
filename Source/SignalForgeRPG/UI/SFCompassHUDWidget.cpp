@@ -56,10 +56,12 @@ USFCompassHUDWidget::USFCompassHUDWidget(const FObjectInitializer& ObjectInitial
 
 TSharedRef<SWidget> USFCompassHUDWidget::RebuildWidget()
 {
-	// Do NOT touch WidgetTree here. RebuildWidget runs during BP compile and
-	// asset save in the editor — modifying the tree at that point fights the
-	// blueprint compiler and crashes on save. We build the full visual tree
-	// in NativeConstruct (runtime only) instead.
+	// Build our visual tree here so the slate wrappers are generated as part
+	// of the normal RebuildWidget pass. We MUST NOT remove or replace any
+	// widget the BP compiler placed in WidgetTree (doing so during save was
+	// what crashed the editor previously). Instead we only ADD widgets,
+	// reusing the existing root canvas when possible.
+	BuildVisualTree();
 	return Super::RebuildWidget();
 }
 
@@ -82,40 +84,36 @@ void USFCompassHUDWidget::BuildVisualTree()
 {
 	if (bVisualTreeBuilt && RootCanvas)
 	{
+		UE_LOG(LogSFCompassHUD, Verbose, TEXT("[CompassHUD] BuildVisualTree skipped (already built)."));
 		return;
 	}
 	UWidgetTree* Tree = WidgetTree;
 	if (!Tree)
 	{
+		UE_LOG(LogSFCompassHUD, Warning, TEXT("[CompassHUD] BuildVisualTree called with null WidgetTree."));
 		return;
 	}
+	UE_LOG(LogSFCompassHUD, Log,
+		TEXT("[CompassHUD] BuildVisualTree start. ExistingRoot=%s StripPixelWidth=%.1f StripPixelHeight=%.1f"),
+		Tree->RootWidget ? *Tree->RootWidget->GetClass()->GetName() : TEXT("<null>"),
+		StripPixelWidth, StripPixelHeight);
 
-	// We always want our own fullscreen CanvasPanel as the root so the compass
-	// can anchor to top-center of the viewport. NativeConstruct runs at runtime
-	// (PIE / packaged), NOT during BP compile or asset save, so it is safe to
-	// mutate WidgetTree here. (Doing the same in RebuildWidget would crash the
-	// editor on save — that's what the previous regression was.)
-	if (UWidget* OldRoot = Tree->RootWidget)
+	// Reuse the existing root canvas if the BP provided one (the editor
+	// auto-creates a CanvasPanel for every user widget). If the BP root is
+	// something else, leave it alone and just construct our own canvas as
+	// an extra sibling — we never remove the BP-managed root because
+	// RemoveWidget during BP compile/save is what crashed previously.
+	if (UCanvasPanel* ExistingCanvas = Cast<UCanvasPanel>(Tree->RootWidget))
 	{
-		// Reuse the existing root if it is already a CanvasPanel — avoids
-		// churning slate state when the designer-provided stub canvas is
-		// suitable. We still want fullscreen behaviour for it, which is the
-		// default when a CanvasPanel is a UserWidget root.
-		if (UCanvasPanel* ExistingCanvas = Cast<UCanvasPanel>(OldRoot))
-		{
-			RootCanvas = ExistingCanvas;
-		}
-		else
-		{
-			Tree->RemoveWidget(OldRoot);
-			RootCanvas = nullptr;
-		}
+		RootCanvas = ExistingCanvas;
 	}
-
-	if (!RootCanvas)
+	else
 	{
 		RootCanvas = Tree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("CompassRootCanvas"));
-		Tree->RootWidget = RootCanvas;
+		if (!Tree->RootWidget)
+		{
+			Tree->RootWidget = RootCanvas;
+		}
 	}
 
 	CompassSizeBox = Tree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("CompassSizeBox"));
@@ -162,12 +160,20 @@ void USFCompassHUDWidget::BuildVisualTree()
 	}
 
 	bVisualTreeBuilt = true;
+	UE_LOG(LogSFCompassHUD, Log,
+		TEXT("[CompassHUD] BuildVisualTree complete. RootCanvas=%s Overlay=%s StripCanvas=%s"),
+		*GetNameSafe(RootCanvas),
+		*GetNameSafe(CompassOverlay),
+		*GetNameSafe(StripCanvas));
 }
 
 void USFCompassHUDWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	// BuildVisualTree was already invoked from RebuildWidget; this is a
+	// safety net for cases where RebuildWidget never ran (e.g. the slate
+	// tree was released and not regenerated before NativeConstruct).
 	BuildVisualTree();
 	BuildCardinalTickLabels();
 	SpawnCardinalLabelWidgets();
