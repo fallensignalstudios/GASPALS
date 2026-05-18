@@ -47,7 +47,7 @@ void USFPlayerHUDWidgetController::Initialize(ASFCharacterBase* InPlayerCharacte
 	OnShieldsChanged.Broadcast(CurrentShields, MaxShields);
 	OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina);
 
-	UE_LOG(LogTemp, Verbose, TEXT("HUDWidgetController Initialize called: %s"), *GetNameSafe(InPlayerCharacter));
+	UE_LOG(LogTemp, Display, TEXT("HUDWidgetController Initialize called: %s"), *GetNameSafe(InPlayerCharacter));
 
 	// Reset interaction HUD state
 	bHasInteractionPrompt = false;
@@ -239,7 +239,7 @@ void USFPlayerHUDWidgetController::HandleInteractableChanged(
 	FSFInteractionOption PrimaryOption,
 	const TArray<FSFInteractionOption>& AllOptions)
 {
-	UE_LOG(LogTemp, Verbose, TEXT("HandleInteractableChanged. Actor: %s, Primary: '%s'"),
+	UE_LOG(LogTemp, Display, TEXT("HandleInteractableChanged. Actor: %s, Primary: '%s'"),
 		*GetNameSafe(NewInteractableActor),
 		*PrimaryOption.PromptText.ToString());
 
