@@ -3,6 +3,7 @@
 #include "Dialogue/DialogueGraph/SFDialogueGraph.h"
 #include "Dialogue/DialogueGraph/SFDialogueEdGraph.h"
 #include "Dialogue/DialogueGraph/SFDialogueGraphCompiler.h"
+#include "SFDialogueGraphSchema.h"
 
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraphUtilities.h"
@@ -32,6 +33,26 @@ const FName FSFDialogueGraphEditorToolkit::CompileResultsTabId(TEXT("SFDialogueG
 void FSFDialogueGraphEditorToolkit::Initialize(USFDialogueGraph* InDialogueGraph, TSharedPtr<IToolkitHost> InitToolkitHost)
 {
 	DialogueGraph = InDialogueGraph;
+
+	// Older dialogue graph assets (saved before the editor module was wired
+	// into the build) can have EdGraph == nullptr because the factory's
+	// EnsureGraphInitialized never ran. Heal them here before any widget
+	// touches the inner graph — SGraphEditor dereferences the graph pointer
+	// during construction, so passing nullptr is an immediate crash.
+	if (DialogueGraph)
+	{
+		DialogueGraph->EnsureGraphInitialized();
+
+		if (DialogueGraph->EdGraph && DialogueGraph->EdGraph->Schema == nullptr)
+		{
+			// The runtime module that owns USFDialogueGraph cannot reference
+			// USFDialogueGraphSchema (schema lives in the editor module), so
+			// the schema class is assigned here at edit time. Mark the asset
+			// dirty so the schema persists with the next save.
+			DialogueGraph->EdGraph->Schema = USFDialogueGraphSchema::StaticClass();
+			DialogueGraph->EdGraph->MarkPackageDirty();
+		}
+	}
 
 	BindGraphEditorCommands();
 	CreateInternalWidgets();
@@ -125,6 +146,26 @@ TStatId FSFDialogueGraphEditorToolkit::GetStatId() const
 
 TSharedRef<SDockTab> FSFDialogueGraphEditorToolkit::SpawnGraphTab(const FSpawnTabArgs& Args)
 {
+	if (!GraphEditorWidget.IsValid())
+	{
+		return SNew(SDockTab)
+			[
+				SNew(SVerticalBox)
+				+ SVerticalBox::Slot()
+				.HAlign(HAlign_Center)
+				.VAlign(VAlign_Center)
+				.Padding(16.0f)
+				[
+					SNew(STextBlock)
+					.AutoWrapText(true)
+					.ColorAndOpacity(FSlateColor(FLinearColor(0.9f, 0.25f, 0.25f)))
+					.Text(FText::FromString(TEXT("Dialogue graph asset is missing its inner EdGraph and could not be opened. "
+						"Try duplicating the asset (which will run the factory and produce a fresh inner graph), "
+						"or delete and recreate it.")))
+				]
+			];
+	}
+
 	return SNew(SDockTab)
 		[
 			GraphEditorWidget.ToSharedRef()
@@ -179,12 +220,29 @@ void FSFDialogueGraphEditorToolkit::CreateInternalWidgets()
 			this,
 			&FSFDialogueGraphEditorToolkit::OnGraphSelectionChanged);
 
-	GraphEditorWidget =
-		SNew(SGraphEditor)
-		.AdditionalCommands(GraphEditorCommands)
-		.Appearance(AppearanceInfo)
-		.GraphToEdit(DialogueGraph ? DialogueGraph->EdGraph : nullptr)
-		.GraphEvents(GraphEditorEvents);
+	// Initialize() runs EnsureGraphInitialized + schema heal before this is
+	// called, so EdGraph should always be valid here. If it is still null the
+	// asset itself is broken: surface an error panel instead of feeding
+	// nullptr to SGraphEditor (which would crash) or papering over it with a
+	// transient stub graph (which would silently lose user data on save).
+	UEdGraph* GraphToEdit = DialogueGraph ? DialogueGraph->EdGraph.Get() : nullptr;
+	if (!GraphToEdit)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[SFDialogueGraphEditor] '%s' has no inner EdGraph after EnsureGraphInitialized; opening read-only error panel."),
+			*GetNameSafe(DialogueGraph));
+
+		GraphEditorWidget.Reset();
+	}
+	else
+	{
+		GraphEditorWidget =
+			SNew(SGraphEditor)
+			.AdditionalCommands(GraphEditorCommands)
+			.Appearance(AppearanceInfo)
+			.GraphToEdit(GraphToEdit)
+			.GraphEvents(GraphEditorEvents);
+	}
 
 	FPropertyEditorModule& PropertyEditorModule =
 		FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
@@ -299,21 +357,34 @@ void FSFDialogueGraphEditorToolkit::CompileGraph()
 
 void FSFDialogueGraphEditorToolkit::AddToolbarExtender()
 {
-	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateLambda([this]()
-		{
-			FToolMenuOwnerScoped OwnerScoped(this);
+	// ToolMenus is already initialized by the time an asset editor opens, so we
+	// extend the toolbar directly rather than queueing another startup callback.
+	// Using a per-toolkit owner means each open toolkit registers its own button
+	// and removes it on shutdown (FAssetEditorToolkit::CleanupAfterClose calls
+	// UToolMenus::UnregisterOwner on "this"), preventing button stacking across
+	// repeated opens of the dialogue editor within the same session.
+	if (UToolMenus::Get() == nullptr)
+	{
+		return;
+	}
 
-			UToolMenu* Toolbar = UToolMenus::Get()->ExtendMenu("AssetEditor.DefaultToolBar");
-			FToolMenuSection& Section = Toolbar->AddSection("Dialogue");
+	FToolMenuOwnerScoped OwnerScoped(this);
 
-			Section.AddEntry(FToolMenuEntry::InitToolBarButton(
-				"CompileDialogue",
-				FUIAction(FExecuteAction::CreateSP(this, &FSFDialogueGraphEditorToolkit::CompileGraph)),
-				FText::FromString("Compile"),
-				FText::FromString("Compile Dialogue Graph"),
-				FSlateIcon()
-			));
-		}));
+	UToolMenu* Toolbar = UToolMenus::Get()->ExtendMenu("AssetEditor.DefaultToolBar");
+	if (Toolbar == nullptr)
+	{
+		return;
+	}
+
+	FToolMenuSection& Section = Toolbar->FindOrAddSection("Dialogue");
+
+	Section.AddEntry(FToolMenuEntry::InitToolBarButton(
+		"CompileDialogue",
+		FUIAction(FExecuteAction::CreateSP(this, &FSFDialogueGraphEditorToolkit::CompileGraph)),
+		FText::FromString(TEXT("Compile")),
+		FText::FromString(TEXT("Compile Dialogue Graph")),
+		FSlateIcon()
+	));
 }
 
 TSharedRef<SDockTab> FSFDialogueGraphEditorToolkit::SpawnCompileResultsTab(const FSpawnTabArgs& Args)
@@ -453,6 +524,7 @@ void FSFDialogueGraphEditorToolkit::DeleteSelectedDuplicableNodes()
 	const FGraphPanelSelectionSet SelectedNodes = GraphEditorWidget->GetSelectedNodes();
 	GraphEditorWidget->ClearSelectionSet();
 
+	bool bAnyDeleted = false;
 	for (UObject* SelectedObject : SelectedNodes)
 	{
 		if (UEdGraphNode* Node = Cast<UEdGraphNode>(SelectedObject))
@@ -460,9 +532,20 @@ void FSFDialogueGraphEditorToolkit::DeleteSelectedDuplicableNodes()
 			if (Node->CanUserDeleteNode())
 			{
 				Node->Modify();
+				// DestroyNode breaks pin links and removes the node from its
+				// owning graph's Nodes array, so no explicit RemoveNode call is
+				// needed. NotifyGraphChanged below tells the SGraphEditor view
+				// to refresh.
 				Node->DestroyNode();
+				bAnyDeleted = true;
 			}
 		}
+	}
+
+	if (bAnyDeleted)
+	{
+		DialogueGraph->EdGraph->NotifyGraphChanged();
+		DialogueGraph->MarkPackageDirty();
 	}
 }
 

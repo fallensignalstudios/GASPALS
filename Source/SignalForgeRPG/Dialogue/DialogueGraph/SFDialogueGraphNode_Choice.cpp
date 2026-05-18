@@ -21,8 +21,12 @@ void USFDialogueGraphNode_Choice::AllocateDefaultPins()
 
 void USFDialogueGraphNode_Choice::RebuildChoiceOutputPins()
 {
+	// Snapshot the existing pin pointers so we can destroy them after the new
+	// pin set is allocated. Just clearing the Pins array would orphan the old
+	// UEdGraphPin* objects (pin leak) and leave dangling LinkedTo entries on
+	// any nodes they were connected to.
 	TArray<UEdGraphPin*> OldPins = Pins;
-	Pins.Empty();
+	Pins.Reset();
 
 	AllocateDefaultPins();
 
@@ -31,6 +35,7 @@ void USFDialogueGraphNode_Choice::RebuildChoiceOutputPins()
 		if (OldPin)
 		{
 			OldPin->BreakAllPinLinks();
+			OldPin->MarkAsGarbage();
 		}
 	}
 
@@ -54,8 +59,27 @@ void USFDialogueGraphNode_Choice::PostEditChangeProperty(FPropertyChangedEvent& 
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 
-	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(USFDialogueGraphNode_Choice, Choices))
+	// GetMemberPropertyName resolves to the outer property the user edited,
+	// even when the change happened inside an inner struct field (e.g. typing
+	// into Choices[0].ChoiceText). GetPropertyName alone would miss those.
+	const FName MemberName = PropertyChangedEvent.GetMemberPropertyName();
+	if (MemberName != GET_MEMBER_NAME_CHECKED(USFDialogueGraphNode_Choice, Choices))
+	{
+		return;
+	}
+
+	// Only structural changes to the Choices array require rebuilding output
+	// pins — editing a choice's text or tags does not change the pin count.
+	const EPropertyChangeType::Type ChangeType = PropertyChangedEvent.ChangeType;
+	const bool bStructuralChange =
+		ChangeType == EPropertyChangeType::ArrayAdd ||
+		ChangeType == EPropertyChangeType::ArrayRemove ||
+		ChangeType == EPropertyChangeType::ArrayClear ||
+		ChangeType == EPropertyChangeType::ArrayMove ||
+		ChangeType == EPropertyChangeType::Duplicate ||
+		ChangeType == EPropertyChangeType::ValueSet;
+
+	if (bStructuralChange)
 	{
 		RebuildChoiceOutputPins();
 	}

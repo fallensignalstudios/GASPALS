@@ -69,8 +69,16 @@ void USFDialogueGraphNode_Base::PostLoad()
 {
 	Super::PostLoad();
 
+	// Heal nodes that were saved before NodeGuidValue was added (or that
+	// somehow lost their GUID). Mark dirty so the new GUID is persisted on
+	// the next save — otherwise PostLoad would re-roll it every load and
+	// the runtime NodeId would not be stable across sessions.
 	if (!NodeGuidValue.IsValid())
 	{
 		NodeGuidValue = FGuid::NewGuid();
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SFDialogueGraphNode_Base] '%s' had no NodeGuidValue on load; generated a new one. Re-save the dialogue graph to persist it."),
+			*GetName());
+		MarkPackageDirty();
 	}
 }
