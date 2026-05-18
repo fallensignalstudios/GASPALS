@@ -19,6 +19,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void SetPlayerHUDWidgetController(USFPlayerHUDWidgetController* InWidgetController);
 
+protected:
+	/**
+	 * Native hook fired immediately before OnWidgetControllerSet is broadcast
+	 * to Blueprint. C++ subclasses override this to bind controller delegates
+	 * without relying on Blueprint scripting.
+	 */
+	virtual void NativeOnPlayerHUDWidgetControllerSet() {}
+
+public:
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "HUD")
 	void PlayHUDResumeAnimation();
 };

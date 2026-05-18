@@ -10,6 +10,13 @@
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
+#include "HAL/IConsoleManager.h"
+
+static TAutoConsoleVariable<int32> CVarSFInteractionDebug(
+	TEXT("sf.Interaction.Debug"),
+	0,
+	TEXT("When >0, log every interaction trace result to LogTemp at Display level."),
+	ECVF_Default);
 
 USFInteractionComponent::USFInteractionComponent()
 {
@@ -145,22 +152,26 @@ void USFInteractionComponent::UpdateCurrentInteractable()
 			{
 				NewInteractableActor = HitActor;
 			}
-			else
+			else if (CVarSFInteractionDebug.GetValueOnGameThread() > 0)
 			{
 				const ESFInteractionAvailability Availability =
 					ISFInteractableInterface::Execute_GetInteractionAvailability(HitActor, NewContext);
-				UE_LOG(LogTemp, VeryVerbose,
+				UE_LOG(LogTemp, Display,
 					TEXT("SFInteractionComponent: trace hit '%s' but it was rejected (Availability=%d)."),
 					*GetNameSafe(HitActor),
 					static_cast<int32>(Availability));
 			}
 		}
-		else if (IsValid(HitActor))
+		else if (IsValid(HitActor) && CVarSFInteractionDebug.GetValueOnGameThread() > 0)
 		{
-			UE_LOG(LogTemp, VeryVerbose,
+			UE_LOG(LogTemp, Display,
 				TEXT("SFInteractionComponent: trace hit '%s' which does not implement ISFInteractableInterface."),
 				*GetNameSafe(HitActor));
 		}
+	}
+	else if (CVarSFInteractionDebug.GetValueOnGameThread() > 0)
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("SFInteractionComponent: trace did not hit any actor."));
 	}
 
 	SetCurrentInteractable(NewInteractableActor, NewContext);
@@ -249,6 +260,12 @@ void USFInteractionComponent::SetCurrentInteractable(
 			? CurrentInteractionOptions[0]
 			: ResolvePrimaryOption(FocusContext);
 	}
+
+	UE_LOG(LogTemp, Verbose,
+		TEXT("SFInteractionComponent: SetCurrentInteractable -> %s, prompt='%s', options=%d"),
+		*GetNameSafe(CurrentInteractableActor),
+		*CurrentPrimaryOption.PromptText.ToString(),
+		CurrentInteractionOptions.Num());
 
 	OnInteractableChanged.Broadcast(CurrentInteractableActor, CurrentPrimaryOption, CurrentInteractionOptions);
 }
