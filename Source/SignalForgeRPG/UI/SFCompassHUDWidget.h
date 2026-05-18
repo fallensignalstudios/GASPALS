@@ -184,6 +184,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Layout")
 	float CardinalLabelTopPadding = 4.0f;
 
+	/** Distance (in pixels) the compass is offset from the top edge of the viewport. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Layout")
+	float CompassTopOffsetPixels = 24.0f;
+
 	// -- Designer-tunable visuals (optional — sensible fallbacks built in) --
 
 	/** Cardinal tick image (a thin vertical line). If unset, a solid colored box is drawn. */
