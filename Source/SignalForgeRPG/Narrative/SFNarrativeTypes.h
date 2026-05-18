@@ -200,6 +200,44 @@ struct SIGNALFORGERPG_API FSFQuestTaskDefinition
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest", meta = (ClampMin = "1"))
     int32 RequiredQuantity = 1;
+
+    // ---------------------------------------------------------------------
+    // Waypoint authoring
+    // ---------------------------------------------------------------------
+    // Fields below describe a waypoint anchored to this task. The runtime
+    // waypoint subsystem prefers an in-level ASFNarrativeWaypoint actor
+    // matching (QuestId, TaskId) over the authored coordinate; the actor
+    // path lets designers move the marker by dragging the actor (or attach
+    // it to a moving NPC/door). Use the coordinate path for waypoints that
+    // can live entirely in the task definition (e.g. a static landmark).
+
+    /** If true, this task has a waypoint that may be surfaced to HUD/UI. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest|Waypoint")
+    bool bHasWaypoint = false;
+
+    /** Authored world coordinate for the waypoint (used when no level actor is registered). */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest|Waypoint", meta = (EditCondition = "bHasWaypoint"))
+    FVector WaypointLocation = FVector::ZeroVector;
+
+    /**
+     * Optional level association. The subsystem only surfaces the authored
+     * coordinate when this level is loaded (or when this is empty, meaning
+     * the coordinate is valid in the persistent world).
+     */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest|Waypoint", meta = (EditCondition = "bHasWaypoint", AllowedClasses = "/Script/Engine.World"))
+    TSoftObjectPtr<UWorld> WaypointLevel;
+
+    /** Optional override for the HUD label. Falls back to the objective text if empty. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest|Waypoint", meta = (EditCondition = "bHasWaypoint"))
+    FText WaypointDisplayText;
+
+    /** Drives icon selection on the compass / HUD widget (e.g. Waypoint.Icon.Travel, Waypoint.Icon.Kill). */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest|Waypoint", meta = (EditCondition = "bHasWaypoint"))
+    FGameplayTag WaypointIconTag;
+
+    /** True when the waypoint should appear on a compass/minimap-style widget (vs. only the off-screen arrow). */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Narrative|Quest|Waypoint", meta = (EditCondition = "bHasWaypoint"))
+    bool bRevealOnCompass = true;
 };
 
 /**
