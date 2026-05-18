@@ -83,7 +83,7 @@ void USFInteractionPromptWidget::UnbindFromController()
 
 void USFInteractionPromptWidget::HandleInteractionPromptChanged(
 	bool bHasPrompt,
-	const FText& PromptText)
+	FText PromptText)
 {
 	// Prompt-only path: no option metadata, treat as Available.
 	ApplyPromptState(bHasPrompt, PromptText, FText::GetEmpty(), /*bAvailable*/ true);
