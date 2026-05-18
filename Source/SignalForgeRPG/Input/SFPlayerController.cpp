@@ -12,6 +12,7 @@
 #include "UI/SFPlayerMenuWidget.h"
 #include "UI/SFUserWidgetBase.h"
 #include "Inventory/SFInventoryWidgetController.h"
+#include "Save/SFPlayerSaveService.h"
 
 namespace
 {
@@ -54,6 +55,15 @@ void ASFPlayerController::BeginPlay()
 	// 		0.15f,
 	// 		true);
 	// }
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (USFPlayerSaveService* Save = GI->GetSubsystem<USFPlayerSaveService>())
+		{
+			// No-op when there is no pending load (i.e. New Game, normal play).
+			Save->ConsumePendingLoadAndApply();
+		}
+	}
 }
 
 void ASFPlayerController::InitializePlayerMenuPreviewScene()

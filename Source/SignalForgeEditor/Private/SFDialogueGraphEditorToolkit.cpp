@@ -370,13 +370,13 @@ void FSFDialogueGraphEditorToolkit::AddToolbarExtender()
 
 	FToolMenuOwnerScoped OwnerScoped(this);
 
-	UToolMenu* Toolbar = UToolMenus::Get()->ExtendMenu("AssetEditor.DefaultToolBar");
-	if (Toolbar == nullptr)
+	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("AssetEditor.DefaultToolBar");
+	if (ToolbarMenu == nullptr)
 	{
 		return;
 	}
 
-	FToolMenuSection& Section = Toolbar->FindOrAddSection("Dialogue");
+	FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("Dialogue");
 
 	Section.AddEntry(FToolMenuEntry::InitToolBarButton(
 		"CompileDialogue",
