@@ -80,7 +80,7 @@ protected:
 
 protected:
 	UFUNCTION()
-	void HandleInteractionPromptChanged(bool bHasPrompt, const FText& PromptText);
+	void HandleInteractionPromptChanged(bool bHasPrompt, FText PromptText);
 
 	UFUNCTION()
 	void HandleInteractionOptionsChanged(
