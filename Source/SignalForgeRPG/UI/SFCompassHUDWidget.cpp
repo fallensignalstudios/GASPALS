@@ -433,10 +433,10 @@ void USFCompassHUDWidget::RebuildMarkerWidgets()
 			Img->SetVisibility(ESlateVisibility::Collapsed);
 			Set.BehindArrow = Img;
 			Set.bBehindIsBorder = false;
-			if (UOverlaySlot* Slot = MarkerRoot->AddChildToOverlay(Img))
+			if (UOverlaySlot* BehindSlot = MarkerRoot->AddChildToOverlay(Img))
 			{
-				Slot->SetHorizontalAlignment(HAlign_Center);
-				Slot->SetVerticalAlignment(VAlign_Center);
+				BehindSlot->SetHorizontalAlignment(HAlign_Center);
+				BehindSlot->SetVerticalAlignment(VAlign_Center);
 			}
 		}
 		else
@@ -448,10 +448,10 @@ void USFCompassHUDWidget::RebuildMarkerWidgets()
 			B->SetVisibility(ESlateVisibility::Collapsed);
 			Set.BehindArrow = B;
 			Set.bBehindIsBorder = true;
-			if (UOverlaySlot* Slot = MarkerRoot->AddChildToOverlay(B))
+			if (UOverlaySlot* BehindSlot = MarkerRoot->AddChildToOverlay(B))
 			{
-				Slot->SetHorizontalAlignment(HAlign_Center);
-				Slot->SetVerticalAlignment(VAlign_Center);
+				BehindSlot->SetHorizontalAlignment(HAlign_Center);
+				BehindSlot->SetVerticalAlignment(VAlign_Center);
 			}
 		}
 
@@ -464,10 +464,10 @@ void USFCompassHUDWidget::RebuildMarkerWidgets()
 			Img->SetVisibility(ESlateVisibility::Collapsed);
 			Set.Ring = Img;
 			Set.bRingIsBorder = false;
-			if (UOverlaySlot* Slot = MarkerRoot->AddChildToOverlay(Img))
+			if (UOverlaySlot* RingSlot = MarkerRoot->AddChildToOverlay(Img))
 			{
-				Slot->SetHorizontalAlignment(HAlign_Center);
-				Slot->SetVerticalAlignment(VAlign_Center);
+				RingSlot->SetHorizontalAlignment(HAlign_Center);
+				RingSlot->SetVerticalAlignment(VAlign_Center);
 			}
 		}
 		else
@@ -480,10 +480,10 @@ void USFCompassHUDWidget::RebuildMarkerWidgets()
 			B->SetVisibility(ESlateVisibility::Collapsed);
 			Set.Ring = B;
 			Set.bRingIsBorder = true;
-			if (UOverlaySlot* Slot = MarkerRoot->AddChildToOverlay(B))
+			if (UOverlaySlot* RingSlot = MarkerRoot->AddChildToOverlay(B))
 			{
-				Slot->SetHorizontalAlignment(HAlign_Center);
-				Slot->SetVerticalAlignment(VAlign_Center);
+				RingSlot->SetHorizontalAlignment(HAlign_Center);
+				RingSlot->SetVerticalAlignment(VAlign_Center);
 			}
 		}
 
@@ -497,10 +497,10 @@ void USFCompassHUDWidget::RebuildMarkerWidgets()
 			Img->SetBrush(IconBrush);
 			Set.Icon = Img;
 			Set.bIconIsBorder = false;
-			if (UOverlaySlot* Slot = MarkerRoot->AddChildToOverlay(Img))
+			if (UOverlaySlot* IconSlot = MarkerRoot->AddChildToOverlay(Img))
 			{
-				Slot->SetHorizontalAlignment(HAlign_Center);
-				Slot->SetVerticalAlignment(VAlign_Center);
+				IconSlot->SetHorizontalAlignment(HAlign_Center);
+				IconSlot->SetVerticalAlignment(VAlign_Center);
 			}
 		}
 		else
@@ -510,10 +510,10 @@ void USFCompassHUDWidget::RebuildMarkerWidgets()
 				IconTint, FVector2D(MarkerPixelSize, MarkerPixelSize));
 			Set.Icon = B;
 			Set.bIconIsBorder = true;
-			if (UOverlaySlot* Slot = MarkerRoot->AddChildToOverlay(B))
+			if (UOverlaySlot* IconSlot = MarkerRoot->AddChildToOverlay(B))
 			{
-				Slot->SetHorizontalAlignment(HAlign_Center);
-				Slot->SetVerticalAlignment(VAlign_Center);
+				IconSlot->SetHorizontalAlignment(HAlign_Center);
+				IconSlot->SetVerticalAlignment(VAlign_Center);
 			}
 		}
 
@@ -528,11 +528,11 @@ void USFCompassHUDWidget::RebuildMarkerWidgets()
 			Distance->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 1.0f, 1.0f, 0.85f)));
 			Distance->SetText(FText::GetEmpty());
 			Set.DistanceText = Distance;
-			if (UOverlaySlot* Slot = MarkerRoot->AddChildToOverlay(Distance))
+			if (UOverlaySlot* DistanceSlot = MarkerRoot->AddChildToOverlay(Distance))
 			{
-				Slot->SetHorizontalAlignment(HAlign_Center);
-				Slot->SetVerticalAlignment(VAlign_Bottom);
-				Slot->SetPadding(FMargin(0.0f, MarkerPixelSize + 2.0f, 0.0f, 0.0f));
+				DistanceSlot->SetHorizontalAlignment(HAlign_Center);
+				DistanceSlot->SetVerticalAlignment(VAlign_Bottom);
+				DistanceSlot->SetPadding(FMargin(0.0f, MarkerPixelSize + 2.0f, 0.0f, 0.0f));
 			}
 		}
 
@@ -671,13 +671,13 @@ void USFCompassHUDWidget::UpdateChildPositions()
 			continue;
 		}
 		UOverlay* LabelOverlay = *FoundPtr;
-		UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(LabelOverlay->Slot);
-		if (!Slot)
+		UCanvasPanelSlot* LabelSlot = Cast<UCanvasPanelSlot>(LabelOverlay->Slot);
+		if (!LabelSlot)
 		{
 			continue;
 		}
 		const float PixelX = StripCoordinateToPixelX(Tick.StripCoordinate);
-		Slot->SetPosition(FVector2D(PixelX, 0.0f));
+		LabelSlot->SetPosition(FVector2D(PixelX, 0.0f));
 
 		const bool bVisible = FMath::Abs(Tick.StripCoordinate) <= MaxAbs;
 		LabelOverlay->SetVisibility(bVisible ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
@@ -721,10 +721,10 @@ void USFCompassHUDWidget::UpdateChildPositions()
 			continue;
 		}
 
-		if (UCanvasPanelSlot* Slot = Cast<UCanvasPanelSlot>(MarkerRoot->Slot))
+		if (UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(MarkerRoot->Slot))
 		{
 			const float PixelX = StripCoordinateToPixelX(DisplayStrip);
-			Slot->SetPosition(FVector2D(PixelX, 0.0f));
+			MarkerSlot->SetPosition(FVector2D(PixelX, 0.0f));
 		}
 
 		if (UWidget* Behind = Found->BehindArrow.Get())
