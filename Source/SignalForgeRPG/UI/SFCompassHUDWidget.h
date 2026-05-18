@@ -4,11 +4,20 @@
 
 #include "CoreMinimal.h"
 #include "Engine/EngineTypes.h"
+#include "GameplayTagContainer.h"
 #include "Narrative/SFWaypointTypes.h"
+#include "Styling/SlateBrush.h"
 #include "UI/SFUserWidgetBase.h"
 #include "SFCompassHUDWidget.generated.h"
 
+class UBorder;
+class UCanvasPanel;
+class UCanvasPanelSlot;
+class UImage;
+class UOverlay;
+class USizeBox;
 class USFNarrativeWaypointSubsystem;
+class UTextBlock;
 
 /**
  * Per-frame view of a single compass marker, computed from a waypoint
@@ -24,20 +33,11 @@ struct SIGNALFORGERPG_API FSFCompassMarker
 	UPROPERTY(BlueprintReadOnly, Category = "Narrative|Quest|Waypoint")
 	FSFWaypointSnapshot Waypoint;
 
-	/**
-	 * Position along the compass strip in [-1, +1], where -1 is the left
-	 * edge (HalfFov to the player's left), 0 is dead-center (forward), and
-	 * +1 is the right edge. Values outside [-1, +1] indicate the marker is
-	 * outside the visible strip. Designers usually clamp + scale this to
-	 * the strip's pixel width.
-	 */
+	/** Position along the compass strip in [-1, +1]. -1 = left edge, 0 = forward, +1 = right edge. */
 	UPROPERTY(BlueprintReadOnly, Category = "Narrative|Quest|Waypoint")
 	float StripCoordinate = 0.0f;
 
-	/**
-	 * Signed angular offset from the player's forward direction, in
-	 * degrees. Negative = left, positive = right. Wrapped to [-180, +180].
-	 */
+	/** Signed angular offset from player forward in degrees, wrapped to [-180, +180]. */
 	UPROPERTY(BlueprintReadOnly, Category = "Narrative|Quest|Waypoint")
 	float AngularOffsetDegrees = 0.0f;
 
@@ -55,49 +55,67 @@ struct SIGNALFORGERPG_API FSFCompassMarker
 };
 
 /**
- * Per-frame view of a cardinal/sub-cardinal tick (N, NE, E, ...) used to
- * drive the compass strip's background label positions.
+ * Per-frame view of a cardinal/sub-cardinal tick (N, NE, E, ...).
  */
 USTRUCT(BlueprintType)
 struct SIGNALFORGERPG_API FSFCompassCardinalTick
 {
 	GENERATED_BODY()
 
-	/** Label text such as "N", "NE", "E". Drives the visual tick. */
 	UPROPERTY(BlueprintReadOnly, Category = "Narrative|Compass")
 	FString Label;
 
-	/** Yaw this tick represents (degrees, world-space, N = 0). */
 	UPROPERTY(BlueprintReadOnly, Category = "Narrative|Compass")
 	float YawDegrees = 0.0f;
 
-	/** Strip coordinate the same way FSFCompassMarker computes it. */
 	UPROPERTY(BlueprintReadOnly, Category = "Narrative|Compass")
 	float StripCoordinate = 0.0f;
 
-	/** Signed angular offset from player forward, [-180, +180]. */
 	UPROPERTY(BlueprintReadOnly, Category = "Narrative|Compass")
 	float AngularOffsetDegrees = 0.0f;
 };
 
 /**
- * Player-facing compass widget.
+ * Optional per-tag override for marker visuals.
+ * Designers fill the TMap in widget defaults: tag -> brush.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFCompassMarkerStyle
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass")
+	FSlateBrush IconBrush;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass")
+	FLinearColor IconTint = FLinearColor::White;
+};
+
+/**
+ * Fully self-contained player compass HUD widget.
  *
- * Responsibilities:
- *  - Track the player's forward yaw each tick and expose it for BP visuals.
- *  - Provide cardinal / sub-cardinal tick data (N, NE, E, SE, S, SW, W, NW)
- *    suitable for a scrolling horizontal compass strip.
- *  - Subscribe to USFNarrativeWaypointSubsystem so any active waypoint with
- *    bRevealOnCompass = true appears as a marker (and the user's tracked
- *    waypoint can be drawn with emphasis).
+ * The widget builds its own visual tree at construct time (background +
+ * clipped strip + center pip + cardinal labels) and spawns native marker
+ * child widgets for every active quest waypoint. You add it to your HUD,
+ * optionally drop a few brushes into its defaults, and you are done.
  *
- * Designers drive the visual layout entirely from blueprints. Typical wiring:
- *  - On BP_OnCompassTick, position background labels (cardinals) and marker
- *    icons using StripCoordinate * (StripPixelWidth * 0.5).
- *  - On BP_OnCompassMarkersChanged, rebuild the pool of marker child widgets.
+ * What you get out of the box:
+ *  - Eight cardinal/sub-cardinal labels (N, NE, E, SE, S, SW, W, NW) sliding
+ *    on a horizontal strip as the player rotates.
+ *  - One marker per active waypoint with bRevealOnCompass = true. The
+ *    tracked quest's marker shows a ring overlay. Markers that move behind
+ *    the player show a left/right "behind" chevron at the strip edge.
+ *  - All sized/positioned in code — no WBP layout required.
  *
- * The widget self-resolves the narrative waypoint subsystem on construct,
- * with a retry pump for early-boot timing (mirrors the toast / waypoint HUD).
+ * What you can customise (optional, in widget defaults):
+ *  - StripPixelWidth, StripPixelHeight, BackgroundColor, CenterPipColor.
+ *  - DefaultMarkerBrush, TrackedRingBrush, BehindArrowBrush, TickBrush.
+ *  - MarkerStylesByTag — per-IconTag overrides for different waypoint types.
+ *  - CompassHalfFovDegrees, MaxStripCoordinateAbs, bUseCameraRotation.
+ *
+ * The widget self-resolves USFNarrativeWaypointSubsystem on construct
+ * (with the same retry pump as the toast widget), so early-boot ordering
+ * does not break it.
  */
 UCLASS(Blueprintable)
 class SIGNALFORGERPG_API USFCompassHUDWidget : public USFUserWidgetBase
@@ -105,25 +123,16 @@ class SIGNALFORGERPG_API USFCompassHUDWidget : public USFUserWidgetBase
 	GENERATED_BODY()
 
 public:
-	// -- Read API (BP-friendly) --
+	USFCompassHUDWidget(const FObjectInitializer& ObjectInitializer);
 
-	/** Current player view yaw in degrees, wrapped to [0, 360). */
+	// -- BP read API --
+
 	UFUNCTION(BlueprintPure, Category = "Narrative|Compass")
 	float GetPlayerYawDegrees() const { return CachedPlayerYaw; }
 
-	/** Half-angle (in degrees) that maps to StripCoordinate == 1.0. */
 	UFUNCTION(BlueprintPure, Category = "Narrative|Compass")
 	float GetCompassHalfFovDegrees() const { return CompassHalfFovDegrees; }
 
-	/**
-	 * Compute the [-1, +1] strip coordinate for a world-space target. Returns
-	 * false when the calling context has no valid player view (e.g. the local
-	 * player controller isn't available yet).
-	 *
-	 * @param OutStripCoordinate -1..+1 strip position (can exceed range when off-strip).
-	 * @param OutAngularOffsetDegrees signed degrees from player forward (left negative, right positive).
-	 * @param OutbIsBehind true when |angle| > 90.
-	 */
 	UFUNCTION(BlueprintCallable, Category = "Narrative|Compass")
 	bool GetStripCoordinateForWorldLocation(
 		FVector WorldLocation,
@@ -131,73 +140,120 @@ public:
 		float& OutAngularOffsetDegrees,
 		bool& OutbIsBehind) const;
 
-	/**
-	 * Compute the [-1, +1] strip coordinate for a world yaw (N = 0, E = 90,
-	 * S = 180, W = 270). Useful for placing fixed compass ticks.
-	 */
 	UFUNCTION(BlueprintCallable, Category = "Narrative|Compass")
 	bool GetStripCoordinateForYaw(
 		float TargetYawDegrees,
 		float& OutStripCoordinate,
 		float& OutAngularOffsetDegrees) const;
 
-	/**
-	 * The marker list computed during the last tick. Each entry contains a
-	 * full FSFWaypointSnapshot plus its current strip coordinate so the
-	 * blueprint can position icons without recomputing geometry.
-	 */
 	UFUNCTION(BlueprintPure, Category = "Narrative|Compass")
 	const TArray<FSFCompassMarker>& GetCompassMarkers() const { return CompassMarkers; }
 
-	/**
-	 * The cardinal tick list computed during the last tick. Always returns
-	 * the 8 sub-cardinal directions (N, NE, E, SE, S, SW, W, NW) — designers
-	 * can ignore subset (e.g. only show majors when zoomed).
-	 */
 	UFUNCTION(BlueprintPure, Category = "Narrative|Compass")
 	const TArray<FSFCompassCardinalTick>& GetCardinalTicks() const { return CardinalTicks; }
 
-	/** True if the user is currently tracking a quest with a waypoint. */
 	UFUNCTION(BlueprintPure, Category = "Narrative|Compass")
 	bool HasTrackedWaypoint() const { return bHasTrackedWaypoint; }
 
-	/** Snapshot of the tracked waypoint (read inside BP_OnTrackedWaypointChanged or per-tick). */
 	UFUNCTION(BlueprintPure, Category = "Narrative|Compass")
 	const FSFWaypointSnapshot& GetTrackedWaypoint() const { return CurrentTrackedWaypoint; }
 
+	// -- Designer-tunable layout --
+
+	/** Strip width in pixels (drives both visuals and StripCoordinate -> pixel mapping). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Layout", meta = (ClampMin = "100.0"))
+	float StripPixelWidth = 800.0f;
+
+	/** Strip height in pixels. Cardinal labels and markers both fit inside this height. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Layout", meta = (ClampMin = "16.0"))
+	float StripPixelHeight = 48.0f;
+
+	/** Background panel tint (set alpha to 0 to disable the background entirely). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Layout")
+	FLinearColor BackgroundColor = FLinearColor(0.0f, 0.0f, 0.0f, 0.45f);
+
+	/** Center forward indicator tint. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Layout")
+	FLinearColor CenterPipColor = FLinearColor(1.0f, 0.85f, 0.25f, 1.0f);
+
+	/** Marker icon size in pixels. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Layout", meta = (ClampMin = "8.0"))
+	float MarkerPixelSize = 24.0f;
+
+	/** Cardinal label vertical offset from strip top (pixels). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Layout")
+	float CardinalLabelTopPadding = 4.0f;
+
+	// -- Designer-tunable visuals (optional — sensible fallbacks built in) --
+
+	/** Cardinal tick image (a thin vertical line). If unset, a solid colored box is drawn. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Visuals")
+	FSlateBrush TickBrush;
+
+	/** Default marker icon when no per-tag override applies. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Visuals")
+	FSlateBrush DefaultMarkerBrush;
+
+	/** Ring overlay drawn on the tracked marker. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Visuals")
+	FSlateBrush TrackedRingBrush;
+
+	/** Small chevron drawn when a marker is behind the player. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Visuals")
+	FSlateBrush BehindArrowBrush;
+
+	/** Per-IconTag overrides — looked up by FSFWaypointSnapshot::IconTag. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Visuals")
+	TMap<FGameplayTag, FSFCompassMarkerStyle> MarkerStylesByTag;
+
+	/** Tint applied to the tracked marker icon (independent of the ring brush). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Visuals")
+	FLinearColor TrackedMarkerTint = FLinearColor(1.0f, 0.85f, 0.25f, 1.0f);
+
+	/** Tint applied to non-tracked marker icons (multiplies onto the brush). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Visuals")
+	FLinearColor UntrackedMarkerTint = FLinearColor::White;
+
+	/** Distance text font size. Set to 0 to hide distance labels entirely. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass|Visuals", meta = (ClampMin = "0.0"))
+	float DistanceFontSize = 9.0f;
+
 	// -- Designer-tunable behaviour --
 
-	/**
-	 * How wide (in world yaw degrees) the compass strip represents from
-	 * center to one edge. 90 means the strip shows ~180 degrees of arc; 60
-	 * is a tighter, more zoomed feel; 30 is very zoomed. Designers usually
-	 * pick something between 45 and 90.
-	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass", meta = (ClampMin = "10.0", ClampMax = "180.0"))
 	float CompassHalfFovDegrees = 90.0f;
 
-	/**
-	 * Master "off-strip culling" threshold. Markers whose |StripCoordinate|
-	 * exceeds this are excluded from BP_OnCompassTick / GetCompassMarkers.
-	 * Set > 1.0 to allow marker pinning at the edges, or huge to disable.
-	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass", meta = (ClampMin = "0.5", ClampMax = "10.0"))
 	float MaxStripCoordinateAbs = 1.05f;
 
-	/**
-	 * If true, GetPlayerYawDegrees uses the camera/view rotation (matches
-	 * what the player sees on screen). If false, uses the control rotation
-	 * (the input intent). For most third-person and first-person games this
-	 * should be true.
-	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass")
 	bool bUseCameraRotation = true;
+
+	/** When markers move behind the player, pin them to the strip edge with the behind chevron instead of culling. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass")
+	bool bPinBehindMarkersToEdge = true;
+
+	/** Show distance text below each marker (e.g. "120m"). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Narrative|Compass")
+	bool bShowMarkerDistance = true;
 
 protected:
 	// -- UUserWidget --
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void ReleaseSlateResources(bool bReleaseChildren) override;
+
+	// -- BP hooks (still available for designers who want extra polish) --
+	UFUNCTION(BlueprintImplementableEvent, Category = "Narrative|Compass")
+	void BP_OnCompassTick(float DeltaSeconds);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Narrative|Compass")
+	void BP_OnCompassMarkersChanged(const TArray<FSFCompassMarker>& Markers);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Narrative|Compass")
+	void BP_OnTrackedWaypointChanged(const FSFWaypointSnapshot& TrackedWaypoint, bool bHasTracked);
 
 	// -- Subsystem wiring --
 	UFUNCTION()
@@ -214,54 +270,62 @@ protected:
 	void StartAutoResolveRetryTimer();
 	void StopAutoResolveRetryTimer();
 
-	// -- BP hooks (designer-driven visuals) --
-
-	/**
-	 * Fires every tick AFTER the widget refreshes player yaw, cardinal
-	 * ticks, and compass marker strip coordinates. Designers use this to
-	 * reposition labels/icons. No data is passed because GetCompassMarkers /
-	 * GetCardinalTicks / GetPlayerYawDegrees already expose the current
-	 * frame's data.
-	 */
-	UFUNCTION(BlueprintImplementableEvent, Category = "Narrative|Compass")
-	void BP_OnCompassTick(float DeltaSeconds);
-
-	/**
-	 * Fires when the set of compass markers changes (a waypoint was added,
-	 * removed, or its identity/icon tag changed). Designers usually rebuild
-	 * their marker child-widget pool here.
-	 */
-	UFUNCTION(BlueprintImplementableEvent, Category = "Narrative|Compass")
-	void BP_OnCompassMarkersChanged(const TArray<FSFCompassMarker>& Markers);
-
-	/** Fires when the tracked waypoint identity changes (or appears / disappears). */
-	UFUNCTION(BlueprintImplementableEvent, Category = "Narrative|Compass")
-	void BP_OnTrackedWaypointChanged(const FSFWaypointSnapshot& TrackedWaypoint, bool bHasTracked);
-
 	// -- Internals --
-
-	/** Pulls a fresh player yaw from the local view and writes CachedPlayerYaw. */
-	void RefreshPlayerYaw();
-
-	/** Rebuild CompassMarkers from the subsystem's active waypoints list (identity change). */
-	void RebuildCompassMarkers();
-
-	/** Recompute strip coordinates on the existing marker / tick lists for this frame. */
-	void RecomputeStripCoordinates();
-
-	/** Rebuild the 8-entry cardinal tick label table (called once at construct). */
 	void BuildCardinalTickLabels();
+	void BuildVisualTree();
+	void SpawnCardinalLabelWidgets();
+	void RebuildMarkerWidgets();
+	void RefreshPlayerYaw();
+	void RecomputeStripCoordinates();
+	void ApplyMarkerVisualState();
+	void UpdateChildPositions();
 
-	/** Convert a desired angular offset (signed degrees) to strip coordinate using the configured half-FOV. */
 	float AngleToStripCoordinate(float SignedAngleDegrees) const;
+	float StripCoordinateToPixelX(float StripCoordinate) const;
+	void ResolveMarkerStyle(const FSFWaypointSnapshot& Snapshot, FSlateBrush& OutBrush, FLinearColor& OutTint) const;
 
-	/** Wrap a yaw to [0, 360). */
 	static float WrapYawPositive(float Yaw);
-
-	/** Wrap a signed angle to [-180, +180]. */
 	static float WrapSignedDegrees(float Angle);
+	static FString MakeMarkerKey(const FSFWaypointSnapshot& Snapshot);
 
-protected:
+private:
+	// Cached visual tree pointers (created in RebuildWidget).
+	UPROPERTY(Transient)
+	TObjectPtr<UCanvasPanel> RootCanvas;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USizeBox> CompassSizeBox;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UOverlay> CompassOverlay;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> BackgroundBorder;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCanvasPanel> StripCanvas;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UBorder> CenterPipBorder;
+
+	// Spawned label children keyed by their cardinal text.
+	UPROPERTY(Transient)
+	TMap<FString, TObjectPtr<UOverlay>> CardinalLabelOverlays;
+
+	// Spawned marker children keyed by "QuestId|TaskId".
+	struct FMarkerWidgetSet
+	{
+		TWeakObjectPtr<UOverlay> Root;
+		TWeakObjectPtr<UWidget> Icon;        // UImage when designer brush set, UBorder when fallback.
+		TWeakObjectPtr<UWidget> Ring;        // ditto.
+		TWeakObjectPtr<UWidget> BehindArrow; // ditto.
+		TWeakObjectPtr<UTextBlock> DistanceText;
+		bool bIconIsBorder = false;
+		bool bRingIsBorder = false;
+		bool bBehindIsBorder = false;
+	};
+	TMap<FString, FMarkerWidgetSet> MarkerWidgets;
+
 	UPROPERTY()
 	TWeakObjectPtr<USFNarrativeWaypointSubsystem> Subsystem;
 
@@ -283,12 +347,14 @@ protected:
 	UPROPERTY()
 	float CachedPlayerYaw = 0.0f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Narrative|Compass", meta = (ClampMin = "0.1", ClampMax = "5.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "Narrative|Compass|Retry", meta = (ClampMin = "0.1", ClampMax = "5.0"))
 	float AutoResolveRetryPeriodSeconds = 0.5f;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Narrative|Compass", meta = (ClampMin = "0.5", ClampMax = "60.0"))
+	UPROPERTY(EditDefaultsOnly, Category = "Narrative|Compass|Retry", meta = (ClampMin = "0.5", ClampMax = "60.0"))
 	float MaxAutoResolveRetrySeconds = 10.0f;
 
 	FTimerHandle AutoResolveRetryHandle;
 	float AutoResolveRetryElapsedSeconds = 0.0f;
+
+	bool bVisualTreeBuilt = false;
 };
