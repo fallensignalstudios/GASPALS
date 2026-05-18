@@ -370,13 +370,15 @@ void FSFDialogueGraphEditorToolkit::AddToolbarExtender()
 
 	FToolMenuOwnerScoped OwnerScoped(this);
 
-	UToolMenu* Toolbar = UToolMenus::Get()->ExtendMenu("AssetEditor.DefaultToolBar");
-	if (Toolbar == nullptr)
+	// Local renamed to avoid shadowing FAssetEditorToolkit::Toolbar
+	// (TSharedPtr<SWidget>), which would trip C4458 → WX in UBT.
+	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("AssetEditor.DefaultToolBar");
+	if (ToolbarMenu == nullptr)
 	{
 		return;
 	}
 
-	FToolMenuSection& Section = Toolbar->FindOrAddSection("Dialogue");
+	FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("Dialogue");
 
 	Section.AddEntry(FToolMenuEntry::InitToolBarButton(
 		"CompileDialogue",
