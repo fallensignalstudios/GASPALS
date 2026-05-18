@@ -4,5 +4,6 @@
 void USFUserWidgetBase::SetPlayerHUDWidgetController(USFPlayerHUDWidgetController* InWidgetController)
 {
 	PlayerHUDWidgetController = InWidgetController;
+	NativeOnPlayerHUDWidgetControllerSet();
 	OnWidgetControllerSet();
 }
