@@ -29,9 +29,19 @@ void USFInteractionComponent::BeginPlay()
 
 	OwnerCharacter = Cast<ACharacter>(GetOwner());
 
+	// Unconditional log so we always know whether the component spawned.
+	UE_LOG(LogTemp, Display,
+		TEXT("SFInteractionComponent::BeginPlay on '%s' (Owner=%s, TickEnabled=%d, NetMode=%d)"),
+		*GetNameSafe(this),
+		*GetNameSafe(GetOwner()),
+		IsComponentTickEnabled() ? 1 : 0,
+		GetWorld() ? static_cast<int32>(GetWorld()->GetNetMode()) : -1);
+
 	if (!OwnerCharacter)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("SFInteractionComponent owner is not a Character: %s"), *GetNameSafe(GetOwner()));
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFInteractionComponent owner is not a Character: %s. Tick disabled."),
+			*GetNameSafe(GetOwner()));
 		SetComponentTickEnabled(false);
 	}
 }
@@ -53,6 +63,22 @@ void USFInteractionComponent::TickComponent(
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	// Heartbeat: prove Tick is firing at all. Throttled so we don't spam.
+	if (CVarSFInteractionDebug.GetValueOnGameThread() > 0)
+	{
+		static double LastHeartbeatTime = 0.0;
+		const double Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0;
+		if (Now - LastHeartbeatTime > 1.0)
+		{
+			LastHeartbeatTime = Now;
+			UE_LOG(LogTemp, Display,
+				TEXT("SFInteractionComponent: Tick alive (Enabled=%d, LocallyControlled=%d, Owner=%s)"),
+				bInteractionEnabled ? 1 : 0,
+				IsLocallyControlled() ? 1 : 0,
+				*GetNameSafe(OwnerCharacter));
+		}
+	}
 
 	if (!bInteractionEnabled || !IsLocallyControlled())
 	{
