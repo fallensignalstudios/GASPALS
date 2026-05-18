@@ -3,6 +3,7 @@
 #include "Dialogue/DialogueGraph/SFDialogueGraph.h"
 #include "Dialogue/DialogueGraph/SFDialogueEdGraph.h"
 #include "Dialogue/DialogueGraph/SFDialogueGraphCompiler.h"
+#include "SFDialogueGraphSchema.h"
 
 #include "EdGraph/EdGraphNode.h"
 #include "EdGraphUtilities.h"
@@ -32,6 +33,26 @@ const FName FSFDialogueGraphEditorToolkit::CompileResultsTabId(TEXT("SFDialogueG
 void FSFDialogueGraphEditorToolkit::Initialize(USFDialogueGraph* InDialogueGraph, TSharedPtr<IToolkitHost> InitToolkitHost)
 {
 	DialogueGraph = InDialogueGraph;
+
+	// Older dialogue graph assets (saved before the editor module was wired
+	// into the build) can have EdGraph == nullptr because the factory's
+	// EnsureGraphInitialized never ran. Heal them here before any widget
+	// touches the inner graph — SGraphEditor dereferences the graph pointer
+	// during construction, so passing nullptr is an immediate crash.
+	if (DialogueGraph)
+	{
+		DialogueGraph->EnsureGraphInitialized();
+
+		if (DialogueGraph->EdGraph && DialogueGraph->EdGraph->Schema == nullptr)
+		{
+			// The runtime module that owns USFDialogueGraph cannot reference
+			// USFDialogueGraphSchema (schema lives in the editor module), so
+			// the schema class is assigned here at edit time. Mark the asset
+			// dirty so the schema persists with the next save.
+			DialogueGraph->EdGraph->Schema = USFDialogueGraphSchema::StaticClass();
+			DialogueGraph->EdGraph->MarkPackageDirty();
+		}
+	}
 
 	BindGraphEditorCommands();
 	CreateInternalWidgets();
@@ -179,11 +200,33 @@ void FSFDialogueGraphEditorToolkit::CreateInternalWidgets()
 			this,
 			&FSFDialogueGraphEditorToolkit::OnGraphSelectionChanged);
 
+	// Last-resort safety net. EnsureGraphInitialized in Initialize() should
+	// have populated EdGraph for every reachable code path; if we still see
+	// nullptr here it means the asset failed to construct its inner graph
+	// and we must not feed nullptr to SGraphEditor (immediate crash).
+	UEdGraph* GraphToEdit = DialogueGraph ? DialogueGraph->EdGraph.Get() : nullptr;
+	if (!GraphToEdit)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[SFDialogueGraphEditor] '%s' has no inner EdGraph; constructing transient stub so the editor can open."),
+			*GetNameSafe(DialogueGraph));
+
+		UObject* Outer = DialogueGraph ? static_cast<UObject*>(DialogueGraph) : GetTransientPackage();
+		USFDialogueEdGraph* StubGraph = NewObject<USFDialogueEdGraph>(
+			Outer, USFDialogueEdGraph::StaticClass(), NAME_None, RF_Transient);
+		StubGraph->Schema = USFDialogueGraphSchema::StaticClass();
+		if (DialogueGraph)
+		{
+			DialogueGraph->EdGraph = StubGraph;
+		}
+		GraphToEdit = StubGraph;
+	}
+
 	GraphEditorWidget =
 		SNew(SGraphEditor)
 		.AdditionalCommands(GraphEditorCommands)
 		.Appearance(AppearanceInfo)
-		.GraphToEdit(DialogueGraph ? DialogueGraph->EdGraph : nullptr)
+		.GraphToEdit(GraphToEdit)
 		.GraphEvents(GraphEditorEvents);
 
 	FPropertyEditorModule& PropertyEditorModule =
