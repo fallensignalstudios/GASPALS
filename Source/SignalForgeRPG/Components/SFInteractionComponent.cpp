@@ -145,6 +145,21 @@ void USFInteractionComponent::UpdateCurrentInteractable()
 			{
 				NewInteractableActor = HitActor;
 			}
+			else
+			{
+				const ESFInteractionAvailability Availability =
+					ISFInteractableInterface::Execute_GetInteractionAvailability(HitActor, NewContext);
+				UE_LOG(LogTemp, VeryVerbose,
+					TEXT("SFInteractionComponent: trace hit '%s' but it was rejected (Availability=%d)."),
+					*GetNameSafe(HitActor),
+					static_cast<int32>(Availability));
+			}
+		}
+		else if (IsValid(HitActor))
+		{
+			UE_LOG(LogTemp, VeryVerbose,
+				TEXT("SFInteractionComponent: trace hit '%s' which does not implement ISFInteractableInterface."),
+				*GetNameSafe(HitActor));
 		}
 	}
 
@@ -260,7 +275,25 @@ bool USFInteractionComponent::IsActorInteractable(const FSFInteractionContext& C
 	const ESFInteractionAvailability Availability =
 		ISFInteractableInterface::Execute_GetInteractionAvailability(TargetActor, Context);
 
-	return Availability == ESFInteractionAvailability::Available;
+	if (Availability == ESFInteractionAvailability::Available)
+	{
+		return true;
+	}
+
+	// Hard-disabled (Disabled / Invalid) targets are never surfaced.
+	if (Availability == ESFInteractionAvailability::Disabled
+		|| Availability == ESFInteractionAvailability::Invalid)
+	{
+		return false;
+	}
+
+	// Soft-unavailable targets (e.g. OutOfRange) are surfaced if the option asks
+	// the HUD to display an unavailable prompt. This lets designers show a grey
+	// "Talk" prompt while the player closes the gap, instead of nothing at all.
+	const FSFInteractionOption PrimaryOption =
+		ISFInteractableInterface::Execute_GetPrimaryInteractionOption(TargetActor, Context);
+
+	return PrimaryOption.bShowPromptWhenUnavailable;
 }
 
 FSFInteractionContext USFInteractionComponent::BuildInteractionContextFromHit(const FHitResult& HitResult) const
