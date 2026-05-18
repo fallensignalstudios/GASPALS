@@ -252,21 +252,20 @@ const FPinConnectionResponse USFDialogueGraphSchema::CanCreateConnection(const U
 		return FPinConnectionResponse(CONNECT_RESPONSE_DISALLOW, TEXT("Start nodes cannot have incoming connections."));
 	}
 
-	// Only one inbound link per input pin.
-	if (InputPin->LinkedTo.Num() > 0)
-	{
-		return FPinConnectionResponse(
-			(InputPin == A) ? CONNECT_RESPONSE_BREAK_OTHERS_A : CONNECT_RESPONSE_BREAK_OTHERS_B,
-			TEXT("Replacing existing input connection."));
-	}
-
+	// Output pins in a dialogue graph route to exactly one next runtime node
+	// (Line.Out / Event.Out / each Choice_N pin). Allowing multiple outgoing
+	// links would make the compiler ambiguous — GetLinkedNodeFromPin only
+	// reads LinkedTo[0]. So we replace any existing outgoing connection.
 	if (OutputPin->LinkedTo.Num() > 0)
 	{
 		return FPinConnectionResponse(
 			(OutputPin == A) ? CONNECT_RESPONSE_BREAK_OTHERS_A : CONNECT_RESPONSE_BREAK_OTHERS_B,
-			TEXT("Replacing existing output connection."));
+			TEXT("Replacing existing outgoing connection."));
 	}
 
+	// Input pins are intentionally fan-in: many predecessor nodes can route
+	// into the same Line / Choice / End. Allow extra inbound links without
+	// breaking the ones already there.
 	return FPinConnectionResponse(CONNECT_RESPONSE_MAKE, TEXT(""));
 }
 
