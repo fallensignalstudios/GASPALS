@@ -10,6 +10,6 @@ public class SignalForgeRPGEditorTarget : TargetRules
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.V6;
 
-		ExtraModuleNames.AddRange( new string[] { "SignalForgeRPG" } );
+		ExtraModuleNames.AddRange( new string[] { "SignalForgeRPG", "SignalForgeEditor" } );
 	}
 }
