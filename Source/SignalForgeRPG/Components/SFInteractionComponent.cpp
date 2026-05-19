@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 
 static TAutoConsoleVariable<int32> CVarSFInteractionDebug(
@@ -64,14 +65,14 @@ void USFInteractionComponent::TickComponent(
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	// Heartbeat: prove Tick is firing at all. Throttled so we don't spam.
+	// Heartbeat: prove Tick is firing at all. Throttled per-instance so we
+	// don't only see one component when multiple are alive (every NPC has one).
 	if (CVarSFInteractionDebug.GetValueOnGameThread() > 0)
 	{
-		static double LastHeartbeatTime = 0.0;
 		const double Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.0;
-		if (Now - LastHeartbeatTime > 1.0)
+		if (Now - LastHeartbeatLogTime > 1.0)
 		{
-			LastHeartbeatTime = Now;
+			LastHeartbeatLogTime = Now;
 			UE_LOG(LogTemp, Display,
 				TEXT("SFInteractionComponent: Tick alive (Enabled=%d, LocallyControlled=%d, Owner=%s)"),
 				bInteractionEnabled ? 1 : 0,
@@ -236,10 +237,14 @@ bool USFInteractionComponent::PerformInteractionTrace(FHitResult& OutHitResult) 
 		QueryParams
 	);
 
-	if (bDrawDebugInteractionTrace)
+	if (bDrawDebugInteractionTrace || CVarSFInteractionDebug.GetValueOnGameThread() > 0)
 	{
 		DrawDebugLine(World, Start, End, bHit ? FColor::Green : FColor::Red, false, 0.0f, 0, 1.0f);
 		DrawDebugSphere(World, End, InteractionTraceRadius, 12, bHit ? FColor::Green : FColor::Red, false, 0.0f);
+		if (bHit && IsValid(OutHitResult.GetActor()))
+		{
+			DrawDebugSphere(World, OutHitResult.ImpactPoint, InteractionTraceRadius * 0.5f, 12, FColor::Yellow, false, 0.0f);
+		}
 	}
 
 	return bHit && IsValid(OutHitResult.GetActor());
@@ -299,7 +304,17 @@ void USFInteractionComponent::SetCurrentInteractable(
 bool USFInteractionComponent::IsLocallyControlled() const
 {
 	const APawn* OwnerPawn = Cast<APawn>(OwnerCharacter);
-	return OwnerPawn && OwnerPawn->IsLocallyControlled();
+	if (!OwnerPawn || !OwnerPawn->IsLocallyControlled())
+	{
+		return false;
+	}
+
+	// Critical: every ASFCharacterBase has an InteractionComponent, including
+	// NPCs and AI companions. On standalone / listen-server, AI-controlled
+	// pawns also return IsLocallyControlled()=true because the server is the
+	// local authority. We must additionally require an APlayerController so
+	// only the actual player runs interaction traces.
+	return OwnerPawn->GetController() && OwnerPawn->GetController()->IsA<APlayerController>();
 }
 
 bool USFInteractionComponent::IsActorInteractable(const FSFInteractionContext& Context) const
