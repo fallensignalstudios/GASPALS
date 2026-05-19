@@ -2,11 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
+#include "GameplayTagContainer.h"
 #include "Dialogue/Data/SFDialogueTypes.h"
 #include "SFDialogueWidgetController.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDialogueActiveChangedSignature, bool, bIsActive);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDialogueDisplayDataChangedSignature, const FSFDialogueDisplayData&, DisplayData);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDialoguePauseChangedSignature, bool, bIsPaused);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDialogueEventForwardedSignature, FGameplayTag, EventTag);
 
 class ASFPlayerCharacter;
 class USFDialogueComponent;
@@ -26,6 +29,15 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	bool SelectChoice(int32 ChoiceIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	bool SkipCurrentLine();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void PauseDialogue();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ResumeDialogue();
 
 	UFUNCTION(BlueprintPure, Category = "UI")
 	bool IsDialogueActive() const { return bIsDialogueActive; }
@@ -63,6 +75,12 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "UI")
 	FOnDialogueDisplayDataChangedSignature OnDialogueDisplayDataChanged;
 
+	UPROPERTY(BlueprintAssignable, Category = "UI")
+	FOnDialoguePauseChangedSignature OnDialoguePauseChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "UI")
+	FOnDialogueEventForwardedSignature OnDialogueEventForwarded;
+
 protected:
 	UFUNCTION()
 	void HandleConversationStarted(AActor* SourceActor);
@@ -72,4 +90,10 @@ protected:
 
 	UFUNCTION()
 	void HandleDialogueNodeUpdated(const FSFDialogueDisplayData& DisplayData);
+
+	UFUNCTION()
+	void HandlePauseStateChanged(bool bPaused);
+
+	UFUNCTION()
+	void HandleDialogueEvent(FGameplayTag EventTag);
 };

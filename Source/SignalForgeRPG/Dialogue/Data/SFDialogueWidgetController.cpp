@@ -24,10 +24,14 @@ void USFDialogueWidgetController::Initialize(ASFPlayerCharacter* InPlayerCharact
 	DialogueComponent->OnConversationStarted.RemoveDynamic(this, &USFDialogueWidgetController::HandleConversationStarted);
 	DialogueComponent->OnConversationEnded.RemoveDynamic(this, &USFDialogueWidgetController::HandleConversationEnded);
 	DialogueComponent->OnDialogueNodeUpdated.RemoveDynamic(this, &USFDialogueWidgetController::HandleDialogueNodeUpdated);
+	DialogueComponent->OnDialoguePauseStateChanged.RemoveDynamic(this, &USFDialogueWidgetController::HandlePauseStateChanged);
+	DialogueComponent->OnDialogueEventTriggered.RemoveDynamic(this, &USFDialogueWidgetController::HandleDialogueEvent);
 
 	DialogueComponent->OnConversationStarted.AddDynamic(this, &USFDialogueWidgetController::HandleConversationStarted);
 	DialogueComponent->OnConversationEnded.AddDynamic(this, &USFDialogueWidgetController::HandleConversationEnded);
 	DialogueComponent->OnDialogueNodeUpdated.AddDynamic(this, &USFDialogueWidgetController::HandleDialogueNodeUpdated);
+	DialogueComponent->OnDialoguePauseStateChanged.AddDynamic(this, &USFDialogueWidgetController::HandlePauseStateChanged);
+	DialogueComponent->OnDialogueEventTriggered.AddDynamic(this, &USFDialogueWidgetController::HandleDialogueEvent);
 
 	bIsDialogueActive = DialogueComponent->IsConversationActive();
 	CurrentDisplayData = DialogueComponent->GetCurrentDisplayData();
@@ -60,6 +64,31 @@ bool USFDialogueWidgetController::SelectChoice(int32 ChoiceIndex)
 	return DialogueComponent->SelectChoice(ChoiceIndex);
 }
 
+bool USFDialogueWidgetController::SkipCurrentLine()
+{
+	if (!DialogueComponent)
+	{
+		return false;
+	}
+	return DialogueComponent->SkipCurrentLine();
+}
+
+void USFDialogueWidgetController::PauseDialogue()
+{
+	if (DialogueComponent)
+	{
+		DialogueComponent->PauseConversation();
+	}
+}
+
+void USFDialogueWidgetController::ResumeDialogue()
+{
+	if (DialogueComponent)
+	{
+		DialogueComponent->ResumeConversation();
+	}
+}
+
 void USFDialogueWidgetController::HandleConversationStarted(AActor* SourceActor)
 {
 	bIsDialogueActive = true;
@@ -86,4 +115,14 @@ void USFDialogueWidgetController::HandleDialogueNodeUpdated(const FSFDialogueDis
 {
 	CurrentDisplayData = DisplayData;
 	OnDialogueDisplayDataChanged.Broadcast(CurrentDisplayData);
+}
+
+void USFDialogueWidgetController::HandlePauseStateChanged(bool bPaused)
+{
+	OnDialoguePauseChanged.Broadcast(bPaused);
+}
+
+void USFDialogueWidgetController::HandleDialogueEvent(FGameplayTag EventTag)
+{
+	OnDialogueEventForwarded.Broadcast(EventTag);
 }
