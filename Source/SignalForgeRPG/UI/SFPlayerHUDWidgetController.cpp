@@ -55,7 +55,9 @@ void USFPlayerHUDWidgetController::Initialize(ASFCharacterBase* InPlayerCharacte
 	CurrentInteractionPrimaryOption = FSFInteractionOption();
 	CurrentInteractionOptions.Reset();
 
-	if (ASFPlayerCharacter* PlayerPawn = Cast<ASFPlayerCharacter>(PlayerCharacter))
+	// Bind to whichever ASFCharacterBase owns the pawn — the InteractionComponent
+	// lives on the base class, so we don't need an ASFPlayerCharacter specifically.
+	if (ASFCharacterBase* PlayerPawn = Cast<ASFCharacterBase>(PlayerCharacter))
 	{
 		if (USFInteractionComponent* InteractionComponent = PlayerPawn->GetInteractionComponent())
 		{
@@ -64,6 +66,10 @@ void USFPlayerHUDWidgetController::Initialize(ASFCharacterBase* InPlayerCharacte
 
 			InteractionComponent->OnInteractableChanged.AddDynamic(
 				this, &USFPlayerHUDWidgetController::HandleInteractableChanged);
+
+			UE_LOG(LogTemp, Display,
+				TEXT("HUDWidgetController bound to InteractionComponent on '%s'"),
+				*GetNameSafe(PlayerPawn));
 
 			// Prime initial state from the component
 			const AActor* CurrentActor = InteractionComponent->GetCurrentInteractableActor();
@@ -77,13 +83,17 @@ void USFPlayerHUDWidgetController::Initialize(ASFCharacterBase* InPlayerCharacte
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("HUDWidgetController could not find InteractionComponent."));
+			UE_LOG(LogTemp, Error,
+				TEXT("HUDWidgetController could not find InteractionComponent on '%s'."),
+				*GetNameSafe(PlayerPawn));
 		}
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("HUDWidgetController PlayerCharacter was not ASFPlayerCharacter: %s"),
-			*GetNameSafe(PlayerCharacter));
+		UE_LOG(LogTemp, Error,
+			TEXT("HUDWidgetController PlayerCharacter was not ASFCharacterBase: %s (Class=%s)"),
+			*GetNameSafe(PlayerCharacter),
+			PlayerCharacter ? *PlayerCharacter->GetClass()->GetName() : TEXT("<null>"));
 	}
 
 	ResetInactivityTimer();
