@@ -117,3 +117,58 @@ struct SIGNALFORGERPG_API FSFDialogueDisplayData
 	UPROPERTY(BlueprintReadOnly, Category = "Dialogue")
 	ESFDialogueNodeType NodeType = ESFDialogueNodeType::End;
 };
+
+/**
+ * A single entry in the rolling dialogue history (lines + chosen choices).
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFDialogueHistoryEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|History")
+	FName NodeId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|History")
+	FName SpeakerId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|History")
+	FText LineText;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|History")
+	ESFDialogueNodeType NodeType = ESFDialogueNodeType::Line;
+
+	/** For Choice entries, the choice the player picked (in its visible list). */
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|History")
+	FText ChosenChoiceText;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|History")
+	FGameplayTag EventTag;
+
+	/** Approximate world time when the entry was recorded. */
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|History")
+	float TimeSeconds = 0.0f;
+};
+
+/**
+ * Snapshot of an in-progress conversation. The conversation asset is referenced
+ * by soft pointer so it can be saved alongside game saves without forcing the
+ * asset to remain loaded.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFDialogueSnapshot
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|Snapshot")
+	TSoftObjectPtr<class USFConversationDataAsset> Conversation;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|Snapshot")
+	FName CurrentNodeId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|Snapshot")
+	TArray<FSFDialogueHistoryEntry> History;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Dialogue|Snapshot")
+	bool bIsValid = false;
+};

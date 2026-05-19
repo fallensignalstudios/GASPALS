@@ -55,8 +55,11 @@ bool USFDialogueComponent::StartConversation(USFConversationDataAsset* InConvers
 	ActiveConversation = InConversation;
 	ActiveSourceActor = InSourceActor;
 	bConversationActive = true;
+	bConversationPaused = false;
 	CurrentNodeId = NAME_None;
 	CurrentVisibleChoiceIndices.Reset();
+	DialogueHistory.Reset();
+	PausedAdvanceTimeRemaining = -1.0f;
 
 	ApplyConversationStaging();
 
@@ -90,6 +93,9 @@ void USFDialogueComponent::AdvanceConversation()
 	switch (CurrentNode->NodeType)
 	{
 	case ESFDialogueNodeType::Line:
+		// Record this line in history as we leave it.
+		PushHistoryForCurrentNode(nullptr);
+
 		if (CurrentNode->NextNodeId == NAME_None)
 		{
 			EndConversation();
@@ -162,6 +168,10 @@ bool USFDialogueComponent::SelectChoice(int32 ChoiceIndex)
 		return false;
 	}
 
+	// Record the chosen choice in history before navigating away from this node.
+	PushHistoryForCurrentNode(&SelectedChoice);
+	OnDialogueChoiceSelected.Broadcast(ChoiceIndex, SelectedChoice);
+
 	if (SelectedChoice.NextNodeId == NAME_None)
 	{
 		EndConversation();
@@ -189,13 +199,203 @@ void USFDialogueComponent::EndConversation()
 
 	ClearAdvanceState();
 	bConversationActive = false;
+	bConversationPaused = false;
 	ActiveConversation = nullptr;
 	ActiveSourceActor = nullptr;
 	CurrentNodeId = NAME_None;
 	CurrentVisibleChoiceIndices.Reset();
+	PausedAdvanceTimeRemaining = -1.0f;
 
 	OnConversationEnded.Broadcast();
 	OnDialogueCameraShotChanged.Broadcast(FSFDialogueCameraShot());
+}
+
+void USFDialogueComponent::PauseConversation()
+{
+	if (!bConversationActive || bConversationPaused)
+	{
+		return;
+	}
+
+	bConversationPaused = true;
+
+	if (UWorld* World = GetWorld())
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+		if (TimerManager.IsTimerActive(AutoAdvanceTimerHandle))
+		{
+			PausedAdvanceTimeRemaining = TimerManager.GetTimerRemaining(AutoAdvanceTimerHandle);
+			TimerManager.ClearTimer(AutoAdvanceTimerHandle);
+		}
+		else
+		{
+			PausedAdvanceTimeRemaining = -1.0f;
+		}
+	}
+
+	if (ActiveDialogueAudioComponent)
+	{
+		ActiveDialogueAudioComponent->SetPaused(true);
+	}
+
+	OnDialoguePauseStateChanged.Broadcast(true);
+}
+
+void USFDialogueComponent::ResumeConversation()
+{
+	if (!bConversationActive || !bConversationPaused)
+	{
+		return;
+	}
+
+	bConversationPaused = false;
+
+	if (PausedAdvanceTimeRemaining > 0.0f)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimer(
+				AutoAdvanceTimerHandle,
+				this,
+				&USFDialogueComponent::AdvanceConversation,
+				PausedAdvanceTimeRemaining,
+				false
+			);
+		}
+	}
+	PausedAdvanceTimeRemaining = -1.0f;
+
+	if (ActiveDialogueAudioComponent)
+	{
+		ActiveDialogueAudioComponent->SetPaused(false);
+	}
+
+	OnDialoguePauseStateChanged.Broadcast(false);
+}
+
+bool USFDialogueComponent::SkipCurrentLine()
+{
+	if (!bConversationActive || bConversationPaused)
+	{
+		return false;
+	}
+
+	const FSFDialogueNode* CurrentNode = GetCurrentNode();
+	if (!CurrentNode || CurrentNode->NodeType != ESFDialogueNodeType::Line)
+	{
+		return false;
+	}
+
+	// Clear auto-advance timer / audio so we don't double-advance, then advance now.
+	ClearAdvanceState();
+	AdvanceConversation();
+	return true;
+}
+
+FSFDialogueSnapshot USFDialogueComponent::CreateSnapshot() const
+{
+	FSFDialogueSnapshot Snapshot;
+
+	if (!bConversationActive || !IsValid(ActiveConversation))
+	{
+		return Snapshot;
+	}
+
+	Snapshot.Conversation = TSoftObjectPtr<USFConversationDataAsset>(ActiveConversation);
+	Snapshot.CurrentNodeId = CurrentNodeId;
+	Snapshot.History = DialogueHistory;
+	Snapshot.bIsValid = true;
+	return Snapshot;
+}
+
+bool USFDialogueComponent::RestoreFromSnapshot(const FSFDialogueSnapshot& Snapshot, AActor* InSourceActor)
+{
+	if (!Snapshot.bIsValid || Snapshot.CurrentNodeId == NAME_None)
+	{
+		UE_LOG(LogSFDialogue, Warning, TEXT("RestoreFromSnapshot failed: snapshot is not valid."));
+		return false;
+	}
+
+	USFConversationDataAsset* Conversation = Snapshot.Conversation.LoadSynchronous();
+	if (!IsValid(Conversation))
+	{
+		UE_LOG(LogSFDialogue, Warning, TEXT("RestoreFromSnapshot failed: conversation asset could not be loaded ('%s')."),
+			*Snapshot.Conversation.ToString());
+		return false;
+	}
+
+	if (!Conversation->FindNodeById(Snapshot.CurrentNodeId))
+	{
+		UE_LOG(LogSFDialogue, Warning, TEXT("RestoreFromSnapshot failed: node '%s' not in conversation '%s'."),
+			*Snapshot.CurrentNodeId.ToString(),
+			*GetNameSafe(Conversation));
+		return false;
+	}
+
+	if (bConversationActive)
+	{
+		EndConversation();
+	}
+
+	ActiveConversation = Conversation;
+	ActiveSourceActor = InSourceActor;
+	bConversationActive = true;
+	bConversationPaused = false;
+	CurrentNodeId = NAME_None;
+	CurrentVisibleChoiceIndices.Reset();
+	DialogueHistory = Snapshot.History;
+	PausedAdvanceTimeRemaining = -1.0f;
+
+	ApplyConversationStaging();
+
+	if (!MoveToNode(Snapshot.CurrentNodeId))
+	{
+		FailConversation(FString::Printf(
+			TEXT("RestoreFromSnapshot failed: could not move to node '%s'."),
+			*Snapshot.CurrentNodeId.ToString()
+		));
+		return false;
+	}
+
+	OnConversationStarted.Broadcast(ActiveSourceActor);
+	return true;
+}
+
+void USFDialogueComponent::PushHistoryForCurrentNode(const FSFDialogueChoice* ChosenChoice)
+{
+	if (MaxHistoryEntries <= 0)
+	{
+		return;
+	}
+
+	const FSFDialogueNode* CurrentNode = GetCurrentNode();
+	if (!CurrentNode)
+	{
+		return;
+	}
+
+	FSFDialogueHistoryEntry Entry;
+	Entry.NodeId = CurrentNode->NodeId;
+	Entry.SpeakerId = CurrentNode->SpeakerId;
+	Entry.LineText = CurrentNode->LineText;
+	Entry.NodeType = CurrentNode->NodeType;
+	Entry.EventTag = CurrentNode->EventTag;
+	if (ChosenChoice)
+	{
+		Entry.ChosenChoiceText = ChosenChoice->ChoiceText;
+	}
+	if (UWorld* World = GetWorld())
+	{
+		Entry.TimeSeconds = World->GetTimeSeconds();
+	}
+
+	DialogueHistory.Add(MoveTemp(Entry));
+
+	const int32 Overflow = DialogueHistory.Num() - MaxHistoryEntries;
+	if (Overflow > 0)
+	{
+		DialogueHistory.RemoveAt(0, Overflow);
+	}
 }
 
 FSFDialogueDisplayData USFDialogueComponent::GetCurrentDisplayData() const
@@ -364,6 +564,9 @@ void USFDialogueComponent::ProcessCurrentNodeChain()
 				UE_LOG(LogSFDialogue, Verbose, TEXT("Event node '%s' has no valid EventTag."),
 					*CurrentNode->NodeId.ToString());
 			}
+
+			// Record the event in history as it fires.
+			PushHistoryForCurrentNode(nullptr);
 
 			if (CurrentNode->NextNodeId == NAME_None)
 			{

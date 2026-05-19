@@ -557,6 +557,7 @@ void ASFPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	if (InteractAction)
 	{
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Triggered, this, &ASFPlayerCharacter::HandleInteractInput);
+		UE_LOG(LogTemp, Display, TEXT("ASFPlayerCharacter '%s': InteractAction bound."), *GetNameSafe(this));
 	}
 
 	if (TogglePlayerMenuAction)
@@ -856,6 +857,10 @@ void ASFPlayerCharacter::OnHolsterWeapon(const FInputActionValue& Value)
 
 void ASFPlayerCharacter::HandleInteractInput(const FInputActionValue& Value)
 {
+	UE_LOG(LogTemp, Display, TEXT("ASFPlayerCharacter::HandleInteractInput fired. DialogueActive=%d, InteractionComponent=%s"),
+		(DialogueComponent && DialogueComponent->IsConversationActive()) ? 1 : 0,
+		*GetNameSafe(InteractionComponent));
+
 	if (DialogueComponent && DialogueComponent->IsConversationActive())
 	{
 		DialogueComponent->AdvanceConversation();

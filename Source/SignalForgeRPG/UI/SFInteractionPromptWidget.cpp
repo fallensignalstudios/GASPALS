@@ -8,6 +8,11 @@ void USFInteractionPromptWidget::NativeOnPlayerHUDWidgetControllerSet()
 {
 	Super::NativeOnPlayerHUDWidgetControllerSet();
 
+	UE_LOG(LogTemp, Display,
+		TEXT("SFInteractionPromptWidget '%s': controller set to %s"),
+		*GetNameSafe(this),
+		*GetNameSafe(PlayerHUDWidgetController));
+
 	// The PlayerController sets the controller AFTER widget construction in
 	// most cases, but if it's set before NativeConstruct we still want to
 	// bind so the prime-state path runs. Either order is safe — BindToController
@@ -36,8 +41,8 @@ void USFInteractionPromptWidget::BindToController()
 {
 	if (!PlayerHUDWidgetController)
 	{
-		UE_LOG(LogTemp, Verbose,
-			TEXT("SFInteractionPromptWidget: no controller assigned yet on '%s'."),
+		UE_LOG(LogTemp, Display,
+			TEXT("SFInteractionPromptWidget '%s': no controller assigned yet, bind deferred."),
 			*GetNameSafe(this));
 		return;
 	}
@@ -58,6 +63,13 @@ void USFInteractionPromptWidget::BindToController()
 		this, &USFInteractionPromptWidget::HandleInteractionPromptChanged);
 	BoundController->OnInteractionOptionsChanged.AddDynamic(
 		this, &USFInteractionPromptWidget::HandleInteractionOptionsChanged);
+
+	UE_LOG(LogTemp, Display,
+		TEXT("SFInteractionPromptWidget '%s': bound to controller %s (PromptTextBlock=%s, PromptRoot=%s)"),
+		*GetNameSafe(this),
+		*GetNameSafe(BoundController),
+		PromptTextBlock ? TEXT("OK") : TEXT("NULL"),
+		PromptRoot ? TEXT("OK") : TEXT("NULL"));
 
 	// Prime the widget with whatever the controller already knows so the
 	// prompt is correct on level-load even if no change has fired yet.
@@ -99,6 +111,14 @@ void USFInteractionPromptWidget::HandleInteractionOptionsChanged(
 		bHasInteractable
 		&& !PrimaryOption.PromptText.IsEmpty()
 		&& (bAvailable || PrimaryOption.bShowPromptWhenUnavailable);
+
+	UE_LOG(LogTemp, Display,
+		TEXT("SFInteractionPromptWidget: options changed. HasInteractable=%d, Prompt='%s', Available=%d, ShowWhenUnavailable=%d -> bHasPrompt=%d"),
+		bHasInteractable ? 1 : 0,
+		*PrimaryOption.PromptText.ToString(),
+		bAvailable ? 1 : 0,
+		PrimaryOption.bShowPromptWhenUnavailable ? 1 : 0,
+		bHasPrompt ? 1 : 0);
 
 	ApplyPromptState(
 		bHasPrompt,
