@@ -129,17 +129,17 @@ void USFAbilityBarWidget::RebuildSlotWidgets()
 			continue;
 		}
 
-		USFAbilitySlotWidget* Slot = CreateWidget<USFAbilitySlotWidget>(this, SlotWidgetClass);
-		if (!Slot)
+		USFAbilitySlotWidget* SlotWidget = CreateWidget<USFAbilitySlotWidget>(this, SlotWidgetClass);
+		if (!SlotWidget)
 		{
 			continue;
 		}
 
-		Slot->SetInputTag(Layout.InputTag);
-		Slot->HotkeyLabel = Layout.HotkeyLabel;
+		SlotWidget->SetInputTag(Layout.InputTag);
+		SlotWidget->SetHotkeyLabel(Layout.HotkeyLabel);
 
-		SlotsContainer->AddChild(Slot);
-		SlotWidgets.Add(Layout.InputTag, Slot);
+		SlotsContainer->AddChild(SlotWidget);
+		SlotWidgets.Add(Layout.InputTag, SlotWidget);
 	}
 }
 
@@ -168,9 +168,9 @@ void USFAbilityBarWidget::RefreshSlotsFromController()
 
 	for (const FSFAbilitySlotUIData& Data : AllSlots)
 	{
-		if (USFAbilitySlotWidget* Slot = GetSlotForTag(Data.InputTag))
+		if (USFAbilitySlotWidget* SlotWidget = GetSlotForTag(Data.InputTag))
 		{
-			Slot->SetSlotData(Data);
+			SlotWidget->SetSlotData(Data);
 		}
 	}
 }
@@ -186,9 +186,9 @@ USFAbilitySlotWidget* USFAbilityBarWidget::GetSlotForTag(FGameplayTag InputTag) 
 
 void USFAbilityBarWidget::HandleSlotUpdated(FGameplayTag InputTag, FSFAbilitySlotUIData SlotData)
 {
-	if (USFAbilitySlotWidget* Slot = GetSlotForTag(InputTag))
+	if (USFAbilitySlotWidget* SlotWidget = GetSlotForTag(InputTag))
 	{
-		Slot->SetSlotData(SlotData);
+		SlotWidget->SetSlotData(SlotData);
 	}
 }
 
