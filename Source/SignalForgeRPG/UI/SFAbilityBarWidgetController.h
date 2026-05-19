@@ -36,6 +36,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "UI")
 	FOnAbilitySlotUpdated OnAbilitySlotUpdated;
 
+	/** Snapshot of all current slot data (for widgets that prefer to pull rather than subscribe). */
+	UFUNCTION(BlueprintPure, Category = "UI")
+	void GetAllSlotData(TArray<FSFAbilitySlotUIData>& OutSlots) const;
+
+	/** True after the first ASC rebuild has populated SlotDataMap. */
+	UFUNCTION(BlueprintPure, Category = "UI")
+	bool HasInitialData() const { return bHasInitialData; }
+
 protected:
 	void HandleAbilitiesChanged();
 	void HandleCooldownTagChanged(FGameplayTag ChangedTag, int32 NewCount);
@@ -61,4 +69,6 @@ protected:
 	TMap<FGameplayTag, FGameplayTag> CooldownTagByInputTag;
 
 	TMap<FGameplayTag, FDelegateHandle> CooldownDelegateHandles;
+
+	bool bHasInitialData = false;
 };

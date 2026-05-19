@@ -78,7 +78,18 @@ void USFAbilityBarWidgetController::RebuildFromASC()
 	}
 
 	RebuildCooldownListeners();
+	bHasInitialData = true;
 	BroadcastAllSlots();
+}
+
+void USFAbilityBarWidgetController::GetAllSlotData(TArray<FSFAbilitySlotUIData>& OutSlots) const
+{
+	OutSlots.Reset();
+	OutSlots.Reserve(SlotDataMap.Num());
+	for (const TPair<FGameplayTag, FSFAbilitySlotUIData>& Pair : SlotDataMap)
+	{
+		OutSlots.Add(Pair.Value);
+	}
 }
 
 void USFAbilityBarWidgetController::BroadcastAllSlots()
