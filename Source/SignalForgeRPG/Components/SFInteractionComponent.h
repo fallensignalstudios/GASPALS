@@ -26,6 +26,9 @@ protected:
 	UPROPERTY()
 	TObjectPtr<class ACharacter> OwnerCharacter;
 
+	/** Per-instance throttle for the cvar-gated heartbeat log. */
+	double LastHeartbeatLogTime = 0.0;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Interaction")
 	float InteractionTraceDistance = 250.0f;
 
