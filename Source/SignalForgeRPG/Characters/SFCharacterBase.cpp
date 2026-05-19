@@ -52,6 +52,17 @@ ASFCharacterBase::ASFCharacterBase()
 		MoveComp->MaxWalkSpeedCrouched = CrouchSpeed;
 		MoveComp->GetNavAgentPropertiesRef().bCanCrouch = true;
 	}
+
+	// Ensure the capsule blocks the Visibility trace channel so the
+	// InteractionComponent's sphere sweep can hit characters. The default Pawn
+	// collision profile in many UE5 projects sets Visibility = Ignore, which
+	// silently breaks line-of-sight interaction. We override per-channel
+	// without changing the profile so other code (camera occlusion etc.) is
+	// unaffected.
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	}
 }
 
 // -----------------------------------------------------------------------------
