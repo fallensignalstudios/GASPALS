@@ -2,6 +2,38 @@
 #include "UI/SFPlayerHUDWidgetController.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/PanelWidget.h"
+
+static void PropagateControllerToSFChildren(
+	UWidget* Root,
+	USFPlayerHUDWidgetController* InWidgetController)
+{
+	if (!Root)
+	{
+		return;
+	}
+
+	// If this child is itself a UserWidget, set its controller directly so its
+	// own native hook fires and recurses into ITS widget tree.
+	if (USFUserWidgetBase* ChildSF = Cast<USFUserWidgetBase>(Root))
+	{
+		if (ChildSF->PlayerHUDWidgetController != InWidgetController)
+		{
+			ChildSF->SetPlayerHUDWidgetController(InWidgetController);
+		}
+		return;
+	}
+
+	// Otherwise, walk this widget's children if it's a panel.
+	if (UPanelWidget* Panel = Cast<UPanelWidget>(Root))
+	{
+		const int32 NumChildren = Panel->GetChildrenCount();
+		for (int32 i = 0; i < NumChildren; ++i)
+		{
+			PropagateControllerToSFChildren(Panel->GetChildAt(i), InWidgetController);
+		}
+	}
+}
 
 void USFUserWidgetBase::SetPlayerHUDWidgetController(USFPlayerHUDWidgetController* InWidgetController)
 {
@@ -9,25 +41,32 @@ void USFUserWidgetBase::SetPlayerHUDWidgetController(USFPlayerHUDWidgetControlle
 	NativeOnPlayerHUDWidgetControllerSet();
 	OnWidgetControllerSet();
 
-	// Propagate the controller down the widget tree so nested USFUserWidgetBase
-	// children (e.g. WBP_InteractionPrompt placed inside WBP_PlayerHUD) receive
-	// the same controller and can bind their own delegates without each
-	// designer having to wire it up by hand.
+	UE_LOG(LogTemp, Display,
+		TEXT("USFUserWidgetBase '%s': SetPlayerHUDWidgetController(%s) — propagating to children"),
+		*GetNameSafe(this),
+		*GetNameSafe(InWidgetController));
+
+	// Walk the WidgetTree's panel children. WidgetTree::ForEachWidget can be
+	// inconsistent across versions when child UserWidgets are involved, so we
+	// drive the recursion ourselves through the panel hierarchy.
 	if (WidgetTree)
 	{
-		WidgetTree->ForEachWidget([InWidgetController, this](UWidget* Widget)
+		if (UWidget* Root = WidgetTree->RootWidget)
 		{
-			if (Widget == this)
+			if (UPanelWidget* RootPanel = Cast<UPanelWidget>(Root))
 			{
-				return;
-			}
-			if (USFUserWidgetBase* ChildSF = Cast<USFUserWidgetBase>(Widget))
-			{
-				if (ChildSF->PlayerHUDWidgetController != InWidgetController)
+				const int32 NumChildren = RootPanel->GetChildrenCount();
+				for (int32 i = 0; i < NumChildren; ++i)
 				{
-					ChildSF->SetPlayerHUDWidgetController(InWidgetController);
+					PropagateControllerToSFChildren(
+						RootPanel->GetChildAt(i),
+						InWidgetController);
 				}
 			}
-		});
+			else if (Root != this)
+			{
+				PropagateControllerToSFChildren(Root, InWidgetController);
+			}
+		}
 	}
 }
