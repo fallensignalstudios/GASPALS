@@ -38,6 +38,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ability|Slot")
 	void SetInputTag(FGameplayTag InTag);
 
+	/** Set the hotkey hint shown by the slot (e.g. "1", "Q"). */
+	UFUNCTION(BlueprintCallable, Category = "Ability|Slot")
+	void SetHotkeyLabel(const FText& InLabel);
+
 	UFUNCTION(BlueprintPure, Category = "Ability|Slot")
 	FGameplayTag GetInputTag() const { return InputTag; }
 

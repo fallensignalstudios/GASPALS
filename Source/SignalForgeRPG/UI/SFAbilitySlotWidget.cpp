@@ -24,6 +24,15 @@ void USFAbilitySlotWidget::SetInputTag(FGameplayTag InTag)
 	ApplyVisuals();
 }
 
+void USFAbilitySlotWidget::SetHotkeyLabel(const FText& InLabel)
+{
+	HotkeyLabel = InLabel;
+	if (HotkeyText)
+	{
+		HotkeyText->SetText(HotkeyLabel);
+	}
+}
+
 void USFAbilitySlotWidget::SetSlotData(const FSFAbilitySlotUIData& InData)
 {
 	const bool bReadyChanged = (CurrentData.bIsReady != InData.bIsReady);
