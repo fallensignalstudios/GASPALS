@@ -49,6 +49,7 @@ FSFAbilitySlotUIData USFAbilityBarWidgetController::GetSlotData(FGameplayTag Inp
 
 void USFAbilityBarWidgetController::HandleAbilitiesChanged()
 {
+	UE_LOG(LogTemp, Log, TEXT("[SF AbilityBarCtrl] HandleAbilitiesChanged fired — rebuilding from ASC."));
 	RebuildFromASC();
 }
 
