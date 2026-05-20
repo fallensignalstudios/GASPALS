@@ -204,7 +204,12 @@ void USFAbilitySystemComponent::GetAbilityBarSlotData(TArray<FSFAbilitySlotUIDat
 	OutSlots.Reset();
 
 	FScopedAbilityListLock ActiveScopeLock(*const_cast<USFAbilitySystemComponent*>(this));
-	for (const FGameplayAbilitySpec& Spec : GetActivatableAbilities())
+	const TArray<FGameplayAbilitySpec>& Specs = GetActivatableAbilities();
+	UE_LOG(LogTemp, Log,
+		TEXT("[SF ASC] GetAbilityBarSlotData: %d activatable spec(s) on '%s'."),
+		Specs.Num(), *GetNameSafe(GetOwner()));
+
+	for (const FGameplayAbilitySpec& Spec : Specs)
 	{
 		const USFGameplayAbility* AbilityCDO = nullptr;
 
@@ -213,16 +218,33 @@ void USFAbilitySystemComponent::GetAbilityBarSlotData(TArray<FSFAbilitySlotUIDat
 			AbilityCDO = Cast<USFGameplayAbility>(Spec.Ability->GetClass()->GetDefaultObject());
 		}
 
-		if (!AbilityCDO || !AbilityCDO->ShouldShowInAbilityBar())
+		if (!AbilityCDO)
 		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[SF ASC]   skip spec '%s' — not a USFGameplayAbility (class='%s')."),
+				*GetNameSafe(Spec.Ability), Spec.Ability ? *Spec.Ability->GetClass()->GetName() : TEXT("null"));
+			continue;
+		}
+		if (!AbilityCDO->ShouldShowInAbilityBar())
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[SF ASC]   skip ability '%s' — bShowInAbilityBar=false."),
+				*GetNameSafe(AbilityCDO));
 			continue;
 		}
 
 		const FGameplayTag InputTag = AbilityCDO->GetInputTag();
 		if (!InputTag.IsValid())
 		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[SF ASC]   skip ability '%s' — InputTag is not valid."),
+				*GetNameSafe(AbilityCDO));
 			continue;
 		}
+
+		UE_LOG(LogTemp, Log,
+			TEXT("[SF ASC]   accept ability '%s' InputTag='%s' Icon=%s"),
+			*GetNameSafe(AbilityCDO), *InputTag.ToString(), *GetNameSafe(AbilityCDO->GetAbilityIcon()));
 
 		FSFAbilitySlotUIData Data;
 		Data.InputTag = InputTag;
