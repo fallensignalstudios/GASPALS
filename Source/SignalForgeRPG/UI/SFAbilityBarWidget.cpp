@@ -190,16 +190,34 @@ void USFAbilityBarWidget::RebuildSlotWidgets()
 	SlotsContainer->ClearChildren();
 	SlotWidgets.Reset();
 
+	UE_LOG(LogSFAbilityBar, Log,
+		TEXT("RebuildSlotWidgets: iterating %d SlotLayout entries on '%s'."),
+		SlotLayout.Num(), *GetNameSafe(this));
+
+	int32 LayoutIndex = 0;
 	for (const FSFAbilityBarSlotLayout& Layout : SlotLayout)
 	{
+		UE_LOG(LogSFAbilityBar, Log,
+			TEXT("  SlotLayout[%d]: InputTag='%s' IsValid=%d HotkeyLabel='%s'"),
+			LayoutIndex,
+			*Layout.InputTag.ToString(),
+			(int32)Layout.InputTag.IsValid(),
+			*Layout.HotkeyLabel.ToString());
+		++LayoutIndex;
+
 		if (!Layout.InputTag.IsValid())
 		{
+			UE_LOG(LogSFAbilityBar, Warning,
+				TEXT("    -> skipped: InputTag is not valid."));
 			continue;
 		}
 
 		USFAbilitySlotWidget* SlotWidget = CreateWidget<USFAbilitySlotWidget>(this, SlotWidgetClass);
 		if (!SlotWidget)
 		{
+			UE_LOG(LogSFAbilityBar, Warning,
+				TEXT("    -> CreateWidget returned null for class '%s'."),
+				*GetNameSafe(SlotWidgetClass.Get()));
 			continue;
 		}
 
@@ -208,7 +226,16 @@ void USFAbilityBarWidget::RebuildSlotWidgets()
 
 		SlotsContainer->AddChild(SlotWidget);
 		SlotWidgets.Add(Layout.InputTag, SlotWidget);
+
+		UE_LOG(LogSFAbilityBar, Log,
+			TEXT("    -> created slot widget '%s' added under '%s'."),
+			*GetNameSafe(SlotWidget), *GetNameSafe(SlotsContainer));
 	}
+
+	UE_LOG(LogSFAbilityBar, Log,
+		TEXT("RebuildSlotWidgets done: SlotWidgets.Num()=%d, SlotsContainer children=%d."),
+		SlotWidgets.Num(),
+		SlotsContainer ? SlotsContainer->GetChildrenCount() : -1);
 }
 
 void USFAbilityBarWidget::RefreshSlotsFromController()
