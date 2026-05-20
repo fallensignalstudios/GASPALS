@@ -14,10 +14,11 @@ USFGameplayAbility_Projectile::USFGameplayAbility_Projectile()
 {
 	const FSignalForgeGameplayTags& GameplayTags = FSignalForgeGameplayTags::Get();
 
-	InputTag = GameplayTags.Input_Ability_4;
+	// Projectile is the equipped-weapon slot 2 ability — Heal owns Ability.4.
+	InputTag = GameplayTags.Input_Ability_2;
 
 	FGameplayTagContainer AssetTags;
-	// You could introduce a dedicated Ability.Projectile tag later.
+	AssetTags.AddTag(GameplayTags.Ability_Ranged_Projectile);
 	SetAssetTags(AssetTags);
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
