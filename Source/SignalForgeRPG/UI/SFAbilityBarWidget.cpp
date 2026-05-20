@@ -14,6 +14,10 @@ void USFAbilityBarWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
+	UE_LOG(LogSFAbilityBar, Log,
+		TEXT("AbilityBar '%s' constructing. SlotLayout entries=%d, SlotWidgetClass=%s, bAutoBindOnConstruct=%d"),
+		*GetNameSafe(this), SlotLayout.Num(), *GetNameSafe(SlotWidgetClass.Get()), (int32)bAutoBindOnConstruct);
+
 	RebuildSlotWidgets();
 
 	if (bAutoBindOnConstruct)
@@ -64,7 +68,7 @@ void USFAbilityBarWidget::BindToPlayer(ASFCharacterBase* InPlayer)
 {
 	if (BoundCharacter == InPlayer && AbilityController)
 	{
-		// Already bound — just resync visuals.
+		UE_LOG(LogSFAbilityBar, Verbose, TEXT("BindToPlayer: already bound to '%s'; resyncing."), *GetNameSafe(InPlayer));
 		RefreshSlotsFromController();
 		return;
 	}
@@ -85,6 +89,32 @@ void USFAbilityBarWidget::BindToPlayer(ASFCharacterBase* InPlayer)
 
 	AbilityController->OnAbilitySlotUpdated.AddDynamic(this, &USFAbilityBarWidget::HandleSlotUpdated);
 	AbilityController->Initialize(BoundCharacter);
+
+	// Diagnostic: how many abilities did the controller actually see?
+	TArray<FSFAbilitySlotUIData> AllSlots;
+	AbilityController->GetAllSlotData(AllSlots);
+	UE_LOG(LogSFAbilityBar, Log,
+		TEXT("AbilityBar bound to '%s'. Controller reports %d ability slot(s). HasInitialData=%d"),
+		*GetNameSafe(InPlayer), AllSlots.Num(), (int32)AbilityController->HasInitialData());
+
+	for (const FSFAbilitySlotUIData& Data : AllSlots)
+	{
+		const bool bMatchedLayout = SlotWidgets.Contains(Data.InputTag);
+		UE_LOG(LogSFAbilityBar, Log,
+			TEXT("  Slot: InputTag='%s' Icon=%s CooldownTag='%s' MatchesLayout=%d"),
+			*Data.InputTag.ToString(), *GetNameSafe(Data.Icon),
+			*Data.CooldownTag.ToString(), (int32)bMatchedLayout);
+	}
+
+	if (AllSlots.Num() == 0)
+	{
+		UE_LOG(LogSFAbilityBar, Warning,
+			TEXT("AbilityBar: controller returned 0 slots. Common causes: "
+			     "(1) abilities haven't been granted to the ASC yet, "
+			     "(2) abilities don't have bShowInAbilityBar=true, "
+			     "(3) abilities have no InputTag set, "
+			     "(4) the pawn's ASC is not a USFAbilitySystemComponent."));
+	}
 
 	// Pull initial data in case Initialize broadcast before our binding completed
 	// (defensive — AddDynamic is processed before Initialize, but this also catches
@@ -117,6 +147,13 @@ void USFAbilityBarWidget::RebuildSlotWidgets()
 			TEXT("RebuildSlotWidgets: SlotWidgetClass is not set on '%s'. Set it in the bar's class defaults."),
 			*GetNameSafe(this));
 		return;
+	}
+
+	if (SlotLayout.Num() == 0)
+	{
+		UE_LOG(LogSFAbilityBar, Warning,
+			TEXT("RebuildSlotWidgets: SlotLayout on '%s' is empty. Add one entry per visible slot with the matching InputTag."),
+			*GetNameSafe(this));
 	}
 
 	SlotsContainer->ClearChildren();
