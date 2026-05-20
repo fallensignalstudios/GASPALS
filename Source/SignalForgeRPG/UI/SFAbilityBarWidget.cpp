@@ -223,9 +223,29 @@ USFAbilitySlotWidget* USFAbilityBarWidget::GetSlotForTag(FGameplayTag InputTag) 
 
 void USFAbilityBarWidget::HandleSlotUpdated(FGameplayTag InputTag, FSFAbilitySlotUIData SlotData)
 {
-	if (USFAbilitySlotWidget* SlotWidget = GetSlotForTag(InputTag))
+	USFAbilitySlotWidget* SlotWidget = GetSlotForTag(InputTag);
+	if (SlotWidget)
 	{
+		UE_LOG(LogSFAbilityBar, Verbose,
+			TEXT("HandleSlotUpdated: tag='%s' -> matched slot widget '%s'."),
+			*InputTag.ToString(), *GetNameSafe(SlotWidget));
 		SlotWidget->SetSlotData(SlotData);
+	}
+	else
+	{
+		FString KnownTags;
+		for (const TPair<FGameplayTag, TObjectPtr<USFAbilitySlotWidget>>& Pair : SlotWidgets)
+		{
+			if (!KnownTags.IsEmpty()) { KnownTags += TEXT(", "); }
+			KnownTags += Pair.Key.ToString();
+		}
+		UE_LOG(LogSFAbilityBar, Warning,
+			TEXT("HandleSlotUpdated: NO MATCHING SLOT for InputTag='%s'. SlotsContainer bound=%d, SlotWidgetClass set=%d, SlotWidgets count=%d. Known layout tags: [%s]."),
+			*InputTag.ToString(),
+			(int32)(SlotsContainer != nullptr),
+			(int32)(SlotWidgetClass != nullptr),
+			SlotWidgets.Num(),
+			*KnownTags);
 	}
 }
 
