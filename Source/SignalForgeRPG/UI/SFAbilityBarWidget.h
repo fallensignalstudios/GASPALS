@@ -96,6 +96,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Ability|Bar")
 	TObjectPtr<USFAbilityBarWidgetController> AbilityController = nullptr;
 
+	/** True when the bar created AbilityController itself; false when reusing the PC's. */
+	bool bOwnsAbilityController = false;
+
 	UPROPERTY(Transient)
 	TMap<FGameplayTag, TObjectPtr<USFAbilitySlotWidget>> SlotWidgets;
 
