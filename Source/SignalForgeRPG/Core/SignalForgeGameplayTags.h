@@ -63,12 +63,16 @@ public:
 	FGameplayTag Ability_Movement_Dash;
 	FGameplayTag Ability_Movement_Sprint;
 	FGameplayTag Ability_Ranged_Projectile;
+	FGameplayTag Ability_EchoBased_Heal;
 
 	/** State */
 	FGameplayTag State_Attacking;
 	FGameplayTag State_Movement_Sprinting;
+	FGameplayTag State_Movement_Dashing;
+	FGameplayTag State_Invulnerable_Dodge;
 	FGameplayTag State_Blocking;
 	FGameplayTag State_Broken;
+	FGameplayTag State_Healing;
 
 	/** Cinematic / hit feedback */
 	FGameplayTag Cue_Hit_Impact;

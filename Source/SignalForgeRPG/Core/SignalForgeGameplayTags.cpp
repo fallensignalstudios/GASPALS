@@ -191,6 +191,10 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("Ability.Ranged.Projectile"),
 		TEXT("Projectile-based ranged ability tag"));
 
+	GameplayTags.Ability_EchoBased_Heal = TagManager.AddNativeGameplayTag(
+		FName("Ability.EchoBased.Heal"),
+		TEXT("Echo-fuelled self heal ability tag"));
+
 	/** State */
 	GameplayTags.State_Attacking = TagManager.AddNativeGameplayTag(
 		FName("State.Attacking"),
@@ -199,6 +203,18 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.State_Movement_Sprinting = TagManager.AddNativeGameplayTag(
 		FName("State.Movement.Sprinting"),
 		TEXT("Character is currently sprinting"));
+
+	GameplayTags.State_Movement_Dashing = TagManager.AddNativeGameplayTag(
+		FName("State.Movement.Dashing"),
+		TEXT("Character is mid-dash (movement burst, no gravity influence)"));
+
+	GameplayTags.State_Invulnerable_Dodge = TagManager.AddNativeGameplayTag(
+		FName("State.Invulnerable.Dodge"),
+		TEXT("Character has i-frames from a dodge/dash"));
+
+	GameplayTags.State_Healing = TagManager.AddNativeGameplayTag(
+		FName("State.Healing"),
+		TEXT("Character is mid heal animation (cannot stack heals)"));
 
 	GameplayTags.State_Blocking = TagManager.AddNativeGameplayTag(
 		FName("State.Blocking"),

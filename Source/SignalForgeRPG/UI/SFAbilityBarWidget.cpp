@@ -11,6 +11,29 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogSFAbilityBar, Log, All);
 
+USFAbilityBarWidget::USFAbilityBarWidget(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	// Seed the layout with the four standard ability slots so the bar works
+	// out of the box even if the WBP_AbilityBar asset's SlotLayout override
+	// fails to serialize (a known UE quirk with FGameplayTag in nested struct
+	// arrays on instanced subwidgets). Designers can still extend or override
+	// SlotLayout in the WBP class defaults; this just guarantees a sane default.
+	auto MakeSlot = [](const TCHAR* TagName, const TCHAR* HotkeyLabelText) -> FSFAbilityBarSlotLayout
+	{
+		FSFAbilityBarSlotLayout Slot;
+		Slot.InputTag = FGameplayTag::RequestGameplayTag(FName(TagName), /*ErrorIfNotFound=*/false);
+		Slot.HotkeyLabel = FText::FromString(HotkeyLabelText);
+		return Slot;
+	};
+
+	SlotLayout.Reset();
+	SlotLayout.Add(MakeSlot(TEXT("InputTag.Ability.1"), TEXT("1")));
+	SlotLayout.Add(MakeSlot(TEXT("InputTag.Ability.2"), TEXT("2")));
+	SlotLayout.Add(MakeSlot(TEXT("InputTag.Ability.3"), TEXT("3")));
+	SlotLayout.Add(MakeSlot(TEXT("InputTag.Ability.4"), TEXT("4")));
+}
+
 void USFAbilityBarWidget::NativeConstruct()
 {
 	Super::NativeConstruct();

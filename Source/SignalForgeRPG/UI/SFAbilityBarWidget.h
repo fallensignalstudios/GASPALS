@@ -53,6 +53,8 @@ class SIGNALFORGERPG_API USFAbilityBarWidget : public USFUserWidgetBase
 	GENERATED_BODY()
 
 public:
+	USFAbilityBarWidget(const FObjectInitializer& ObjectInitializer);
+
 	/** Manually point the bar at a player (useful for split-screen). */
 	UFUNCTION(BlueprintCallable, Category = "Ability|Bar")
 	void BindToPlayer(ASFCharacterBase* InPlayer);
