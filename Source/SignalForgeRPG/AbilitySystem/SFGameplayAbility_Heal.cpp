@@ -38,26 +38,31 @@ bool USFGameplayAbility_Heal::CanActivateAbility(
 {
 	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SF Heal] CanActivate=FALSE — Super rejected (cost/cooldown/blocked tags). Check Echo cost GE, Cooldown.EchoBased.Heal, and active tags."));
 		return false;
 	}
 
 	ASFCharacterBase* Character = nullptr;
 	if (!TryGetHealCharacter(ActorInfo, Character))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SF Heal] CanActivate=FALSE — AvatarActor is not an ASFCharacterBase."));
 		return false;
 	}
 
 	if (!HealEffect)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SF Heal] CanActivate=FALSE — HealEffect is unset on the GA. Assign a Heal GameplayEffect on GA_EchoHeal."));
 		return false;
 	}
 
 	// Don't allow casting the heal if already at full health — avoids wasting Echo.
 	if (IsHealthAlreadyFull(Character))
 	{
+		UE_LOG(LogTemp, Log, TEXT("[SF Heal] CanActivate=FALSE — Health is already at MaxHealth."));
 		return false;
 	}
 
+	UE_LOG(LogTemp, Log, TEXT("[SF Heal] CanActivate=TRUE"));
 	return true;
 }
 
@@ -67,9 +72,12 @@ void USFGameplayAbility_Heal::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[SF Heal] ActivateAbility ENTER"));
+
 	ASFCharacterBase* Character = nullptr;
 	if (!TryGetHealCharacter(ActorInfo, Character))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SF Heal] Activate aborted — no character."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -79,6 +87,7 @@ void USFGameplayAbility_Heal::ActivateAbility(
 	// the ability ends without applying a heal.
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SF Heal] Activate aborted — CommitAbility failed (cost GE could not be paid — not enough Echo, or cost GE is unset)."));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
