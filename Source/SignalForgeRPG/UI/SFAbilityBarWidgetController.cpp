@@ -10,14 +10,23 @@ void USFAbilityBarWidgetController::Initialize(ASFCharacterBase* InPlayerCharact
 	PlayerCharacter = InPlayerCharacter;
 	if (!PlayerCharacter)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SF AbilityBarCtrl %p] Initialize called with NULL character."), this);
 		return;
 	}
 
 	AbilitySystemComponent = Cast<USFAbilitySystemComponent>(PlayerCharacter->GetAbilitySystemComponent());
 	if (!AbilitySystemComponent)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SF AbilityBarCtrl %p] Initialize: pawn '%s' returned ASC that is not USFAbilitySystemComponent (got '%s')."),
+			this, *GetNameSafe(InPlayerCharacter),
+			*GetNameSafe(InPlayerCharacter->GetAbilitySystemComponent()));
 		return;
 	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[SF AbilityBarCtrl %p] Initialize bound to pawn '%s' ASC=%p"),
+		this, *GetNameSafe(InPlayerCharacter), AbilitySystemComponent);
 
 	AbilitySystemComponent->OnAbilitiesChanged().AddUObject(
 		this, &USFAbilityBarWidgetController::HandleAbilitiesChanged);
@@ -49,7 +58,7 @@ FSFAbilitySlotUIData USFAbilityBarWidgetController::GetSlotData(FGameplayTag Inp
 
 void USFAbilityBarWidgetController::HandleAbilitiesChanged()
 {
-	UE_LOG(LogTemp, Log, TEXT("[SF AbilityBarCtrl] HandleAbilitiesChanged fired — rebuilding from ASC."));
+	UE_LOG(LogTemp, Log, TEXT("[SF AbilityBarCtrl %p] HandleAbilitiesChanged fired — rebuilding from ASC."), this);
 	RebuildFromASC();
 }
 
