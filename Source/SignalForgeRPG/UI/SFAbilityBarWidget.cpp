@@ -4,6 +4,7 @@
 #include "Components/PanelWidget.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "Input/SFPlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "UI/SFAbilityBarWidgetController.h"
 #include "UI/SFAbilitySlotWidget.h"
@@ -81,14 +82,42 @@ void USFAbilityBarWidget::BindToPlayer(ASFCharacterBase* InPlayer)
 		return;
 	}
 
-	AbilityController = NewObject<USFAbilityBarWidgetController>(this);
-	if (!AbilityController)
+	// Prefer the PlayerController's existing AbilityBarWidgetController when
+	// available — it is created in ASFPlayerController::InitializeUIControllers
+	// and stays subscribed to OnAbilitiesChanged for the lifetime of the PC.
+	// This avoids a race where the bar widget's own controller is created and
+	// destroyed across HUD rebuilds before late ability grants arrive.
+	ASFPlayerController* SFPlayerController =
+		Cast<ASFPlayerController>(BoundCharacter->GetController());
+	if (!SFPlayerController)
 	{
-		return;
+		SFPlayerController = Cast<ASFPlayerController>(
+			UGameplayStatics::GetPlayerController(this, 0));
+	}
+
+	if (SFPlayerController && SFPlayerController->GetAbilityBarWidgetController())
+	{
+		AbilityController = SFPlayerController->GetAbilityBarWidgetController();
+		bOwnsAbilityController = false;
+		UE_LOG(LogSFAbilityBar, Log,
+			TEXT("BindToPlayer: reusing PlayerController-owned AbilityBarWidgetController (%p)."),
+			AbilityController.Get());
+	}
+	else
+	{
+		AbilityController = NewObject<USFAbilityBarWidgetController>(this);
+		bOwnsAbilityController = true;
+		if (!AbilityController)
+		{
+			return;
+		}
+		AbilityController->Initialize(BoundCharacter);
+		UE_LOG(LogSFAbilityBar, Log,
+			TEXT("BindToPlayer: no PC-owned controller; created bar-owned one (%p)."),
+			AbilityController.Get());
 	}
 
 	AbilityController->OnAbilitySlotUpdated.AddDynamic(this, &USFAbilityBarWidget::HandleSlotUpdated);
-	AbilityController->Initialize(BoundCharacter);
 
 	// Diagnostic: how many abilities did the controller actually see?
 	TArray<FSFAbilitySlotUIData> AllSlots;
@@ -127,8 +156,10 @@ void USFAbilityBarWidget::TeardownController()
 	if (AbilityController)
 	{
 		AbilityController->OnAbilitySlotUpdated.RemoveDynamic(this, &USFAbilityBarWidget::HandleSlotUpdated);
+		// Only forget the pointer — never destroy a controller we don't own.
 		AbilityController = nullptr;
 	}
+	bOwnsAbilityController = false;
 }
 
 void USFAbilityBarWidget::RebuildSlotWidgets()
