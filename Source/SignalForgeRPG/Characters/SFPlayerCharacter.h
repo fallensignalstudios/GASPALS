@@ -16,6 +16,7 @@ class USFDialogueCameraComponent;
 class USceneComponent;
 class UCameraComponent;
 class USpringArmComponent;
+class USFAutoAimComponent;
 class UInputMappingContext;
 class UInputAction;
 class USFWeaponData;
@@ -260,6 +261,10 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USpringArmComponent> GameplayCameraBoom = nullptr;
+
+	/** Destiny-style aim-assist: bullet magnetism, sticky aim, ADS reticle nudge. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USFAutoAimComponent> AutoAimComponent = nullptr;
 
 	/*UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCameraComponent> PlayerGameplayCamera = nullptr;*/

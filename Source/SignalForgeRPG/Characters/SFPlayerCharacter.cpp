@@ -25,6 +25,7 @@
 #include "UI/SFPlayerHUDWidgetController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/Light.h"
+#include "Combat/SFAutoAimComponent.h"
 #include "Combat/SFWeaponData.h"
 #include "Core/SFPlayerState.h"
 #include "Narrative/SFNarrativeComponent.h"
@@ -64,6 +65,9 @@ ASFPlayerCharacter::ASFPlayerCharacter()
 	GameplayCameraBoom->bUsePawnControlRotation = true;
 	GameplayCameraBoom->bDoCollisionTest = true;
 	GameplayCameraBoom->SetRelativeLocation(FVector(0.0f, 0.0f, 70.0f));
+
+	// Destiny-style aim assist (bullet magnetism + sticky aim + ADS reticle nudge).
+	AutoAimComponent = CreateDefaultSubobject<USFAutoAimComponent>(TEXT("AutoAimComponent"));
 
 	PortraitCaptureComponent = CreateDefaultSubobject<USceneCaptureComponent2D>(TEXT("PortraitCapture"));
 	PortraitCaptureComponent->SetupAttachment(GetMesh(), FName("head"));
@@ -713,7 +717,14 @@ void ASFPlayerCharacter::Move(const FInputActionValue& Value)
 
 void ASFPlayerCharacter::Look(const FInputActionValue& Value)
 {
-	const FVector2D LookAxisVector = Value.Get<FVector2D>();
+	FVector2D LookAxisVector = Value.Get<FVector2D>();
+
+	// Destiny-style sticky aim: slow look input while the reticle is over a hostile.
+	if (AutoAimComponent)
+	{
+		const float StickyMul = AutoAimComponent->GetLookInputMultiplier();
+		LookAxisVector *= StickyMul;
+	}
 
 	AddControllerYawInput(LookAxisVector.X);
 	AddControllerPitchInput(LookAxisVector.Y);

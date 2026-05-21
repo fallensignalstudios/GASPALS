@@ -4,6 +4,7 @@
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Characters/SFCharacterBase.h"
+#include "Combat/SFAutoAimComponent.h"
 #include "Combat/SFWeaponData.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SFEquipmentComponent.h"
@@ -184,6 +185,12 @@ void USFGameplayAbility_ADS::ActivateAbility(
 			&USFGameplayAbility_ADS::TickAdsBlend,
 			InterpTickInterval,
 			true);
+	}
+
+	// Destiny-style reticle nudge: one-shot rotation toward the closest hostile target.
+	if (USFAutoAimComponent* AutoAim = Character->FindComponentByClass<USFAutoAimComponent>())
+	{
+		AutoAim->RequestReticleNudge();
 	}
 
 	BP_OnAdsEntered();
