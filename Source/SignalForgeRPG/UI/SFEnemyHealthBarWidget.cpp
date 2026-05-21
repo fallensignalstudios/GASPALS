@@ -9,6 +9,8 @@
 #include "Components/WidgetComponent.h"
 #include "Core/SFAttributeSetBase.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogSFEnemyHealthBar, Log, All);
+
 namespace
 {
 	/** Safe percent: returns 0 if Max <= 0, otherwise Current/Max clamped to [0,1]. */
@@ -34,12 +36,19 @@ void USFEnemyHealthBarWidget::NativeConstruct()
 	// world-space NPC bars), the component's owner is the pawn we want to track.
 	// GetTypedOuter walks the outer chain so it works whether UE puts the widget
 	// directly under the component or under a transient package in between.
-	if (UWidgetComponent* OwningComp = GetTypedOuter<UWidgetComponent>())
+	UWidgetComponent* OwningComp = GetTypedOuter<UWidgetComponent>();
+	ASFCharacterBase* Owner = OwningComp ? Cast<ASFCharacterBase>(OwningComp->GetOwner()) : nullptr;
+
+	UE_LOG(LogSFEnemyHealthBar, Log,
+		TEXT("NativeConstruct widget=%s OwningComp=%s OwnerActor=%s OwnerAsCharacter=%s"),
+		*GetNameSafe(this),
+		*GetNameSafe(OwningComp),
+		OwningComp ? *GetNameSafe(OwningComp->GetOwner()) : TEXT("<null>"),
+		*GetNameSafe(Owner));
+
+	if (Owner)
 	{
-		if (ASFCharacterBase* Owner = Cast<ASFCharacterBase>(OwningComp->GetOwner()))
-		{
-			InitializeForCharacter(Owner);
-		}
+		InitializeForCharacter(Owner);
 	}
 }
 
@@ -127,13 +136,12 @@ void USFEnemyHealthBarWidget::BindToCharacterDelegates()
 	Target->OnShieldsChanged.AddDynamic(this, &USFEnemyHealthBarWidget::HandleShieldsChanged);
 	Target->OnCharacterDied.AddDynamic(this, &USFEnemyHealthBarWidget::HandleCharacterDied);
 
-	// NPC floating bars bind AFTER ASFCharacterBase::BeginPlay has already fired its
-	// priming broadcast (SFCharacterBase::BroadcastInitialAttributeValues runs before
-	// the widget component's lazy InitWidget builds this widget). That means we never
-	// receive the priming broadcast on this path, so every broadcast we DO receive is
-	// a real damage event. Treat the priming as already-consumed; InitializeForCharacter
-	// has already seeded Target/Displayed percents directly from the attribute set.
-	bHasReceivedInitialBroadcast = true;
+	// ASFCharacterBase::BeginPlay calls InitWidget on the floating-bar component
+	// BEFORE BroadcastInitialAttributeValues, so we are guaranteed to receive the
+	// priming broadcast on possession. Swallow that first event so the bar doesn't
+	// pop visible the instant the character spawns; every subsequent broadcast is
+	// a real damage / heal event and will trigger the fade-in.
+	bHasReceivedInitialBroadcast = false;
 }
 
 void USFEnemyHealthBarWidget::UnbindFromCharacterDelegates()
@@ -195,9 +203,15 @@ void USFEnemyHealthBarWidget::HandleHealthChanged(float NewValue, float MaxValue
 	{
 		bHasReceivedInitialBroadcast = true;
 		DisplayedHealthPct = TargetHealthPct;
+		UE_LOG(LogSFEnemyHealthBar, Log,
+			TEXT("HandleHealthChanged PRIMING-SWALLOW widget=%s NewValue=%.2f Max=%.2f"),
+			*GetNameSafe(this), NewValue, MaxValue);
 		return;
 	}
 
+	UE_LOG(LogSFEnemyHealthBar, Log,
+		TEXT("HandleHealthChanged widget=%s NewValue=%.2f Max=%.2f -> RequestShow"),
+		*GetNameSafe(this), NewValue, MaxValue);
 	RequestShow();
 }
 
@@ -205,9 +219,12 @@ void USFEnemyHealthBarWidget::HandleShieldsChanged(float NewValue, float MaxValu
 {
 	TargetShieldsPct = SafePct(NewValue, MaxValue);
 
-	// Same initial-broadcast guard as health.
+	// Same initial-broadcast guard as health — flip the bit on either path so
+	// the first real event after priming (whether it hits Health or Shields)
+	// correctly fades the bar in.
 	if (!bHasReceivedInitialBroadcast)
 	{
+		bHasReceivedInitialBroadcast = true;
 		DisplayedShieldsPct = TargetShieldsPct;
 		return;
 	}

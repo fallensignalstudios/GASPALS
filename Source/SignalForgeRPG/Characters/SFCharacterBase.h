@@ -27,6 +27,8 @@ class UGameplayEffect;
 class UGameplayAbility;
 class UAnimMontage;
 class USFInteractionComponent;
+class UWidgetComponent;
+class USFEnemyHealthBarWidget;
 class ASFCharacterBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSFAttributeChangedSignature, float, NewValue, float, MaxValue);
@@ -93,6 +95,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USFHitReactionComponent* GetHitReactionComponent() const { return HitReactionComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "UI")
+	UWidgetComponent* GetHealthBarWidgetComponent() const { return HealthBarWidget; }
 
 	// -------------------------------------------------------------------------
 	// IGenericTeamAgentInterface (delegates to FactionComponent)
@@ -413,6 +418,24 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USFHitReactionComponent> HitReactionComponent;
+
+	// -------------------------------------------------------------------------
+	// Floating combat HUD (name + level + shields + health) above the head.
+	// Screen-space UWidgetComponent that hosts USFEnemyHealthBarWidget. Designers
+	// override HealthBarWidgetClass on the BP defaults to swap visuals; leave it
+	// unset to keep the slot dormant (e.g. for the player pawn).
+	// -------------------------------------------------------------------------
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	TObjectPtr<UWidgetComponent> HealthBarWidget;
+
+	/** Widget class to instance into HealthBarWidget at runtime. Set on BP defaults to WBP_EnemyHealthBar. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	TSubclassOf<USFEnemyHealthBarWidget> HealthBarWidgetClass;
+
+	/** Offset above the actor origin where the bar should sit. Tune per archetype height. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
+	FVector HealthBarOffset = FVector(0.0f, 0.0f, 120.0f);
 
 	/** Last character that damaged us; used for XP attribution on death. */
 	UPROPERTY(Transient)
