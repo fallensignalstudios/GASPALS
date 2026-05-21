@@ -24,7 +24,9 @@
 #include "GameplayEffect.h"
 #include "Combat/SFWeaponData.h"
 #include "Components/SFInteractionComponent.h"
+#include "Components/WidgetComponent.h"
 #include "Combat/SFWeaponAnimationSet.h"
+#include "UI/SFEnemyHealthBarWidget.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSFCharacter, Log, All);
 
@@ -47,6 +49,23 @@ ASFCharacterBase::ASFCharacterBase()
 	InteractionComponent = CreateDefaultSubobject<USFInteractionComponent>(TEXT("InteractionComponent"));
 	FactionComponent = CreateDefaultSubobject<USFFactionComponent>(TEXT("FactionComponent"));
 	HitReactionComponent = CreateDefaultSubobject<USFHitReactionComponent>(TEXT("HitReactionComponent"));
+
+	// Floating world health/shield bar slot. Lives on the base class so every
+	// character archetype (player, NPC, enemy, companion) can host one — leave
+	// HealthBarWidgetClass unset on a BP to keep the slot dormant. Screen-space
+	// so the bar always faces the camera and stays a consistent size. Designers
+	// pick the widget class and per-archetype Z offset on BP defaults.
+	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
+	HealthBarWidget->SetupAttachment(GetRootComponent());
+	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	HealthBarWidget->SetDrawAtDesiredSize(true);
+	HealthBarWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HealthBarWidget->SetGenerateOverlapEvents(false);
+	HealthBarWidget->SetRelativeLocation(HealthBarOffset);
+	// Hide until BeginPlay; we don't want a ghost bar on a freshly-spawned
+	// character that has not taken damage yet. The inner widget also self-hides
+	// on NativeConstruct.
+	HealthBarWidget->SetVisibility(false);
 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
@@ -136,6 +155,37 @@ void ASFCharacterBase::BeginPlay()
 
 	GrantStartupAbilities();
 	BindAttributeDelegates();
+
+	// Wire the floating health/shield bar BEFORE BroadcastInitialAttributeValues so
+	// the widget's delegate bindings hook up in time to consume the priming broadcast.
+	// Designers set HealthBarWidgetClass on the BP defaults to WBP_EnemyHealthBar (or
+	// a per-archetype variant). If no class is set we leave the slot dormant — some
+	// characters (the player pawn, vendors, story NPCs) intentionally don't want a
+	// combat bar floating above their head.
+	if (HealthBarWidget)
+	{
+		HealthBarWidget->SetRelativeLocation(HealthBarOffset);
+		if (HealthBarWidgetClass)
+		{
+			HealthBarWidget->SetWidgetClass(HealthBarWidgetClass);
+			HealthBarWidget->SetVisibility(true);
+			// Force the widget to instantiate now so its delegate bindings hook up
+			// before the first damage hit — otherwise UWidgetComponent lazily creates
+			// the widget on first render, which can drop the first damage event.
+			HealthBarWidget->InitWidget();
+			UE_LOG(LogSFCharacter, Log,
+				TEXT("HealthBar wired: actor=%s class=%s widget=%s"),
+				*GetName(),
+				*GetNameSafe(HealthBarWidgetClass),
+				*GetNameSafe(HealthBarWidget->GetWidget()));
+		}
+		else
+		{
+			UE_LOG(LogSFCharacter, Verbose,
+				TEXT("HealthBar dormant on %s (HealthBarWidgetClass not set)"), *GetName());
+		}
+	}
+
 	BroadcastInitialAttributeValues();
 
 	if (AbilitySystemComponent)

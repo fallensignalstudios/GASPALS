@@ -2,13 +2,11 @@
 
 #include "AI/SFNPCAIController.h"
 #include "Characters/SFNPCNarrativeIdentityComponent.h"
-#include "Components/WidgetComponent.h"
 #include "Core/SFPlayerState.h"
 #include "Dialogue/Data/SFConversationDataAsset.h"
 #include "GameFramework/PlayerState.h"
 #include "Narrative/SFNarrativeComponent.h"
 #include "Narrative/SFNarrativeTypes.h"
-#include "UI/SFEnemyHealthBarWidget.h"
 
 ASFNPCBase::ASFNPCBase()
 {
@@ -16,47 +14,8 @@ ASFNPCBase::ASFNPCBase()
 
 	NarrativeIdentity = CreateDefaultSubobject<USFNPCNarrativeIdentityComponent>(TEXT("NarrativeIdentity"));
 
-	// Floating world-space health/shield bar. Screen-space-facing so it always faces the camera,
-	// non-blocking collision, and Screen draw size keeps the bar a consistent size regardless of
-	// distance (matches Destiny / Jedi Survivor framing). Designers pick the widget class and a
-	// per-archetype Z offset on BP defaults; we just create the component slot here.
-	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
-	HealthBarWidget->SetupAttachment(GetRootComponent());
-	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
-	HealthBarWidget->SetDrawAtDesiredSize(true);
-	HealthBarWidget->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	HealthBarWidget->SetGenerateOverlapEvents(false);
-	HealthBarWidget->SetRelativeLocation(HealthBarOffset);
-	// Hide until BeginPlay; we don't want a ghost bar on a freshly-spawned NPC who has not
-	// taken damage yet. The widget itself also self-hides on NativeConstruct.
-	HealthBarWidget->SetVisibility(false);
-
 	AIControllerClass = ASFNPCAIController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
-}
-
-void ASFNPCBase::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// Wire the floating health bar. Designers set HealthBarWidgetClass on the BP defaults to
-	// WBP_EnemyHealthBar (or a per-archetype variant). The widget instance binds to our GAS
-	// delegates inside NativeConstruct, so we just need to set the class + offset and make
-	// the component visible. If no class is configured we leave the slot dormant — some NPCs
-	// (vendors, story characters) intentionally don't want a combat bar.
-	if (HealthBarWidget)
-	{
-		HealthBarWidget->SetRelativeLocation(HealthBarOffset);
-		if (HealthBarWidgetClass)
-		{
-			HealthBarWidget->SetWidgetClass(HealthBarWidgetClass);
-			HealthBarWidget->SetVisibility(true);
-			// Force the widget to instantiate now so its delegate bindings hook up before the
-			// first damage hit — otherwise UWidgetComponent lazily creates the widget on the
-			// first render, which can drop the first damage event.
-			HealthBarWidget->InitWidget();
-		}
-	}
 }
 
 void ASFNPCBase::HandleDeath()
