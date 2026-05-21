@@ -10,6 +10,7 @@
 class USFConversationDataAsset;
 class USFNPCNarrativeIdentityComponent;
 class USFNarrativeComponent;
+class UWidgetComponent;
 
 /**
  * ASFNPCBase
@@ -57,6 +58,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "NPC")
 	FText GetNPCName() const { return NPCName; }
 
+	UFUNCTION(BlueprintPure, Category = "NPC|UI")
+	UWidgetComponent* GetHealthBarWidgetComponent() const { return HealthBarWidget; }
+
 protected:
 	// -------------------------------------------------------------------------
 	// Identity / display
@@ -64,6 +68,23 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "NPC")
 	FText NPCName;
+
+	// -------------------------------------------------------------------------
+	// Floating combat HUD (name + level + shields + health) above the NPC's head.
+	// World-space UWidgetComponent that hosts USFEnemyHealthBarWidget. Designers
+	// override HealthBarWidgetClass on a per-archetype BP to swap visuals.
+	// -------------------------------------------------------------------------
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "NPC|UI")
+	TObjectPtr<UWidgetComponent> HealthBarWidget;
+
+	/** Widget class to instance into HealthBarWidget at runtime. Set in BP defaults to WBP_EnemyHealthBar. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "NPC|UI")
+	TSubclassOf<class USFEnemyHealthBarWidget> HealthBarWidgetClass;
+
+	/** Offset above the actor origin where the bar should sit. Tune per archetype height. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "NPC|UI")
+	FVector HealthBarOffset = FVector(0.0f, 0.0f, 120.0f);
 
 	/** Narrative identity (faction, context id, disposition, narrative tags). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "NPC")
