@@ -4,6 +4,7 @@
 #include "AbilitySystem/SFGameplayAbility.h"
 #include "Abilities/GameplayAbility.h"
 #include "AIController.h"
+#include "GameFramework/PlayerController.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/SFAnimInstanceBase.h"
 #include "Combat/SFCombatComponent.h"
@@ -72,14 +73,25 @@ ASFCharacterBase::ASFCharacterBase()
 
 void ASFCharacterBase::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const
 {
-	// Eye location: actor origin + BaseEyeHeight. Mirrors the default Pawn behavior so player
-	// camera-driven traces and AI eye-line traces share the same height anchor.
+	AController* OwningController = GetController();
+
+	// Player path: use the PlayerController's view point (the gameplay camera location +
+	// control rotation). This is the correct anchor for hitscan / projectile aim in
+	// third-person \u2014 BaseEyeHeight + control rotation would trace from the character's
+	// head, not from where the player actually sees the crosshair, and the offset between
+	// head and SpringArm camera is enough to make bullets visually "fly past" targets at
+	// any distance. We still mirror APawn::GetActorEyesViewPoint when the controller can't
+	// supply a view point.
+	if (APlayerController* PC = Cast<APlayerController>(OwningController))
+	{
+		PC->GetPlayerViewPoint(OutLocation, OutRotation);
+		return;
+	}
+
+	// Default eye location for AI / unpossessed pawns: actor origin + BaseEyeHeight.
 	OutLocation = GetPawnViewLocation();
 
-	const AController* OwningController = GetController();
-
-	// Player path: the default Pawn::GetViewRotation behavior (camera or control rotation) is correct.
-	if (!OwningController || OwningController->IsPlayerController())
+	if (!OwningController)
 	{
 		OutRotation = GetViewRotation();
 		return;
