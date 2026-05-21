@@ -127,7 +127,13 @@ void USFEnemyHealthBarWidget::BindToCharacterDelegates()
 	Target->OnShieldsChanged.AddDynamic(this, &USFEnemyHealthBarWidget::HandleShieldsChanged);
 	Target->OnCharacterDied.AddDynamic(this, &USFEnemyHealthBarWidget::HandleCharacterDied);
 
-	bHasReceivedInitialBroadcast = false;
+	// NPC floating bars bind AFTER ASFCharacterBase::BeginPlay has already fired its
+	// priming broadcast (SFCharacterBase::BroadcastInitialAttributeValues runs before
+	// the widget component's lazy InitWidget builds this widget). That means we never
+	// receive the priming broadcast on this path, so every broadcast we DO receive is
+	// a real damage event. Treat the priming as already-consumed; InitializeForCharacter
+	// has already seeded Target/Displayed percents directly from the attribute set.
+	bHasReceivedInitialBroadcast = true;
 }
 
 void USFEnemyHealthBarWidget::UnbindFromCharacterDelegates()
