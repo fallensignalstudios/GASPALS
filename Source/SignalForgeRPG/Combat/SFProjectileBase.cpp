@@ -56,6 +56,21 @@ void ASFProjectileBase::BeginPlay()
 	SpawnLocation = GetActorLocation();
 	SetLifeSpan(LifeSeconds);
 
+	// Safety: if SetSourceActor() wasn't called before our first physics tick (e.g. the spawn
+	// resolved a hit synchronously), fall back to the spawning Owner so the faction gate and
+	// damage path still have a valid attacker reference.
+	if (!SourceActor)
+	{
+		if (AActor* MyOwner = GetOwner())
+		{
+			SourceActor = MyOwner;
+		}
+		else if (AActor* MyInstigator = GetInstigator())
+		{
+			SourceActor = MyInstigator;
+		}
+	}
+
 	// Push designer-tunable values to the movement component at runtime
 	// (constructor defaults may be overridden in the asset).
 	if (ProjectileMovement)
@@ -197,11 +212,15 @@ void ASFProjectileBase::OnProjectileHit(
 {
 #if !UE_BUILD_SHIPPING
 	UE_LOG(LogTemp, Warning,
-		TEXT("SFProjectile::OnHit -> %s OtherActor=%s OtherComp=%s ImpactPoint=%s"),
+		TEXT("SFProjectile::OnHit -> %s OtherActor=%s OtherComp=%s ImpactPoint=%s source=%s owner=%s damageEffectClass=%s baseDamage=%.1f"),
 		*GetName(),
 		OtherActor ? *OtherActor->GetName() : TEXT("NULL"),
 		OtherComp ? *OtherComp->GetName() : TEXT("NULL"),
-		*Hit.ImpactPoint.ToCompactString());
+		*Hit.ImpactPoint.ToCompactString(),
+		SourceActor ? *SourceActor->GetName() : TEXT("NULL"),
+		GetOwner() ? *GetOwner()->GetName() : TEXT("NULL"),
+		DamageEffectClass ? *DamageEffectClass->GetName() : TEXT("NULL"),
+		BaseDamage);
 
 	DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 16.0f, 8, FColor::Red, false, 3.0f, 0, 1.5f);
 #endif
@@ -271,12 +290,31 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 		if (HitCharacter->IsDead())
 		{
 			bSuppressDamage = true;
+#if !UE_BUILD_SHIPPING
+			UE_LOG(LogTemp, Warning, TEXT("SFProjectile::HandleImpact -> SUPPRESS (target dead): %s"), *HitCharacter->GetName());
+#endif
 		}
 		else if (!bAllowFriendlyFire && !USFFactionStatics::AreHostile(SourceActor, HitCharacter))
 		{
 			bSuppressDamage = true;
+#if !UE_BUILD_SHIPPING
+			UE_LOG(LogTemp, Warning,
+				TEXT("SFProjectile::HandleImpact -> SUPPRESS (faction gate: not hostile). source=%s target=%s allowFF=%d"),
+				SourceActor ? *SourceActor->GetName() : TEXT("NULL"),
+				*HitCharacter->GetName(),
+				bAllowFriendlyFire ? 1 : 0);
+#endif
 		}
 	}
+
+#if !UE_BUILD_SHIPPING
+	UE_LOG(LogTemp, Warning,
+		TEXT("SFProjectile::HandleImpact -> entering damage block: DEC=%s source=%s target=%s suppress=%d"),
+		DamageEffectClass ? *DamageEffectClass->GetName() : TEXT("NULL"),
+		SourceActor ? *SourceActor->GetName() : TEXT("NULL"),
+		OtherActor ? *OtherActor->GetName() : TEXT("NULL"),
+		bSuppressDamage ? 1 : 0);
+#endif
 
 	// VFX
 	if (ImpactNiagara)
