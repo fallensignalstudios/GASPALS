@@ -173,11 +173,21 @@ void ASFCharacterBase::BeginPlay()
 			// before the first damage hit — otherwise UWidgetComponent lazily creates
 			// the widget on first render, which can drop the first damage event.
 			HealthBarWidget->InitWidget();
+
+			// In UE 5.7 the widget's Outer is not always the owning UWidgetComponent
+			// (it can be a transient package), so GetTypedOuter<UWidgetComponent>()
+			// inside the widget returns null and the widget can't discover its host
+			// pawn. Push the target character explicitly so binding is deterministic.
+			if (USFEnemyHealthBarWidget* HealthBarUserWidget = Cast<USFEnemyHealthBarWidget>(HealthBarWidget->GetUserWidgetObject()))
+			{
+				HealthBarUserWidget->InitializeForCharacter(this);
+			}
+
 			UE_LOG(LogSFCharacter, Log,
 				TEXT("HealthBar wired: actor=%s class=%s widget=%s"),
 				*GetName(),
 				*GetNameSafe(HealthBarWidgetClass),
-				*GetNameSafe(HealthBarWidget->GetWidget()));
+				*GetNameSafe(HealthBarWidget->GetUserWidgetObject()));
 		}
 		else
 		{
