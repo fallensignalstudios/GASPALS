@@ -138,7 +138,10 @@ void USFGameplayAbility_WeaponFire::EndAbility(
 	if (ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())
 	{
 		const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
-		if (Tags.State_Weapon_Firing.IsValid())
+		// Only remove the firing tag if we actually added it. Empty-click / cooldown-blocked
+		// activations early-out before AddLooseGameplayTag and the unconditional remove triggers
+		// 'tag is not explicitly in the container!' log spam.
+		if (Tags.State_Weapon_Firing.IsValid() && ActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(Tags.State_Weapon_Firing))
 		{
 			ActorInfo->AbilitySystemComponent->RemoveLooseGameplayTag(Tags.State_Weapon_Firing);
 		}
@@ -406,7 +409,7 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 				if (CachedActorInfo && CachedActorInfo->AbilitySystemComponent.IsValid())
 				{
 					const FSignalForgeGameplayTags& T = FSignalForgeGameplayTags::Get();
-					if (T.State_Weapon_Firing.IsValid())
+					if (T.State_Weapon_Firing.IsValid() && CachedActorInfo->AbilitySystemComponent->HasMatchingGameplayTag(T.State_Weapon_Firing))
 					{
 						CachedActorInfo->AbilitySystemComponent->RemoveLooseGameplayTag(T.State_Weapon_Firing);
 					}

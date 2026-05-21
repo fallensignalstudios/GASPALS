@@ -18,6 +18,11 @@
 #include "Core/SignalForgeGameplayTags.h"
 #include "Engine/OverlapResult.h"
 #include "Faction/SFFactionStatics.h"
+#include "TimerManager.h"
+
+#if !UE_BUILD_SHIPPING
+#include "DrawDebugHelpers.h"
+#endif
 
 ASFProjectileBase::ASFProjectileBase()
 {
@@ -100,6 +105,53 @@ void ASFProjectileBase::BeginPlay()
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, LaunchSound, GetActorLocation());
 	}
+
+#if !UE_BUILD_SHIPPING
+	// --- DIAGNOSTIC: dump collision/movement state so we can see why hits aren't firing.
+	if (CollisionSphere && ProjectileMovement)
+	{
+		const FName ProfileName = CollisionSphere->GetCollisionProfileName();
+		const ECollisionEnabled::Type CE = CollisionSphere->GetCollisionEnabled();
+		const bool bNotifyHit = CollisionSphere->GetBodyInstance() ? CollisionSphere->GetBodyInstance()->bNotifyRigidBodyCollision : false;
+		const FVector Vel = ProjectileMovement->Velocity;
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFProjectile::BeginPlay -> %s profile=%s collision=%d notifyHit=%d radius=%.1f initSpeed=%.1f velocity=%s |V|=%.1f source=%s owner=%s"),
+			*GetName(),
+			*ProfileName.ToString(),
+			(int32)CE,
+			bNotifyHit ? 1 : 0,
+			CollisionSphere->GetUnscaledSphereRadius(),
+			ProjectileMovement->InitialSpeed,
+			*Vel.ToCompactString(),
+			Vel.Size(),
+			SourceActor ? *SourceActor->GetName() : TEXT("NULL"),
+			GetOwner() ? *GetOwner()->GetName() : TEXT("NULL"));
+
+		// Persistent trajectory line (5s) so user can see where projectile is actually going.
+		const FVector StartLoc = GetActorLocation();
+		const FVector EndLoc = StartLoc + GetActorForwardVector() * 5000.0f;
+		DrawDebugLine(GetWorld(), StartLoc, EndLoc, FColor::Cyan, false, 5.0f, 0, 1.5f);
+		DrawDebugSphere(GetWorld(), StartLoc, 12.0f, 8, FColor::Cyan, false, 5.0f, 0, 1.5f);
+	}
+
+	// Delayed sanity check: if projectile is still alive after 0.1s, log its position+velocity.
+	if (UWorld* W = GetWorld())
+	{
+		FTimerHandle TmpHandle;
+		TWeakObjectPtr<ASFProjectileBase> WeakThis(this);
+		W->GetTimerManager().SetTimer(TmpHandle, [WeakThis]()
+		{
+			if (ASFProjectileBase* Self = WeakThis.Get())
+			{
+				const FVector Loc = Self->GetActorLocation();
+				const FVector Vel = Self->ProjectileMovement ? Self->ProjectileMovement->Velocity : FVector::ZeroVector;
+				UE_LOG(LogTemp, Warning,
+					TEXT("SFProjectile::AliveAt+0.1s -> %s loc=%s |V|=%.1f vel=%s"),
+					*Self->GetName(), *Loc.ToCompactString(), Vel.Size(), *Vel.ToCompactString());
+			}
+		}, 0.1f, false);
+	}
+#endif
 }
 
 void ASFProjectileBase::SetSpeedMultiplier(float Multiplier)
@@ -143,9 +195,25 @@ void ASFProjectileBase::OnProjectileHit(
 	FVector NormalImpulse,
 	const FHitResult& Hit)
 {
+#if !UE_BUILD_SHIPPING
+	UE_LOG(LogTemp, Warning,
+		TEXT("SFProjectile::OnHit -> %s OtherActor=%s OtherComp=%s ImpactPoint=%s"),
+		*GetName(),
+		OtherActor ? *OtherActor->GetName() : TEXT("NULL"),
+		OtherComp ? *OtherComp->GetName() : TEXT("NULL"),
+		*Hit.ImpactPoint.ToCompactString());
+
+	DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 16.0f, 8, FColor::Red, false, 3.0f, 0, 1.5f);
+#endif
+
 	// Filter self/source hits so a misaligned muzzle doesn't self-destruct the bullet.
 	if (!OtherActor || OtherActor == this || OtherActor == SourceActor || OtherActor == GetOwner())
 	{
+#if !UE_BUILD_SHIPPING
+		UE_LOG(LogTemp, Warning,
+			TEXT("SFProjectile::OnHit -> SELF-FILTER skipped this hit (other=%s)"),
+			OtherActor ? *OtherActor->GetName() : TEXT("NULL"));
+#endif
 		return;
 	}
 
