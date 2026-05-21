@@ -92,56 +92,28 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 			return;
 		}
 
-		const float ShieldsBeforeDamage = GetShields();
-		const float HealthBeforeDamage = GetHealth();
-		float RemainingDamage = LocalDamage;
-
-		if (ShieldsBeforeDamage > 0.0f)
-		{
-			const float ShieldDamage = FMath::Min(ShieldsBeforeDamage, RemainingDamage);
-			SetShields(FMath::Clamp(ShieldsBeforeDamage - ShieldDamage, 0.0f, GetMaxShields()));
-			RemainingDamage -= ShieldDamage;
-		}
-
-		if (RemainingDamage > 0.0f)
-		{
-			SetHealth(FMath::Clamp(GetHealth() - RemainingDamage, 0.0f, GetMaxHealth()));
-		}
-
-		const bool bShieldsWereDamaged = GetShields() < ShieldsBeforeDamage;
-		const bool bHealthWasDamaged = GetHealth() < HealthBeforeDamage;
-
-		if (Character)
-		{
-			if (ShieldsBeforeDamage > 0.0f && GetShields() <= 0.0f)
-			{
-				// TODO: Shield break event / gameplay cue / UI hook
-			}
-
-			if (GetHealth() <= 0.0f)
-			{
-				if (!Character->IsDead())
-				{
-					Character->HandleDeath();
-				}
-			}
-			else if (bHealthWasDamaged)
-			{
-				Character->HandleHitReact();
-			}
-
-			if (Character->GetStatRegenComponent())
-			{
-				Character->GetStatRegenComponent()->NotifyDamageTaken(
-					bHealthWasDamaged,
-					bShieldsWereDamaged
-				);
-			}
-		}
+		ApplyShieldedDamage(LocalDamage, Character);
 	}
 	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
-		SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
+		// Negative magnitude == incoming damage. Re-route through the shield-first pipeline
+		// so designer GEs that modify Health directly still observe shields, hit react,
+		// and death. Positive magnitudes (heals) are clamped and pass through unchanged.
+		const float Magnitude = Data.EvaluatedData.Magnitude;
+		if (Magnitude < 0.0f)
+		{
+			// Undo the raw health write that the GE just performed, then re-apply via
+			// the shielded path. We subtract Magnitude (it's negative -> adds health back).
+			const float HealthAfterRawHit = GetHealth();
+			const float HealthBeforeRawHit = FMath::Clamp(HealthAfterRawHit - Magnitude, 0.0f, GetMaxHealth());
+			SetHealth(HealthBeforeRawHit);
+
+			ApplyShieldedDamage(-Magnitude, Character);
+		}
+		else
+		{
+			SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
+		}
 	}
 	else if (Data.EvaluatedData.Attribute == GetEchoAttribute())
 	{
@@ -181,5 +153,62 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 		{
 			Character->HandlePoiseBreak();
 		}
+	}
+}
+
+void USFAttributeSetBase::ApplyShieldedDamage(float IncomingDamage, ASFCharacterBase* Character)
+{
+	if (IncomingDamage <= 0.0f)
+	{
+		return;
+	}
+
+	const float ShieldsBeforeDamage = GetShields();
+	const float HealthBeforeDamage = GetHealth();
+	float RemainingDamage = IncomingDamage;
+
+	if (ShieldsBeforeDamage > 0.0f)
+	{
+		const float ShieldDamage = FMath::Min(ShieldsBeforeDamage, RemainingDamage);
+		SetShields(FMath::Clamp(ShieldsBeforeDamage - ShieldDamage, 0.0f, GetMaxShields()));
+		RemainingDamage -= ShieldDamage;
+	}
+
+	if (RemainingDamage > 0.0f)
+	{
+		SetHealth(FMath::Clamp(GetHealth() - RemainingDamage, 0.0f, GetMaxHealth()));
+	}
+
+	const bool bShieldsWereDamaged = GetShields() < ShieldsBeforeDamage;
+	const bool bHealthWasDamaged = GetHealth() < HealthBeforeDamage;
+
+	if (!Character)
+	{
+		return;
+	}
+
+	if (ShieldsBeforeDamage > 0.0f && GetShields() <= 0.0f)
+	{
+		// TODO: Shield break event / gameplay cue / UI hook
+	}
+
+	if (GetHealth() <= 0.0f)
+	{
+		if (!Character->IsDead())
+		{
+			Character->HandleDeath();
+		}
+	}
+	else if (bHealthWasDamaged)
+	{
+		Character->HandleHitReact();
+	}
+
+	if (Character->GetStatRegenComponent())
+	{
+		Character->GetStatRegenComponent()->NotifyDamageTaken(
+			bHealthWasDamaged,
+			bShieldsWereDamaged
+		);
 	}
 }

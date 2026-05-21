@@ -25,52 +25,97 @@ EBTNodeResult::Type USFBTTask_FireWeapon::ExecuteTask(UBehaviorTreeComponent& Ow
 	FMemory* Mem = reinterpret_cast<FMemory*>(NodeMemory);
 	new (Mem) FMemory();
 
-	SendPressed(OwnerComp);
-	Mem->bPressed = true;
-
-	switch (FireMode)
+	// If the designer wants an ADS lead-in, press ADS first and wait for it to settle before
+	// pulling the trigger. Otherwise jump straight to firing.
+	if (AdsLeadInSeconds > 0.0f)
 	{
-	case ESFBTFireMode::Tap:
-		SendReleased(OwnerComp);
-		Mem->bPressed = false;
-		return EBTNodeResult::Succeeded;
-
-	case ESFBTFireMode::PressOnly:
-		// Caller is responsible for releasing via SFBTTask_StopFiring.
-		return EBTNodeResult::Succeeded;
-
-	case ESFBTFireMode::Hold:
-	default:
-		// Tick until HoldDuration elapses, then release.
+		SendAdsPressed(OwnerComp);
+		Mem->bAdsPressed = true;
+		Mem->Phase = EFirePhase::AdsRamp;
+		Mem->ElapsedSeconds = 0.0f;
 		return EBTNodeResult::InProgress;
 	}
+
+	return BeginFiring(OwnerComp, *Mem);
 }
 
 void USFBTTask_FireWeapon::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
-	if (FireMode != ESFBTFireMode::Hold)
+	FMemory* Mem = reinterpret_cast<FMemory*>(NodeMemory);
+	if (!Mem)
 	{
 		return;
 	}
 
-	FMemory* Mem = reinterpret_cast<FMemory*>(NodeMemory);
 	Mem->ElapsedSeconds += DeltaSeconds;
-	if (Mem->ElapsedSeconds >= HoldDuration)
+
+	switch (Mem->Phase)
 	{
-		SendReleased(OwnerComp);
-		Mem->bPressed = false;
-		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+	case EFirePhase::AdsRamp:
+	{
+		if (Mem->ElapsedSeconds >= AdsLeadInSeconds)
+		{
+			// ADS has settled -- start the actual shot. Reset elapsed for the Hold-mode timer.
+			Mem->ElapsedSeconds = 0.0f;
+			const EBTNodeResult::Type FireResult = BeginFiring(OwnerComp, *Mem);
+			if (FireResult != EBTNodeResult::InProgress)
+			{
+				// Tap / PressOnly are immediate -- release ADS and finish.
+				if (Mem->bAdsPressed)
+				{
+					SendAdsReleased(OwnerComp);
+					Mem->bAdsPressed = false;
+				}
+				Mem->Phase = EFirePhase::Done;
+				FinishLatentTask(OwnerComp, FireResult);
+			}
+		}
+		break;
+	}
+
+	case EFirePhase::Holding:
+	{
+		if (Mem->ElapsedSeconds >= HoldDuration)
+		{
+			if (Mem->bFirePressed)
+			{
+				SendFireReleased(OwnerComp);
+				Mem->bFirePressed = false;
+			}
+			if (Mem->bAdsPressed)
+			{
+				SendAdsReleased(OwnerComp);
+				Mem->bAdsPressed = false;
+			}
+			Mem->Phase = EFirePhase::Done;
+			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+		}
+		break;
+	}
+
+	case EFirePhase::Done:
+	default:
+		break;
 	}
 }
 
 EBTNodeResult::Type USFBTTask_FireWeapon::AbortTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	FMemory* Mem = reinterpret_cast<FMemory*>(NodeMemory);
-	// Always release input on abort so we don't leave the weapon stuck firing.
-	if (Mem && Mem->bPressed)
+	// Always release any held inputs on abort so we don't leave the weapon stuck firing or
+	// the AI permanently scoped in.
+	if (Mem)
 	{
-		SendReleased(OwnerComp);
-		Mem->bPressed = false;
+		if (Mem->bFirePressed)
+		{
+			SendFireReleased(OwnerComp);
+			Mem->bFirePressed = false;
+		}
+		if (Mem->bAdsPressed)
+		{
+			SendAdsReleased(OwnerComp);
+			Mem->bAdsPressed = false;
+		}
 	}
 	return EBTNodeResult::Aborted;
 }
@@ -84,14 +129,45 @@ FString USFBTTask_FireWeapon::GetStaticDescription() const
 	case ESFBTFireMode::PressOnly: ModeStr = TEXT("PressOnly"); break;
 	default: break;
 	}
+
+	const FString AdsStr = AdsLeadInSeconds > 0.0f
+		? FString::Printf(TEXT(", ADS %.2fs"), AdsLeadInSeconds)
+		: FString();
+
 	if (FireMode == ESFBTFireMode::Hold)
 	{
-		return FString::Printf(TEXT("Fire (%s, %.2fs)"), ModeStr, HoldDuration);
+		return FString::Printf(TEXT("Fire (%s, %.2fs%s)"), ModeStr, HoldDuration, *AdsStr);
 	}
-	return FString::Printf(TEXT("Fire (%s)"), ModeStr);
+	return FString::Printf(TEXT("Fire (%s%s)"), ModeStr, *AdsStr);
 }
 
-void USFBTTask_FireWeapon::SendPressed(UBehaviorTreeComponent& OwnerComp)
+EBTNodeResult::Type USFBTTask_FireWeapon::BeginFiring(UBehaviorTreeComponent& OwnerComp, FMemory& Mem)
+{
+	SendFirePressed(OwnerComp);
+	Mem.bFirePressed = true;
+
+	switch (FireMode)
+	{
+	case ESFBTFireMode::Tap:
+		// Single shot: release immediately, succeed. Caller will release ADS if it was pressed.
+		SendFireReleased(OwnerComp);
+		Mem.bFirePressed = false;
+		Mem.Phase = EFirePhase::Done;
+		return EBTNodeResult::Succeeded;
+
+	case ESFBTFireMode::PressOnly:
+		// External StopFiring task is responsible for the release.
+		Mem.Phase = EFirePhase::Done;
+		return EBTNodeResult::Succeeded;
+
+	case ESFBTFireMode::Hold:
+	default:
+		Mem.Phase = EFirePhase::Holding;
+		return EBTNodeResult::InProgress;
+	}
+}
+
+void USFBTTask_FireWeapon::SendFirePressed(UBehaviorTreeComponent& OwnerComp)
 {
 	ASFCharacterBase* Character = SFBTHelpers::GetControlledCharacter(OwnerComp.GetAIOwner());
 	if (!Character) { return; }
@@ -102,7 +178,7 @@ void USFBTTask_FireWeapon::SendPressed(UBehaviorTreeComponent& OwnerComp)
 	ASC->AbilityInputTagPressed(FSignalForgeGameplayTags::Get().Input_PrimaryFire);
 }
 
-void USFBTTask_FireWeapon::SendReleased(UBehaviorTreeComponent& OwnerComp)
+void USFBTTask_FireWeapon::SendFireReleased(UBehaviorTreeComponent& OwnerComp)
 {
 	ASFCharacterBase* Character = SFBTHelpers::GetControlledCharacter(OwnerComp.GetAIOwner());
 	if (!Character) { return; }
@@ -111,4 +187,26 @@ void USFBTTask_FireWeapon::SendReleased(UBehaviorTreeComponent& OwnerComp)
 	if (!ASC) { return; }
 
 	ASC->AbilityInputTagReleased(FSignalForgeGameplayTags::Get().Input_PrimaryFire);
+}
+
+void USFBTTask_FireWeapon::SendAdsPressed(UBehaviorTreeComponent& OwnerComp)
+{
+	ASFCharacterBase* Character = SFBTHelpers::GetControlledCharacter(OwnerComp.GetAIOwner());
+	if (!Character) { return; }
+
+	USFAbilitySystemComponent* ASC = Cast<USFAbilitySystemComponent>(Character->GetAbilitySystemComponent());
+	if (!ASC) { return; }
+
+	ASC->AbilityInputTagPressed(FSignalForgeGameplayTags::Get().Input_ADS);
+}
+
+void USFBTTask_FireWeapon::SendAdsReleased(UBehaviorTreeComponent& OwnerComp)
+{
+	ASFCharacterBase* Character = SFBTHelpers::GetControlledCharacter(OwnerComp.GetAIOwner());
+	if (!Character) { return; }
+
+	USFAbilitySystemComponent* ASC = Cast<USFAbilitySystemComponent>(Character->GetAbilitySystemComponent());
+	if (!ASC) { return; }
+
+	ASC->AbilityInputTagReleased(FSignalForgeGameplayTags::Get().Input_ADS);
 }
