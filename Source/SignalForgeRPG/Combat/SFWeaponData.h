@@ -39,6 +39,53 @@ enum class ESFWeaponFireMode : uint8
 };
 
 /**
+ * Destiny-style auto-aim tuning. Lives on each ranged weapon and overrides the
+ * USFAutoAimComponent defaults while that weapon is equipped (when bOverrideComponentDefaults is true).
+ *
+ * Three layers of aim assist all use these values:
+ *   - Bullet magnetism: silently rotates EyeRotation toward a target on each shot.
+ *   - Sticky aim: multiplies look input while reticle is over a target (slows pan).
+ *   - Reticle nudge: one-shot rotation when ADS is engaged to snap to the nearest target.
+ */
+USTRUCT(BlueprintType)
+struct SIGNALFORGERPG_API FSFAutoAimConfig
+{
+	GENERATED_BODY()
+
+	/** If true, the values below replace the USFAutoAimComponent defaults for this weapon. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim")
+	bool bOverrideComponentDefaults = false;
+
+	/** Maximum distance (cm) at which a hostile is considered for any auto-aim layer. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim", meta = (EditCondition = "bOverrideComponentDefaults", ClampMin = "100.0", ClampMax = "30000.0"))
+	float MaxTargetRange = 6000.0f;
+
+	/** Cone half-angle (degrees) inside which bullet magnetism is applied while ADS. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim", meta = (EditCondition = "bOverrideComponentDefaults", ClampMin = "0.0", ClampMax = "20.0"))
+	float MagnetismAngleDeg = 3.0f;
+
+	/** Fraction of magnetism strength applied while hipfiring (0 = none, 1 = same as ADS). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim", meta = (EditCondition = "bOverrideComponentDefaults", ClampMin = "0.0", ClampMax = "1.0"))
+	float HipfireMagnetismFraction = 0.55f;
+
+	/** Cone half-angle (degrees) inside which look-input sticky slowdown engages. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim", meta = (EditCondition = "bOverrideComponentDefaults", ClampMin = "0.0", ClampMax = "30.0"))
+	float StickyAngleDeg = 6.0f;
+
+	/** Minimum look-input multiplier when reticle is centered on a target (1.0 = no slowdown). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim", meta = (EditCondition = "bOverrideComponentDefaults", ClampMin = "0.1", ClampMax = "1.0"))
+	float MinStickyMultiplier = 0.55f;
+
+	/** Cone half-angle (degrees) inside which an ADS reticle nudge will snap toward a target. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim", meta = (EditCondition = "bOverrideComponentDefaults", ClampMin = "0.0", ClampMax = "15.0"))
+	float NudgeAngleDeg = 5.0f;
+
+	/** Fraction (0..1) of the angle to the target that the one-shot ADS nudge will rotate. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim", meta = (EditCondition = "bOverrideComponentDefaults", ClampMin = "0.0", ClampMax = "1.0"))
+	float NudgeStrength = 0.7f;
+};
+
+/**
  * Per-weapon ranged tuning. Drives the default ranged fire ability and weapon-granted abilities.
  * Designed so that designers can swap rifle/pistol/shotgun/sniper feel by editing a single struct.
  */
@@ -114,6 +161,16 @@ struct SIGNALFORGERPG_API FSFRangedWeaponConfig
 	/** Pellets per shot: 1 for rifles/pistols, 8+ for shotguns. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Spread", meta = (ClampMin = "1", ClampMax = "32"))
 	int32 PelletsPerShot = 1;
+
+	/**
+	 * Per-weapon Destiny-style auto-aim tuning (bullet magnetism, sticky aim,
+	 * ADS reticle nudge). When bOverrideComponentDefaults is true the values
+	 * below replace the USFAutoAimComponent defaults while this weapon is equipped.
+	 * Leave the override flag off to inherit the component's tuning — useful for
+	 * generic rifles; flip it on for snipers (tighter cones) and shotguns (wider).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AutoAim", meta = (ShowOnlyInnerProperties))
+	FSFAutoAimConfig AutoAim;
 
 	/** Cone half-angle in degrees while hipfiring. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Spread", meta = (ClampMin = "0.0", ClampMax = "45.0"))

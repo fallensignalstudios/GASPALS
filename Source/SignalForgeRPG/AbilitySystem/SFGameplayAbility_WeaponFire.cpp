@@ -263,6 +263,17 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 	FRotator EyeRotation;
 	Character->GetActorEyesViewPoint(EyeLocation, EyeRotation);
 
+	// Destiny-style bullet magnetism: nudge EyeRotation toward the best hostile target.
+	// AI characters skip this so they don't auto-snap onto the player and erase all skill expression.
+	if (Character->IsPlayerControlled())
+	{
+		if (USFAutoAimComponent* AutoAim = Character->FindComponentByClass<USFAutoAimComponent>())
+		{
+			const bool bAds = IsAimingDownSights(Character);
+			EyeRotation = AutoAim->GetMagnetizedAimDirectionForFireMode(EyeLocation, EyeRotation, bAds);
+		}
+	}
+
 	// Muzzle location: weapon actor socket if available.
 	FVector MuzzleLocation = EyeLocation;
 	FRotator MuzzleRotation = EyeRotation;
