@@ -8,6 +8,7 @@
 #include "Camera/CameraShakeBase.h"
 #include "Characters/SFCharacterBase.h"
 #include "Characters/SFPlayerCharacter.h"
+#include "Combat/SFAutoAimComponent.h"
 #include "Combat/SFProjectileBase.h"
 #include "Combat/SFWeaponActor.h"
 #include "Combat/SFWeaponData.h"
@@ -22,6 +23,9 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
+#if !UE_BUILD_SHIPPING
+#include "DrawDebugHelpers.h"
+#endif
 
 USFGameplayAbility_WeaponFire::USFGameplayAbility_WeaponFire()
 {
@@ -283,6 +287,31 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 		MuzzleRotation = EyeRotation;
 	}
 
+	// Parallax correction: in third-person the camera and the muzzle are offset by ~50\u2013100cm.
+	// If we fire the projectile from the muzzle along the camera direction, the projectile
+	// trail diverges from the crosshair line and visibly misses the target.
+	// Fix: ray-cast from the camera in the (already magnetized) eye direction, find the
+	// first thing it would hit, and re-aim the muzzle rotation toward that point. The hitscan
+	// branch traces from the eye already, so this only affects the projectile path.
+	if (UWorld* WorldForAim = Character->GetWorld())
+	{
+		const float ParallaxTraceDist = FMath::Max(2000.0f, Config.HitscanMaxRange > 0.0f ? Config.HitscanMaxRange : 10000.0f);
+		const FVector EyeFwd = EyeRotation.Vector();
+		const FVector EyeEnd = EyeLocation + EyeFwd * ParallaxTraceDist;
+
+		FCollisionQueryParams ParallaxParams(SCENE_QUERY_STAT(SFWeaponFireParallax), true, Character);
+		if (WeaponActor)
+		{
+			ParallaxParams.AddIgnoredActor(WeaponActor);
+		}
+
+		FHitResult ParallaxHit;
+		const bool bHitParallax = WorldForAim->LineTraceSingleByChannel(ParallaxHit, EyeLocation, EyeEnd, TraceChannel, ParallaxParams);
+		const FVector AimPoint = bHitParallax ? ParallaxHit.ImpactPoint : EyeEnd;
+
+		MuzzleRotation = (AimPoint - MuzzleLocation).Rotation();
+	}
+
 	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
 	if (UAbilitySystemComponent* ASC = CachedActorInfo->AbilitySystemComponent.Get())
 	{
@@ -297,10 +326,10 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 
 	for (int32 Pellet = 0; Pellet < Pellets; ++Pellet)
 	{
-		const FRotator ShotRotation = ApplyConeSpread(EyeRotation, SpreadHalfAngle);
-
 		if (Config.bHitscan)
 		{
+			// Hitscan traces from the eye, so spread applies to the eye rotation.
+			const FRotator ShotRotation = ApplyConeSpread(EyeRotation, SpreadHalfAngle);
 			UE_LOG(LogTemp, Warning,
 				TEXT("WeaponFire::FireOneShot -> HITSCAN branch (Config.bHitscan=true on %s). ")
 				TEXT("Uncheck 'Hitscan' on the weapon data asset to take the projectile branch."),
@@ -309,6 +338,9 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 		}
 		else
 		{
+			// Projectile spawns at the muzzle, so spread applies to the parallax-corrected
+			// muzzle rotation (muzzle aimed at what the crosshair sees, not parallel to the camera).
+			const FRotator ShotRotation = ApplyConeSpread(MuzzleRotation, SpreadHalfAngle);
 			UE_LOG(LogTemp, Warning,
 				TEXT("WeaponFire::FireOneShot -> PROJECTILE branch on %s, ProjectileClass=%s"),
 				WeaponData ? *WeaponData->GetName() : TEXT("<null>"),
@@ -435,6 +467,13 @@ void USFGameplayAbility_WeaponFire::FireHitscanPellet(
 
 	FHitResult Hit;
 	const bool bHit = World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, TraceChannel, Params);
+
+#if !UE_BUILD_SHIPPING
+	DrawDebugLine(World, TraceStart, bHit ? Hit.ImpactPoint : TraceEnd, bHit ? FColor::Red : FColor::Yellow, false, 2.0f, 0, 1.5f);
+	UE_LOG(LogTemp, Warning, TEXT("WeaponFire::Hitscan -> bHit=%s Target=%s"),
+		bHit ? TEXT("true") : TEXT("false"),
+		bHit && Hit.GetActor() ? *Hit.GetActor()->GetName() : TEXT("<none>"));
+#endif
 
 	if (bHit)
 	{
