@@ -22,6 +22,15 @@
 
 #if !UE_BUILD_SHIPPING
 #include "DrawDebugHelpers.h"
+
+// Runtime-toggleable projectile diagnostics. Defaults to 0 so live play is clean; flip to 1 via
+// the console (`SF.Projectile.DrawDebug 1`) to re-enable the cyan trajectory line, red impact
+// spheres, and BeginPlay/OnHit verbose logging without rebuilding. Stripped entirely in shipping.
+static TAutoConsoleVariable<int32> CVarSFProjectileDrawDebug(
+	TEXT("SF.Projectile.DrawDebug"),
+	0,
+	TEXT("Draw projectile trajectory lines + impact spheres and emit verbose projectile logs. 0 = off (default), 1 = on."),
+	ECVF_Cheat);
 #endif
 
 ASFProjectileBase::ASFProjectileBase()
@@ -129,7 +138,8 @@ void ASFProjectileBase::BeginPlay()
 		const ECollisionEnabled::Type CE = CollisionSphere->GetCollisionEnabled();
 		const bool bNotifyHit = CollisionSphere->GetBodyInstance() ? CollisionSphere->GetBodyInstance()->bNotifyRigidBodyCollision : false;
 		const FVector Vel = ProjectileMovement->Velocity;
-		UE_LOG(LogTemp, Warning,
+		const bool bDrawDebug = CVarSFProjectileDrawDebug.GetValueOnGameThread() > 0;
+		UE_LOG(LogTemp, Verbose,
 			TEXT("SFProjectile::BeginPlay -> %s profile=%s collision=%d notifyHit=%d radius=%.1f initSpeed=%.1f velocity=%s |V|=%.1f source=%s owner=%s"),
 			*GetName(),
 			*ProfileName.ToString(),
@@ -143,10 +153,13 @@ void ASFProjectileBase::BeginPlay()
 			GetOwner() ? *GetOwner()->GetName() : TEXT("NULL"));
 
 		// Persistent trajectory line (5s) so user can see where projectile is actually going.
-		const FVector StartLoc = GetActorLocation();
-		const FVector EndLoc = StartLoc + GetActorForwardVector() * 5000.0f;
-		DrawDebugLine(GetWorld(), StartLoc, EndLoc, FColor::Cyan, false, 5.0f, 0, 1.5f);
-		DrawDebugSphere(GetWorld(), StartLoc, 12.0f, 8, FColor::Cyan, false, 5.0f, 0, 1.5f);
+		if (bDrawDebug)
+		{
+			const FVector StartLoc = GetActorLocation();
+			const FVector EndLoc = StartLoc + GetActorForwardVector() * 5000.0f;
+			DrawDebugLine(GetWorld(), StartLoc, EndLoc, FColor::Cyan, false, 5.0f, 0, 1.5f);
+			DrawDebugSphere(GetWorld(), StartLoc, 12.0f, 8, FColor::Cyan, false, 5.0f, 0, 1.5f);
+		}
 	}
 
 	// Delayed sanity check: if projectile is still alive after 0.1s, log its position+velocity.
@@ -160,7 +173,7 @@ void ASFProjectileBase::BeginPlay()
 			{
 				const FVector Loc = Self->GetActorLocation();
 				const FVector Vel = Self->ProjectileMovement ? Self->ProjectileMovement->Velocity : FVector::ZeroVector;
-				UE_LOG(LogTemp, Warning,
+				UE_LOG(LogTemp, Verbose,
 					TEXT("SFProjectile::AliveAt+0.1s -> %s loc=%s |V|=%.1f vel=%s"),
 					*Self->GetName(), *Loc.ToCompactString(), Vel.Size(), *Vel.ToCompactString());
 			}
@@ -211,7 +224,7 @@ void ASFProjectileBase::OnProjectileHit(
 	const FHitResult& Hit)
 {
 #if !UE_BUILD_SHIPPING
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogTemp, Verbose,
 		TEXT("SFProjectile::OnHit -> %s OtherActor=%s OtherComp=%s ImpactPoint=%s source=%s owner=%s damageEffectClass=%s baseDamage=%.1f"),
 		*GetName(),
 		OtherActor ? *OtherActor->GetName() : TEXT("NULL"),
@@ -222,14 +235,17 @@ void ASFProjectileBase::OnProjectileHit(
 		DamageEffectClass ? *DamageEffectClass->GetName() : TEXT("NULL"),
 		BaseDamage);
 
-	DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 16.0f, 8, FColor::Red, false, 3.0f, 0, 1.5f);
+	if (CVarSFProjectileDrawDebug.GetValueOnGameThread() > 0)
+	{
+		DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 16.0f, 8, FColor::Red, false, 3.0f, 0, 1.5f);
+	}
 #endif
 
 	// Filter self/source hits so a misaligned muzzle doesn't self-destruct the bullet.
 	if (!OtherActor || OtherActor == this || OtherActor == SourceActor || OtherActor == GetOwner())
 	{
 #if !UE_BUILD_SHIPPING
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogTemp, Verbose,
 			TEXT("SFProjectile::OnHit -> SELF-FILTER skipped this hit (other=%s)"),
 			OtherActor ? *OtherActor->GetName() : TEXT("NULL"));
 #endif

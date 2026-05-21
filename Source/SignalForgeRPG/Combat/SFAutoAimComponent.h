@@ -88,6 +88,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|AutoAim")
 	void RequestReticleNudge();
 
+	/**
+	 * Melee variant of the reticle nudge: snaps the player's control rotation
+	 * (yaw only, so the camera doesn't pitch up/down on a downhill enemy) toward
+	 * the nearest hostile inside a much wider, shorter-range cone tuned for swing
+	 * arcs. Called from USFGameplayAbility_WeaponMelee::ActivateAbility so the
+	 * swing doesn't whiff just because the player isn't perfectly centered. Uses
+	 * a temporary cone widening so it works even when the standard nudge cone is
+	 * tight (snipers).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Combat|AutoAim")
+	void RequestMeleeFacingSnap();
+
 	/** Returns the actor currently selected as the auto-aim target this frame (or null). */
 	UFUNCTION(BlueprintPure, Category = "Combat|AutoAim")
 	AActor* GetCurrentTarget() const { return CachedTarget.Get(); }
@@ -126,6 +138,24 @@ protected:
 	/** Fraction of the offset the nudge actually applies. 1.0 = full snap, 0.7 = a satisfying tug. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "AutoAim|Nudge", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float NudgeStrength = 0.7f;
+
+	// ---- Melee facing-snap tuning ----
+
+	/** Maximum distance to consider a candidate for the melee facing snap. Past this we don't twist toward anyone. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "AutoAim|Melee", meta = (ClampMin = "50.0"))
+	float MeleeFacingMaxRange = 350.0f;
+
+	/** Half-angle cone (degrees) for the melee facing snap. Should be generous \u2014 a swing covers a wide arc. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "AutoAim|Melee", meta = (ClampMin = "0.0", ClampMax = "90.0"))
+	float MeleeFacingAngleDeg = 60.0f;
+
+	/** Fraction of the offset the melee snap applies. 1.0 = fully face the target, 0.6 = lean toward them. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "AutoAim|Melee", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MeleeFacingStrength = 0.85f;
+
+	/** If true, the melee facing snap only rotates yaw (camera doesn't tilt on uneven terrain). Recommended. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "AutoAim|Melee")
+	bool bMeleeYawOnly = true;
 
 	/** If true, require unobstructed line of sight to the candidate target. Disable for X-ray rifles. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "AutoAim|Selection")

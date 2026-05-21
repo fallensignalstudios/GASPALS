@@ -351,3 +351,129 @@ void USFAutoAimComponent::RequestReticleNudge()
 			FMath::RadiansToDegrees(CachedTargetAngleRad));
 	}
 }
+
+void USFAutoAimComponent::RequestMeleeFacingSnap()
+{
+	// Melee snap is independent of the per-tick ranged auto-aim cones \u2014 those are typically much
+	// narrower (sniper-tight) and would gate out melee swings where the player is already torso-on to
+	// the enemy but not centered. We do a fresh, dedicated scan here using the wider melee cone.
+	if (!bEnabled)
+	{
+		return;
+	}
+
+	APlayerController* PC = CachedPC.Get();
+	ASFCharacterBase* Self = CachedSelf.Get();
+	UWorld* World = GetWorld();
+	if (!PC || !Self || !World)
+	{
+		return;
+	}
+
+	FVector EyeLoc;
+	FRotator EyeRot;
+	Self->GetActorEyesViewPoint(EyeLoc, EyeRot);
+	const FVector EyeFwd = EyeRot.Vector();
+
+	const float MeleeConeRad = FMath::DegreesToRadians(FMath::Clamp(MeleeFacingAngleDeg, 0.0f, 90.0f));
+	const float CosCone = FMath::Cos(MeleeConeRad);
+	const float MaxRangeSq = MeleeFacingMaxRange * MeleeFacingMaxRange;
+
+	ASFCharacterBase* BestTarget = nullptr;
+	float BestScore = TNumericLimits<float>::Max();
+	FVector BestAimPoint = FVector::ZeroVector;
+
+	for (TActorIterator<ASFCharacterBase> It(World); It; ++It)
+	{
+		ASFCharacterBase* Candidate = *It;
+		if (!Candidate || Candidate == Self)
+		{
+			continue;
+		}
+
+		// Dead pawns don't pull a melee snap.
+		if (const USFAttributeSetBase* Attrs = Candidate->GetAttributeSet())
+		{
+			if (Attrs->GetHealth() <= 0.0f)
+			{
+				continue;
+			}
+		}
+
+		// Faction gate \u2014 same safer-default behavior as ScoreCandidate: if AreHostile can't decide, skip.
+		if (!USFFactionStatics::AreHostile(GetOwner(), Candidate))
+		{
+			continue;
+		}
+
+		const FVector AimPoint = GetTargetAimPoint(Candidate);
+		const FVector ToTarget = AimPoint - EyeLoc;
+		const float DistSq = ToTarget.SizeSquared();
+		if (DistSq > MaxRangeSq || DistSq <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+
+		const FVector ToTargetN = ToTarget.GetSafeNormal();
+		const float Dot = FVector::DotProduct(EyeFwd, ToTargetN);
+		if (Dot < CosCone)
+		{
+			continue; // outside the wide melee cone
+		}
+
+		// Optional LOS \u2014 reuse the same toggle as ranged so designers don't have to manage two flags.
+		if (bRequireLineOfSight)
+		{
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(SFAutoAimMeleeLOS), false);
+			Params.AddIgnoredActor(GetOwner());
+			Params.AddIgnoredActor(Candidate);
+
+			FHitResult Hit;
+			if (World->LineTraceSingleByChannel(Hit, EyeLoc, AimPoint, LineOfSightChannel, Params))
+			{
+				continue;
+			}
+		}
+
+		// Score: prefer closest by distance, with a small angle penalty so a near-centered enemy beats
+		// a slightly closer enemy that's almost off-cone. Melee feels best when distance dominates.
+		const float Distance = FMath::Sqrt(DistSq);
+		const float AngleRad = FMath::Acos(FMath::Clamp(Dot, -1.0f, 1.0f));
+		const float Score = Distance + AngleRad * 50.0f;
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			BestTarget = Candidate;
+			BestAimPoint = AimPoint;
+		}
+	}
+
+	if (!BestTarget)
+	{
+		if (bVerboseLogging)
+		{
+			UE_LOG(LogTemp, Verbose, TEXT("[AutoAim] melee snap: no target inside cone (range=%.0f angle=%.1f\u00b0)"),
+				MeleeFacingMaxRange, MeleeFacingAngleDeg);
+		}
+		return;
+	}
+
+	const FRotator CurrentControlRot = PC->GetControlRotation();
+	FRotator TargetRot = (BestAimPoint - EyeLoc).Rotation();
+
+	// Yaw-only by default \u2014 swinging mid-step on uneven ground shouldn't whip the camera up or down.
+	if (bMeleeYawOnly)
+	{
+		TargetRot.Pitch = CurrentControlRot.Pitch;
+		TargetRot.Roll = CurrentControlRot.Roll;
+	}
+
+	const FRotator SnappedRot = FMath::Lerp(CurrentControlRot, TargetRot, FMath::Clamp(MeleeFacingStrength, 0.0f, 1.0f));
+	PC->SetControlRotation(SnappedRot);
+
+	if (bVerboseLogging)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[AutoAim] melee snap \u2192 %s (dist=%.0f score=%.2f)"),
+			*BestTarget->GetName(), FMath::Sqrt(BestScore), BestScore);
+	}
+}
