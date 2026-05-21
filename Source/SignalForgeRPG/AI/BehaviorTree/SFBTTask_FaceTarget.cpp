@@ -71,6 +71,12 @@ void USFBTTask_FaceTarget::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* /*
 	const FRotator NewRot = FMath::RInterpConstantTo(Current, Desired, DeltaSeconds, RotationRate);
 	Self->SetActorRotation(NewRot);
 
+	// Drive the AIController's ControlRotation as well so anything that reads GetControlRotation()
+	// (eye trace / GetActorEyesViewPoint / aim direction / anim BPs querying control rot) sees the
+	// same yaw. Without this, hitscan & projectile aim direction stays stale at spawn rotation and
+	// the weapon fires harmlessly into the void.
+	AI->SetControlRotation(FRotator(0.0f, NewRot.Yaw, 0.0f));
+
 	// Track elapsed time via the component's instanced timer instead of NodeMemory to keep this task non-instanced.
 	// Simple guard: if YawError is still huge after one tick of TimeoutSeconds worth of rotation, give up.
 	// (RotationRate * TimeoutSeconds gives the max degrees we could ever cover.)

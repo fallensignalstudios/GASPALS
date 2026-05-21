@@ -3,6 +3,7 @@
 #include "AbilitySystem/SFAbilitySystemComponent.h"
 #include "AbilitySystem/SFGameplayAbility.h"
 #include "Abilities/GameplayAbility.h"
+#include "AIController.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/SFAnimInstanceBase.h"
 #include "Combat/SFCombatComponent.h"
@@ -63,6 +64,47 @@ ASFCharacterBase::ASFCharacterBase()
 	{
 		Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	}
+}
+
+// -----------------------------------------------------------------------------
+// View point
+// -----------------------------------------------------------------------------
+
+void ASFCharacterBase::GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const
+{
+	// Eye location: actor origin + BaseEyeHeight. Mirrors the default Pawn behavior so player
+	// camera-driven traces and AI eye-line traces share the same height anchor.
+	OutLocation = GetPawnViewLocation();
+
+	const AController* OwningController = GetController();
+
+	// Player path: the default Pawn::GetViewRotation behavior (camera or control rotation) is correct.
+	if (!OwningController || OwningController->IsPlayerController())
+	{
+		OutRotation = GetViewRotation();
+		return;
+	}
+
+	// AI path: prefer the controller's focal point if one is set (SetFocus / SetFocalPoint),
+	// otherwise use the actor's facing yaw so aim follows the body rotation that SFBTTask_FaceTarget drives.
+	if (const AAIController* AI = Cast<AAIController>(OwningController))
+	{
+		const FVector Focal = AI->GetFocalPoint();
+		if (!Focal.IsNearlyZero())
+		{
+			const FVector ToFocal = Focal - OutLocation;
+			if (!ToFocal.IsNearlyZero())
+			{
+				OutRotation = ToFocal.Rotation();
+				return;
+			}
+		}
+	}
+
+	// Fallback: use the controller's current ControlRotation (which SFBTTask_FaceTarget now drives),
+	// or the actor rotation if for some reason that's stale.
+	const FRotator ControlRot = OwningController->GetControlRotation();
+	OutRotation = ControlRot.IsNearlyZero() ? GetActorRotation() : ControlRot;
 }
 
 // -----------------------------------------------------------------------------

@@ -325,6 +325,15 @@ public:
 	UFUNCTION(BlueprintNativeEvent, Category = "Animation|Weapon")
 	void OnWeaponEquipped(const USFWeaponData* WeaponData);
 
+	/**
+	 * Override APawn::GetActorEyesViewPoint so weapon abilities (hitscan & projectile) aim correctly
+	 * for AI-controlled pawns. The default Pawn implementation returns GetControlRotation(), which on
+	 * an AIController only updates if something explicitly drives it (SetFocus / SetControlRotation).
+	 * For AI we instead derive the rotation from the controller's focal point if set, then fall back
+	 * to the actor's facing yaw so aim never points at the stale spawn rotation.
+	 */
+	virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const override;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
