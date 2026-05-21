@@ -52,13 +52,36 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Fire", meta = (ClampMin = "0.0", EditCondition = "FireMode == ESFBTFireMode::Hold"))
 	float HoldDuration = 0.5f;
 
+	/**
+	 * Optional ADS lead-in. When > 0 the task presses the ADS input tag, waits this many
+	 * seconds for the ADS ability to settle (camera FOV, weapon sway), then sends the
+	 * primary-fire press. ADS is released when the task completes (or aborts). Set to 0
+	 * to fire from the hip immediately.
+	 */
+	UPROPERTY(EditAnywhere, Category = "Fire|ADS", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float AdsLeadInSeconds = 0.25f;
+
+	enum class EFirePhase : uint8
+	{
+		AdsRamp,
+		Holding,
+		Done,
+	};
+
 	struct FMemory
 	{
 		float ElapsedSeconds = 0.0f;
-		bool bPressed = false;
+		bool bFirePressed = false;
+		bool bAdsPressed = false;
+		EFirePhase Phase = EFirePhase::AdsRamp;
 	};
 
 private:
-	void SendPressed(UBehaviorTreeComponent& OwnerComp);
-	void SendReleased(UBehaviorTreeComponent& OwnerComp);
+	void SendFirePressed(UBehaviorTreeComponent& OwnerComp);
+	void SendFireReleased(UBehaviorTreeComponent& OwnerComp);
+	void SendAdsPressed(UBehaviorTreeComponent& OwnerComp);
+	void SendAdsReleased(UBehaviorTreeComponent& OwnerComp);
+
+	/** Fire-shot transition: presses fire, configures FMemory state based on FireMode, returns the BT result the caller should propagate. */
+	EBTNodeResult::Type BeginFiring(UBehaviorTreeComponent& OwnerComp, FMemory& Mem);
 };

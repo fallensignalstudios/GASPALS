@@ -22,6 +22,17 @@ public:
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data) override;
 
+private:
+	/**
+	 * Shared damage application: soak through Shields first, then apply the remainder
+	 * to Health, fire HandleHitReact / HandleDeath / StatRegen notifications.
+	 * Both the Damage meta-attribute path and direct-Health writes route through this
+	 * so designer GEs that touch Health directly still observe the shield-first rule.
+	 */
+	void ApplyShieldedDamage(float IncomingDamage, class ASFCharacterBase* Character);
+
+public:
+
 	UPROPERTY(BlueprintReadOnly, Category = "Attributes")
 	FGameplayAttributeData Health;
 	ATTRIBUTE_ACCESSORS(USFAttributeSetBase, Health)
