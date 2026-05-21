@@ -6,6 +6,7 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Animation/AnimMontage.h"
 #include "Characters/SFCharacterBase.h"
+#include "Combat/SFAutoAimComponent.h"
 #include "Combat/SFCombatComponent.h"
 #include "Combat/SFHitTypes.h"
 #include "Combat/SFWeaponActor.h"
@@ -165,6 +166,14 @@ void USFGameplayAbility_WeaponMelee::ActivateAbility(
 
 	// Pick which weapon actor "owns" this swing (for paired weapons we alternate hands).
 	ChooseSwingingWeaponActor(Equipment, WeaponData);
+
+	// Quality-of-life: nudge the player's camera toward the nearest hostile in front of them before
+	// the swing animation kicks off. NPCs swinging melee don't have an auto-aim component (it lives
+	// on the player only) \u2014 FindComponentByClass returns null and we skip silently.
+	if (USFAutoAimComponent* AutoAim = Character->FindComponentByClass<USFAutoAimComponent>())
+	{
+		AutoAim->RequestMeleeFacingSnap();
+	}
 
 	// Apply the swinging state tag so reload / ADS / movement systems can react.
 	if (ActorInfo->AbilitySystemComponent.IsValid())
