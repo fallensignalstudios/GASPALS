@@ -9,6 +9,7 @@
 #include "Characters/SFEnemyCharacter.h"
 #include "Combat/SFHitReactionComponent.h"
 #include "Combat/SFWeaponActor.h"
+#include "Combat/SFWeaponData.h"
 #include "Components/SFEquipmentComponent.h"
 #include "Faction/SFFactionStatics.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -24,6 +25,8 @@
 #include "SFHitResolverInterface.h"
 #include "SFHitTypes.h"
 #include "TimerManager.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogSFMeleeDamage, Log, All);
 
 USFCombatComponent::USFCombatComponent()
 {
@@ -75,6 +78,9 @@ void USFCombatComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void USFCombatComponent::BeginAttackWindow()
 {
+	UE_LOG(LogSFMeleeDamage, Verbose, TEXT("BeginAttackWindow: owner=%s comboIdx=%d"),
+		OwnerCharacter ? *OwnerCharacter->GetName() : TEXT("NULL"),
+		CurrentComboIndex);
 	HitActorsThisAttack.Reset();
 
 	// Combo chain bookkeeping: if the player threw another attack within
@@ -121,6 +127,9 @@ void USFCombatComponent::HandleAttackHitInternal(ESFAttackType AttackType)
 {
 	if (!OwnerCharacter || OwnerCharacter->IsDead())
 	{
+		UE_LOG(LogSFMeleeDamage, Verbose, TEXT("HandleAttackHitInternal: owner=%s dead=%d \u2014 skipping"),
+			OwnerCharacter ? *OwnerCharacter->GetName() : TEXT("NULL"),
+			OwnerCharacter ? (int32)OwnerCharacter->IsDead() : -1);
 		return;
 	}
 
@@ -146,7 +155,12 @@ void USFCombatComponent::HandleAttackHitInternal(ESFAttackType AttackType)
 	}
 
 	TArray<FHitResult> HitResults;
-	if (!PerformAttackSweep(StartOffset, TraceLength, TraceRadius, HitResults))
+	const bool bSwept = PerformAttackSweep(StartOffset, TraceLength, TraceRadius, HitResults);
+	UE_LOG(LogSFMeleeDamage, Log, TEXT("HandleAttackHitInternal: attack=%s sweepHit=%d numHits=%d"),
+		(AttackType == ESFAttackType::Heavy) ? TEXT("Heavy") : TEXT("Light"),
+		bSwept ? 1 : 0,
+		HitResults.Num());
+	if (!bSwept)
 	{
 		return;
 	}
@@ -331,6 +345,21 @@ TSubclassOf<UGameplayEffect> USFCombatComponent::GetDamageEffectForAttackType(ES
 		return nullptr;
 	}
 
+	// Prefer the equipped weapon's DamageEffectClass when set \u2014 lets designers put the kinetic /
+	// energy / etc damage GE on the weapon asset itself instead of duplicating it across every
+	// character BP. Falls back to the character's Light/HeavyAttackDamageEffect when the weapon
+	// doesn't specify one (e.g. unarmed swings, NPCs that don't equip a weapon).
+	if (USFEquipmentComponent* Equipment = OwnerCharacter->GetEquipmentComponent())
+	{
+		if (USFWeaponData* WeaponData = Equipment->GetCurrentWeaponData())
+		{
+			if (WeaponData->DamageEffectClass)
+			{
+				return WeaponData->DamageEffectClass;
+			}
+		}
+	}
+
 	switch (AttackType)
 	{
 	case ESFAttackType::Light:
@@ -361,8 +390,20 @@ void USFCombatComponent::ApplyResolvedHitWithGAS(const FSFHitData& HitData, cons
 	TSubclassOf<UGameplayEffect> DamageEffect = GetDamageEffectForAttackType(HitData.AttackType);
 	if (!DamageEffect)
 	{
+		UE_LOG(LogSFMeleeDamage, Warning,
+			TEXT("ApplyResolvedHitWithGAS: no DamageEffect resolved for %s attack on %s. Set USFWeaponData::DamageEffectClass on the equipped weapon asset (preferred) or LightAttackDamageEffect/HeavyAttackDamageEffect on the character BP."),
+			(HitData.AttackType == ESFAttackType::Heavy) ? TEXT("Heavy") : TEXT("Light"),
+			HitData.TargetActor ? *HitData.TargetActor->GetName() : TEXT("NULL"));
 		return;
 	}
+
+	UE_LOG(LogSFMeleeDamage, Verbose,
+		TEXT("ApplyResolvedHitWithGAS: target=%s damage=%.1f effect=%s outcome=%d weakpoint=%d"),
+		HitData.TargetActor ? *HitData.TargetActor->GetName() : TEXT("NULL"),
+		ResolvedHit.HealthDamage,
+		*DamageEffect->GetName(),
+		(int32)ResolvedHit.Outcome,
+		HitData.bIsWeakpointHit ? 1 : 0);
 
 	FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
 	Context.AddSourceObject(OwnerCharacter);
