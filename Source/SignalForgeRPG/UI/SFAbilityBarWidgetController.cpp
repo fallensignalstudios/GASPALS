@@ -26,7 +26,7 @@ void USFAbilityBarWidgetController::Initialize(ASFCharacterBase* InPlayerCharact
 
 	UE_LOG(LogTemp, Log,
 		TEXT("[SF AbilityBarCtrl %p] Initialize bound to pawn '%s' ASC=%p"),
-		this, *GetNameSafe(InPlayerCharacter), AbilitySystemComponent);
+		this, *GetNameSafe(InPlayerCharacter), AbilitySystemComponent.Get());
 
 	AbilitySystemComponent->OnAbilitiesChanged().AddUObject(
 		this, &USFAbilityBarWidgetController::HandleAbilitiesChanged);
