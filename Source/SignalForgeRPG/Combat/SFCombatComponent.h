@@ -118,12 +118,24 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Crit", meta = (ClampMin = "1.0", ClampMax = "10.0"))
 	float WeakpointDamageMultiplier = 2.0f;
 
-	/** Default damage when the target has no resolver. Replaces the old hard-coded 20.f. */
+	/** Default damage when the target has no resolver and the equipped weapon has no BaseDamage. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Tuning", meta = (ClampMin = "0.0"))
 	float LightDefaultDamage = 18.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Tuning", meta = (ClampMin = "0.0"))
 	float HeavyDefaultDamage = 32.f;
+
+	/** Multiplier applied to USFWeaponData::RangedConfig.BaseDamage when resolving a Light swing's
+	 *  base damage. 1.0 = use the weapon's BaseDamage verbatim. Used only when the weapon has no
+	 *  per-step MeleeConfig.LightComboDamages authored. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Tuning", meta = (ClampMin = "0.0"))
+	float LightBaseDamageMultiplier = 1.0f;
+
+	/** Multiplier applied to USFWeaponData::RangedConfig.BaseDamage when resolving a Heavy swing's
+	 *  base damage. Heavies typically hit harder than lights even when both pull from the same
+	 *  weapon BaseDamage; 1.6 gives roughly Souls-style heavy/light damage spread. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Tuning", meta = (ClampMin = "0.0"))
+	float HeavyBaseDamageMultiplier = 1.6f;
 
 	/** Hit-stop bookkeeping (so overlapping hits don't compound dilation forever). */
 	FTimerHandle HitStopTimerHandle;
@@ -182,6 +194,12 @@ protected:
 
 	/** Utility: get base damage effect for a given attack type from the owner */
 	TSubclassOf<UGameplayEffect> GetDamageEffectForAttackType(ESFAttackType AttackType) const;
+
+	/** Resolve the base damage magnitude for a swing when the target has no hit resolver. Consults
+	 *  (in order) the equipped weapon's MeleeConfig.Light/HeavyComboDamages indexed by combo step,
+	 *  then the weapon's RangedConfig.BaseDamage times the light/heavy multiplier, then the
+	 *  component-level Light/HeavyDefaultDamage. */
+	float ResolveBaseMeleeDamage(ESFAttackType AttackType) const;
 
 	/** Choose feedback profile for an attack type. */
 	const FSFCinematicFeedback& GetFeedbackForAttackType(ESFAttackType AttackType) const;

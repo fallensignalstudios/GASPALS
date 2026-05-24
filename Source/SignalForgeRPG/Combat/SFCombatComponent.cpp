@@ -204,7 +204,7 @@ void USFCombatComponent::HandleAttackHitInternal(ESFAttackType AttackType)
 			// Attribute-driven defaults instead of a magic 20.f. Resolvers can
 			// still override anything they care about; this is the floor.
 			ResolvedHit.Outcome = ESFHitOutcome::Hit;
-			ResolvedHit.HealthDamage = (AttackType == ESFAttackType::Heavy) ? HeavyDefaultDamage : LightDefaultDamage;
+			ResolvedHit.HealthDamage = ResolveBaseMeleeDamage(AttackType);
 		}
 
 		// Layer in crit / weakpoint scaling regardless of resolver path.
@@ -336,6 +336,47 @@ FSFHitData USFCombatComponent::BuildHitDataFromResult(AActor* HitActor, const FH
 	HitData.BreakGuardBonus = 0.0f;
 
 	return HitData;
+}
+
+float USFCombatComponent::ResolveBaseMeleeDamage(ESFAttackType AttackType) const
+{
+	// Resolution order, most specific to least specific:
+	//   1. Equipped weapon's MeleeConfig.LightComboDamages / HeavyComboDamages indexed by current
+	//      combo step. Lets designers ramp damage across the chain (jab \u2192 jab \u2192 finisher).
+	//      If the array is shorter than the combo length, the last entry repeats.
+	//   2. Equipped weapon's RangedConfig.BaseDamage \u2014 the only flat "base damage" slot the
+	//      USFWeaponData asset exposes. Designers tend to drop the desired number there for both
+	//      ranged and melee. Multiplied by Light/HeavyBaseDamageMultiplier so a heavy still hits
+	//      harder than a light when both pull from the same weapon stat.
+	//   3. Component-level Light/HeavyDefaultDamage as the final floor for unarmed swings or NPCs
+	//      without an equipped weapon.
+	if (OwnerCharacter)
+	{
+		if (USFEquipmentComponent* Equipment = OwnerCharacter->GetEquipmentComponent())
+		{
+			if (USFWeaponData* WeaponData = Equipment->GetCurrentWeaponData())
+			{
+				const TArray<float>& ComboDamages = (AttackType == ESFAttackType::Heavy)
+					? WeaponData->MeleeConfig.HeavyComboDamages
+					: WeaponData->MeleeConfig.LightComboDamages;
+				if (ComboDamages.Num() > 0)
+				{
+					const int32 Idx = FMath::Clamp(CurrentComboIndex, 0, ComboDamages.Num() - 1);
+					return ComboDamages[Idx];
+				}
+
+				if (WeaponData->RangedConfig.BaseDamage > 0.f)
+				{
+					const float Multiplier = (AttackType == ESFAttackType::Heavy)
+						? HeavyBaseDamageMultiplier
+						: LightBaseDamageMultiplier;
+					return WeaponData->RangedConfig.BaseDamage * Multiplier;
+				}
+			}
+		}
+	}
+
+	return (AttackType == ESFAttackType::Heavy) ? HeavyDefaultDamage : LightDefaultDamage;
 }
 
 TSubclassOf<UGameplayEffect> USFCombatComponent::GetDamageEffectForAttackType(ESFAttackType AttackType) const
