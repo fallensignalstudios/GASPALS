@@ -779,10 +779,8 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 
 	const bool bIsBlocking = OwnedTags.HasTagExact(GameplayTags.State_Blocking);
 	const bool bIsBroken = OwnedTags.HasTagExact(GameplayTags.State_Broken);
-	const bool bInParryWindow =
-		OwnedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("State.ParryWindow")));
-	const bool bInvulnerable =
-		OwnedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("State.Invulnerable")));
+	const bool bInParryWindow = OwnedTags.HasTagExact(GameplayTags.State_ParryWindow);
+	const bool bInvulnerable = OwnedTags.HasTagExact(GameplayTags.State_Invulnerable);
 
 	const float CurrentGuard = Attr->GetGuard();
 	const float CurrentPoise = Attr->GetPoise();
@@ -796,7 +794,8 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 	if (bIsBroken)
 	{
 		Result.Outcome = ESFHitOutcome::Hit;
-		Result.HealthDamage = 25.f;
+		// Broken targets take full weapon damage (broken-state bonus could be layered here later).
+		Result.HealthDamage = (BaseDamageFromAttacker > 0.f) ? BaseDamageFromAttacker : 25.f;
 		Result.PoiseDamageToTarget = 0.f;
 		return Result;
 	}

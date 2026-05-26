@@ -72,6 +72,8 @@ public:
 	FGameplayTag State_Invulnerable_Dodge;
 	FGameplayTag State_Blocking;
 	FGameplayTag State_Broken;
+	FGameplayTag State_ParryWindow;
+	FGameplayTag State_Invulnerable;
 	FGameplayTag State_Healing;
 
 	/** Cinematic / hit feedback */
