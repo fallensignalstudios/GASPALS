@@ -5,6 +5,8 @@
 #include "Components/SFStatRegenComponent.h"
 #include "GameplayEffectExtension.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogSFDamagePipeline, Log, All);
+
 USFAttributeSetBase::USFAttributeSetBase()
 {
 }
@@ -87,6 +89,10 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 		const float LocalDamage = GetDamage();
 		SetDamage(0.0f);
 
+		UE_LOG(LogSFDamagePipeline, Log,
+			TEXT("PostGEExec Damage meta branch: actor=%s LocalDamage=%.2f HealthBefore=%.2f ShieldsBefore=%.2f"),
+			*GetNameSafe(OwnerActor), LocalDamage, GetHealth(), GetShields());
+
 		if (LocalDamage <= 0.0f)
 		{
 			return;
@@ -100,12 +106,18 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 		// so designer GEs that modify Health directly still observe shields, hit react,
 		// and death. Positive magnitudes (heals) are clamped and pass through unchanged.
 		const float Magnitude = Data.EvaluatedData.Magnitude;
+		UE_LOG(LogSFDamagePipeline, Log,
+			TEXT("PostGEExec Health branch: actor=%s Magnitude=%.2f HealthNow=%.2f MaxHealth=%.2f"),
+			*GetNameSafe(OwnerActor), Magnitude, GetHealth(), GetMaxHealth());
 		if (Magnitude < 0.0f)
 		{
 			// Undo the raw health write that the GE just performed, then re-apply via
 			// the shielded path. We subtract Magnitude (it's negative -> adds health back).
 			const float HealthAfterRawHit = GetHealth();
 			const float HealthBeforeRawHit = FMath::Clamp(HealthAfterRawHit - Magnitude, 0.0f, GetMaxHealth());
+			UE_LOG(LogSFDamagePipeline, Log,
+				TEXT("  -> RawWrite restore: HealthAfterRaw=%.2f HealthBeforeRaw=%.2f (will SetHealth then ApplyShieldedDamage(%.2f))"),
+				HealthAfterRawHit, HealthBeforeRawHit, -Magnitude);
 			SetHealth(HealthBeforeRawHit);
 
 			ApplyShieldedDamage(-Magnitude, Character);
@@ -178,6 +190,11 @@ void USFAttributeSetBase::ApplyShieldedDamage(float IncomingDamage, ASFCharacter
 	{
 		SetHealth(FMath::Clamp(GetHealth() - RemainingDamage, 0.0f, GetMaxHealth()));
 	}
+
+	UE_LOG(LogSFDamagePipeline, Log,
+		TEXT("ApplyShieldedDamage: actor=%s Incoming=%.2f ShieldsBefore=%.2f ShieldsAfter=%.2f HealthBefore=%.2f HealthAfter=%.2f"),
+		*GetNameSafe(Character), IncomingDamage, ShieldsBeforeDamage, GetShields(),
+		HealthBeforeDamage, GetHealth());
 
 	const bool bShieldsWereDamaged = GetShields() < ShieldsBeforeDamage;
 	const bool bHealthWasDamaged = GetHealth() < HealthBeforeDamage;

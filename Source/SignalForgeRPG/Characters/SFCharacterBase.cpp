@@ -342,12 +342,18 @@ void ASFCharacterBase::BroadcastInitialAttributeValues()
 void ASFCharacterBase::HandleHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
 	if (!AttributeSet) { return; }
+	UE_LOG(LogSFCharacter, Log,
+		TEXT("HandleHealthChanged actor=%s OldValue=%.2f NewValue=%.2f MaxHealth=%.2f"),
+		*GetName(), ChangeData.OldValue, ChangeData.NewValue, AttributeSet->GetMaxHealth());
 	OnHealthChanged.Broadcast(ChangeData.NewValue, AttributeSet->GetMaxHealth());
 }
 
 void ASFCharacterBase::HandleMaxHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
 	if (!AttributeSet) { return; }
+	UE_LOG(LogSFCharacter, Log,
+		TEXT("HandleMaxHealthChanged actor=%s OldMax=%.2f NewMax=%.2f Health=%.2f"),
+		*GetName(), ChangeData.OldValue, ChangeData.NewValue, AttributeSet->GetHealth());
 	OnHealthChanged.Broadcast(AttributeSet->GetHealth(), ChangeData.NewValue);
 }
 
@@ -749,12 +755,26 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 		return Result;
 	}
 
+	// Ask the attacker what their weapon thinks this swing should do. This lets the weapon asset's
+	// BaseDamage (or per-combo-step LightComboDamages / HeavyComboDamages) flow through the resolver
+	// path the same way it flows through the no-resolver fallback. Without this, every melee hit
+	// against any ASFCharacterBase-derived enemy snapped to the hardcoded 25.f below regardless of
+	// what was on the weapon asset.
+	float BaseDamageFromAttacker = 0.f;
+	if (AActor* SourceActor = HitData.SourceActor.Get())
+	{
+		if (USFCombatComponent* AttackerCombat = SourceActor->FindComponentByClass<USFCombatComponent>())
+		{
+			BaseDamageFromAttacker = AttackerCombat->ResolveBaseMeleeDamage(HitData.AttackType);
+		}
+	}
+
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	const USFAttributeSetBase* Attr = AttributeSet;
 	if (!ASC || !Attr)
 	{
 		Result.Outcome = ESFHitOutcome::Hit;
-		Result.HealthDamage = 20.f;
+		Result.HealthDamage = (BaseDamageFromAttacker > 0.f) ? BaseDamageFromAttacker : 20.f;
 		return Result;
 	}
 
@@ -765,10 +785,8 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 
 	const bool bIsBlocking = OwnedTags.HasTagExact(GameplayTags.State_Blocking);
 	const bool bIsBroken = OwnedTags.HasTagExact(GameplayTags.State_Broken);
-	const bool bInParryWindow =
-		OwnedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("State.ParryWindow")));
-	const bool bInvulnerable =
-		OwnedTags.HasTagExact(FGameplayTag::RequestGameplayTag(TEXT("State.Invulnerable")));
+	const bool bInParryWindow = OwnedTags.HasTagExact(GameplayTags.State_ParryWindow);
+	const bool bInvulnerable = OwnedTags.HasTagExact(GameplayTags.State_Invulnerable);
 
 	const float CurrentGuard = Attr->GetGuard();
 	const float CurrentPoise = Attr->GetPoise();
@@ -782,7 +800,8 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 	if (bIsBroken)
 	{
 		Result.Outcome = ESFHitOutcome::Hit;
-		Result.HealthDamage = 25.f;
+		// Broken targets take full weapon damage (broken-state bonus could be layered here later).
+		Result.HealthDamage = (BaseDamageFromAttacker > 0.f) ? BaseDamageFromAttacker : 25.f;
 		Result.PoiseDamageToTarget = 0.f;
 		return Result;
 	}
@@ -818,7 +837,7 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 	}
 
 	Result.Outcome = ESFHitOutcome::Hit;
-	Result.HealthDamage = 25.f;
+	Result.HealthDamage = (BaseDamageFromAttacker > 0.f) ? BaseDamageFromAttacker : 25.f;
 	Result.PoiseDamageToTarget = 15.f * HitData.PoiseDamageScale;
 	Result.PoiseDamageToSource = 0.f;
 

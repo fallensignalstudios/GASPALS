@@ -224,6 +224,14 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("State.Broken"),
 		TEXT("Character is guard-broken or staggered"));
 
+	GameplayTags.State_ParryWindow = TagManager.AddNativeGameplayTag(
+		FName("State.ParryWindow"),
+		TEXT("Character is in the active parry timing window; incoming blockable hits convert to perfect parries"));
+
+	GameplayTags.State_Invulnerable = TagManager.AddNativeGameplayTag(
+		FName("State.Invulnerable"),
+		TEXT("Character is fully invulnerable to incoming damage"));
+
 	/** Cinematic / hit feedback cues */
 	GameplayTags.Cue_Hit_Impact = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Hit.Impact"),

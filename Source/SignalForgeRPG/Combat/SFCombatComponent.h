@@ -176,6 +176,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Combat|Cinematic")
 	void PlayCinematicFeedback(FGameplayTag FeedbackTag, AActor* AtActor, FVector AtLocation);
 
+	/** Resolve the base damage magnitude this character's next melee swing should deal. Consulted
+	 *  by both the no-resolver fallback path in HandleAttackHitInternal *and* by hit resolvers on
+	 *  targets (so the weapon's BaseDamage / per-combo-step damage flows through the resolver path
+	 *  too). Order: weapon's MeleeConfig.Light/HeavyComboDamages by combo step, then weapon's
+	 *  RangedConfig.BaseDamage times Light/HeavyBaseDamageMultiplier, then component-level
+	 *  Light/HeavyDefaultDamage. */
+	UFUNCTION(BlueprintCallable, Category = "Combat")
+	float ResolveBaseMeleeDamage(ESFAttackType AttackType) const;
+
 protected:
 	/** Core function to process an attack type (Light/Heavy) */
 	void HandleAttackHitInternal(ESFAttackType AttackType);
@@ -194,12 +203,6 @@ protected:
 
 	/** Utility: get base damage effect for a given attack type from the owner */
 	TSubclassOf<UGameplayEffect> GetDamageEffectForAttackType(ESFAttackType AttackType) const;
-
-	/** Resolve the base damage magnitude for a swing when the target has no hit resolver. Consults
-	 *  (in order) the equipped weapon's MeleeConfig.Light/HeavyComboDamages indexed by combo step,
-	 *  then the weapon's RangedConfig.BaseDamage times the light/heavy multiplier, then the
-	 *  component-level Light/HeavyDefaultDamage. */
-	float ResolveBaseMeleeDamage(ESFAttackType AttackType) const;
 
 	/** Choose feedback profile for an attack type. */
 	const FSFCinematicFeedback& GetFeedbackForAttackType(ESFAttackType AttackType) const;
