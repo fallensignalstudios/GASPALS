@@ -342,12 +342,18 @@ void ASFCharacterBase::BroadcastInitialAttributeValues()
 void ASFCharacterBase::HandleHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
 	if (!AttributeSet) { return; }
+	UE_LOG(LogSFCharacter, Log,
+		TEXT("HandleHealthChanged actor=%s OldValue=%.2f NewValue=%.2f MaxHealth=%.2f"),
+		*GetName(), ChangeData.OldValue, ChangeData.NewValue, AttributeSet->GetMaxHealth());
 	OnHealthChanged.Broadcast(ChangeData.NewValue, AttributeSet->GetMaxHealth());
 }
 
 void ASFCharacterBase::HandleMaxHealthChanged(const FOnAttributeChangeData& ChangeData)
 {
 	if (!AttributeSet) { return; }
+	UE_LOG(LogSFCharacter, Log,
+		TEXT("HandleMaxHealthChanged actor=%s OldMax=%.2f NewMax=%.2f Health=%.2f"),
+		*GetName(), ChangeData.OldValue, ChangeData.NewValue, AttributeSet->GetHealth());
 	OnHealthChanged.Broadcast(AttributeSet->GetHealth(), ChangeData.NewValue);
 }
 
