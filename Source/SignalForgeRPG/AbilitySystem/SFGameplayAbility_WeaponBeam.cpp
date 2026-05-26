@@ -570,6 +570,25 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 				SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_IsWeakpointHit, 1.0f);
 			}
 
+			// Per-weapon crit tuning (see SFGameplayAbility_WeaponFire for full rationale).
+			// Beams typically leave CriticalChance at 0 — precision hits drive crits and
+			// continuous beams crit-stack feels best when limited to weakpoint geometry.
+			if (USFEquipmentComponent* Equipment = Character->GetEquipmentComponent())
+			{
+				if (const USFWeaponData* WeaponData = Equipment->GetCurrentWeaponData())
+				{
+					if (WeaponData->CombatTuning.CriticalChance > 0.0f)
+					{
+						SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_BonusCritChance, WeaponData->CombatTuning.CriticalChance);
+					}
+					const float WeaponMultBonus = FMath::Max(WeaponData->CombatTuning.CriticalMultiplier - 1.0f, 0.0f);
+					if (WeaponMultBonus > 0.0f)
+					{
+						SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_BonusCritMultiplier, WeaponMultBonus);
+					}
+				}
+			}
+
 			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 		}
 	}
