@@ -749,12 +749,26 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 		return Result;
 	}
 
+	// Ask the attacker what their weapon thinks this swing should do. This lets the weapon asset's
+	// BaseDamage (or per-combo-step LightComboDamages / HeavyComboDamages) flow through the resolver
+	// path the same way it flows through the no-resolver fallback. Without this, every melee hit
+	// against any ASFCharacterBase-derived enemy snapped to the hardcoded 25.f below regardless of
+	// what was on the weapon asset.
+	float BaseDamageFromAttacker = 0.f;
+	if (AActor* SourceActor = HitData.SourceActor.Get())
+	{
+		if (USFCombatComponent* AttackerCombat = SourceActor->FindComponentByClass<USFCombatComponent>())
+		{
+			BaseDamageFromAttacker = AttackerCombat->ResolveBaseMeleeDamage(HitData.AttackType);
+		}
+	}
+
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponent();
 	const USFAttributeSetBase* Attr = AttributeSet;
 	if (!ASC || !Attr)
 	{
 		Result.Outcome = ESFHitOutcome::Hit;
-		Result.HealthDamage = 20.f;
+		Result.HealthDamage = (BaseDamageFromAttacker > 0.f) ? BaseDamageFromAttacker : 20.f;
 		return Result;
 	}
 
@@ -818,7 +832,7 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 	}
 
 	Result.Outcome = ESFHitOutcome::Hit;
-	Result.HealthDamage = 25.f;
+	Result.HealthDamage = (BaseDamageFromAttacker > 0.f) ? BaseDamageFromAttacker : 25.f;
 	Result.PoiseDamageToTarget = 15.f * HitData.PoiseDamageScale;
 	Result.PoiseDamageToSource = 0.f;
 

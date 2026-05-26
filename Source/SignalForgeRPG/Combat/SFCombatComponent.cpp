@@ -439,8 +439,8 @@ void USFCombatComponent::ApplyResolvedHitWithGAS(const FSFHitData& HitData, cons
 		return;
 	}
 
-	UE_LOG(LogSFMeleeDamage, Verbose,
-		TEXT("ApplyResolvedHitWithGAS: target=%s damage=%.1f effect=%s outcome=%d weakpoint=%d"),
+	UE_LOG(LogSFMeleeDamage, Log,
+		TEXT("ApplyResolvedHitWithGAS: target=%s damage=%.1f effect=%s outcome=%d weakpoint=%d. If you see damage>0 but the target's Health doesn't drop, the GE is missing an Execution Calculation that reads SetByCaller Data.BaseDamage \u2014 add SFDamageExecutionCalculation to its Executions array."),
 		HitData.TargetActor ? *HitData.TargetActor->GetName() : TEXT("NULL"),
 		ResolvedHit.HealthDamage,
 		*DamageEffect->GetName(),
