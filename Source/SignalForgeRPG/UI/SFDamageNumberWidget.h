@@ -41,10 +41,11 @@ public:
 	/**
 	 * Designer hook fired right after InitDamageNumber finishes wiring state.
 	 * Use this in BP to bind the damage text, set the color on a TextBlock,
-	 * play a sound, spawn a Niagara burst, etc.
+	 * play a sound, spawn a Niagara burst, etc. Named distinctly from
+	 * UUserWidget::OnInitialized() to avoid colliding with that engine hook.
 	 */
 	UFUNCTION(BlueprintImplementableEvent, Category = "SF|DamageNumber")
-	void OnInitialized();
+	void OnDamageNumberInitialized();
 
 protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
