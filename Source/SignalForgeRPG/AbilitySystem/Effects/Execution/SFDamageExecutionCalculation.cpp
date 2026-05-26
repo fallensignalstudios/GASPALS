@@ -179,9 +179,10 @@ void USFDamageExecutionCalculation::Execute_Implementation(
 	}
 
 	// 7) Crit roll if we still have damage
+	bool bCrit = false;
 	if (Damage > 0.0f)
 	{
-		const bool bCrit = FMath::FRand() < CritChance;
+		bCrit = FMath::FRand() < CritChance;
 		if (bCrit)
 		{
 			Damage *= CritMultiplier;
@@ -277,6 +278,16 @@ void USFDamageExecutionCalculation::Execute_Implementation(
 
 	// 10) Final clamp and output Damage meta attribute
 	Damage = FMath::Max(Damage, 0.0f);
+
+	// Write IsCrit + FinalDamage back to Spec so consumers (e.g. damage-number
+	// floaters in SFAttributeSetBase::PostGameplayEffectExecute) can read them.
+	// const_cast is the standard GAS pattern here — the exec owns the spec for
+	// the duration of Execute_Implementation.
+	{
+		FGameplayEffectSpec& MutableSpec = const_cast<FGameplayEffectSpec&>(Spec);
+		MutableSpec.SetSetByCallerMagnitude(Tags.Data_IsCrit, bCrit ? 1.0f : 0.0f);
+		MutableSpec.SetSetByCallerMagnitude(Tags.Data_FinalDamage, Damage);
+	}
 
 	if (Damage > 0.0f)
 	{

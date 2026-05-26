@@ -4,8 +4,13 @@
 #include "Characters/SFCharacterBase.h"
 #include "Components/SFStatRegenComponent.h"
 #include "Core/SignalForgeGameplayTags.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
+#include "GameFramework/Pawn.h"
 #include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
+#include "Kismet/GameplayStatics.h"
+#include "UI/SFDamageNumberSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSFDamagePipeline, Log, All);
 
@@ -101,6 +106,56 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 		}
 
 		ApplyShieldedDamage(LocalDamage, Character);
+
+		// Destiny-style damage-number floater: only show when the local player
+		// was the instigator. Filtering here (rather than in the subsystem)
+		// keeps the spec-context lookup cheap and avoids spawning widgets on
+		// remote/AI damage events. Reads IsCrit / IsWeakpointHit / FinalDamage
+		// SetByCallers populated by SFDamageExecutionCalculation; falls back
+		// to LocalDamage if FinalDamage wasn't written (e.g. raw Damage meta
+		// hits that bypass the exec calc).
+		if (UWorld* World = GetWorld())
+		{
+			const FGameplayEffectSpec& Spec = Data.EffectSpec;
+			AActor* Instigator = Spec.GetContext().GetInstigator();
+			APawn* LocalPawn = UGameplayStatics::GetPlayerPawn(World, 0);
+			if (Instigator && LocalPawn && Instigator == LocalPawn)
+			{
+				const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+				const bool bCrit = Spec.GetSetByCallerMagnitude(Tags.Data_IsCrit, false, 0.0f) > 0.0f;
+				const bool bWeakpoint = Spec.GetSetByCallerMagnitude(Tags.Data_IsWeakpointHit, false, 0.0f) > 0.0f;
+				const float FinalDamage = Spec.GetSetByCallerMagnitude(Tags.Data_FinalDamage, false, LocalDamage);
+
+				// Prefer the actual impact point from the hit result for accurate
+				// placement; fall back to target center + half-height so floaters
+				// still appear above the head for AoE / projectile splash damage
+				// where no per-bone hit was recorded.
+				FVector ImpactLocation = FVector::ZeroVector;
+				if (const FHitResult* HitResult = Spec.GetContext().GetHitResult())
+				{
+					ImpactLocation = HitResult->ImpactPoint;
+				}
+				if (ImpactLocation.IsNearlyZero() && OwnerActor)
+				{
+					ImpactLocation = OwnerActor->GetActorLocation();
+					if (Character)
+					{
+						ImpactLocation.Z += Character->GetSimpleCollisionHalfHeight();
+					}
+				}
+
+				if (APlayerController* LocalPC = UGameplayStatics::GetPlayerController(World, 0))
+				{
+					if (ULocalPlayer* LP = LocalPC->GetLocalPlayer())
+					{
+						if (USFDamageNumberSubsystem* DN = LP->GetSubsystem<USFDamageNumberSubsystem>())
+						{
+							DN->ShowDamageNumber(FinalDamage, bCrit, bWeakpoint, ImpactLocation);
+						}
+					}
+				}
+			}
+		}
 	}
 	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
