@@ -31,7 +31,7 @@ void USFDamageNumberWidget::InitDamageNumber(float InDamage, bool bInIsCrit, boo
 		CanvasSlot->SetPosition(ScreenPos);
 	}
 
-	OnInitialized();
+	OnDamageNumberInitialized();
 }
 
 FLinearColor USFDamageNumberWidget::GetResolvedColor() const
