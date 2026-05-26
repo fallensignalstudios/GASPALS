@@ -3,6 +3,8 @@
 #include "AbilitySystemComponent.h"
 #include "Characters/SFCharacterBase.h"
 #include "Components/SFStatRegenComponent.h"
+#include "Core/SignalForgeGameplayTags.h"
+#include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSFDamagePipeline, Log, All);
@@ -104,7 +106,11 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 	{
 		// Negative magnitude == incoming damage. Re-route through the shield-first pipeline
 		// so designer GEs that modify Health directly still observe shields, hit react,
-		// and death. Positive magnitudes (heals) are clamped and pass through unchanged.
+		// and death. Positive magnitudes (heals) are clamped and pass through unchanged --
+		// unless the same spec is also a damage spec (Data.BaseDamage SetByCaller), in which
+		// case the positive Health modifier is a designer mistake (e.g. a stray Health
+		// modifier alongside the Damage execution calculation) and we must revert it,
+		// otherwise every damage hit silently re-heals the target to MaxHealth.
 		const float Magnitude = Data.EvaluatedData.Magnitude;
 		UE_LOG(LogSFDamagePipeline, Log,
 			TEXT("PostGEExec Health branch: actor=%s Magnitude=%.2f HealthNow=%.2f MaxHealth=%.2f"),
@@ -121,6 +127,30 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 			SetHealth(HealthBeforeRawHit);
 
 			ApplyShieldedDamage(-Magnitude, Character);
+		}
+		else if (Magnitude > 0.0f)
+		{
+			// Is this a damage spec? Damage specs carry the Data.BaseDamage SetByCaller
+			// magnitude (set by USFCombatComponent at apply time). If present, this positive
+			// Health modifier is a misconfiguration on the damage GE that would silently
+			// un-do the damage. Revert it so the Damage meta branch is the single source of
+			// truth for that hit.
+			const FGameplayEffectSpec& Spec = Data.EffectSpec;
+			const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
+			const bool bIsDamageSpec = Spec.GetSetByCallerMagnitude(SFTags.Data_BaseDamage, false, 0.0f) > 0.0f;
+			if (bIsDamageSpec)
+			{
+				const float HealthAfterRawWrite = GetHealth();
+				const float HealthBeforeRawWrite = FMath::Clamp(HealthAfterRawWrite - Magnitude, 0.0f, GetMaxHealth());
+				UE_LOG(LogSFDamagePipeline, Warning,
+					TEXT("  -> SUPPRESSED unintended heal: damage GE '%s' has a positive Health modifier (+%.2f). Reverting %.2f -> %.2f. Open the GE and remove the Health modifier; keep only the Damage execution calculation."),
+					*GetNameSafe(Spec.Def), Magnitude, HealthAfterRawWrite, HealthBeforeRawWrite);
+				SetHealth(HealthBeforeRawWrite);
+			}
+			else
+			{
+				SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
+			}
 		}
 		else
 		{
