@@ -138,7 +138,15 @@ bool USFEquipmentComponent::EquipWeaponInstance(const FSFWeaponInstanceData& Wea
 		}
 	}
 
-	RefreshEquippedWeaponActor();
+	// Route through the slot-aware spawner so paired-weapon (dual-wield) data
+	// assets correctly spawn their offhand actor on the default-weapon /
+	// direct-equip path. The legacy RefreshEquippedWeaponActor() does NOT call
+	// the offhand-spawn branch, which is why setting bIsPairedWeapon weapons
+	// as DefaultWeaponData previously equipped only the mainhand. The inventory
+	// path (EquipFromInventoryEntry) already uses the slot-aware variant, so
+	// behavior between starting-inventory equip and default-weapon equip now
+	// matches.
+	RefreshEquippedWeaponActorForSlot(InSlot, NewWeaponData);
 
 	// New slot is now active — make sure its visual is on the hand socket, not the holster.
 	UpdateWeaponActorAttachmentForSlot(InSlot, /*bIsActive=*/true);

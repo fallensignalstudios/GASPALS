@@ -94,9 +94,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "SF|DamageNumber|Labels")
 	FText CritTagLabel = NSLOCTEXT("SF.DamageNumber", "CritTag", "CRIT");
 
-	/** Tag chip text shown when bIsWeakpoint. */
+	/**
+	 * Optional alternate label for weakpoint hits. Default is empty so
+	 * weakpoint hits show the CRIT chip (Destiny-style: every weakpoint is
+	 * a guaranteed crit and surfaces as the same "CRIT" label). Set this to
+	 * "WEAK", "HEAD", "PRECISION", etc. if you want a distinct chip for
+	 * weakpoint hits.
+	 */
 	UPROPERTY(EditDefaultsOnly, Category = "SF|DamageNumber|Labels")
-	FText WeakpointTagLabel = NSLOCTEXT("SF.DamageNumber", "WeakTag", "WEAK");
+	FText WeakpointTagLabel;
 
 private:
 	/** Total damage dealt by this hit (post-mitigation). */

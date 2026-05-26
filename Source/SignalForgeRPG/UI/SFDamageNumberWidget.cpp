@@ -49,9 +49,16 @@ FLinearColor USFDamageNumberWidget::GetResolvedColor() const
 
 FText USFDamageNumberWidget::GetTagLabel() const
 {
+	// Destiny-style single-tag display: a weakpoint hit already auto-crits
+	// inside the damage execution, so semantically every weakpoint IS a crit.
+	// We surface that as the CRIT chip by default — designers who want the
+	// distinct "WEAK" wording back can edit WeakpointTagLabel on the widget
+	// CDO. Falls through to the explicit weakpoint label if it has been
+	// overridden to something non-empty AND non-equal to the crit label, so
+	// the field still has authoring meaning.
 	if (bIsWeakpoint)
 	{
-		return WeakpointTagLabel;
+		return WeakpointTagLabel.IsEmptyOrWhitespace() ? CritTagLabel : WeakpointTagLabel;
 	}
 	if (bIsCrit)
 	{

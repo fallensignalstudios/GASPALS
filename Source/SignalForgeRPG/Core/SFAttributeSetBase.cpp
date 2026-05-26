@@ -16,6 +16,14 @@ DEFINE_LOG_CATEGORY_STATIC(LogSFDamagePipeline, Log, All);
 
 USFAttributeSetBase::USFAttributeSetBase()
 {
+	// Crit-channel defaults: CritMultiplier starts at 1.0 so the exec calc's
+	// floor (which clamps the final multiplier to >= 1.0) doesn't swallow
+	// weapon-driven bonuses. A weapon contributing +0.5 via Data.BonusCritMultiplier
+	// stacks to 1.0 + 0.5 = 1.5x final on a crit. CritChance starts at 0.0 to
+	// preserve the Destiny model where precision (weakpoint) hits are the
+	// primary crit path and RNG body crits require a weapon or perk to opt in.
+	InitCritChance(0.0f);
+	InitCritMultiplier(1.0f);
 }
 
 void USFAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
