@@ -474,6 +474,32 @@ void USFCombatComponent::ApplyResolvedHitWithGAS(const FSFHitData& HitData, cons
 		Spec->SetSetByCallerMagnitude(Tags.Data_IsWeakpointHit, 1.f);
 	}
 
+	// Per-weapon crit tuning: forward the equipped weapon's CombatTuning.Critical*
+	// fields into the spec as Bonus* SetByCallers so the exec calc can stack them
+	// additively on top of the attacker's base CritChance / CritMultiplier
+	// attributes. Destiny-style: most melee weapons leave CriticalChance at 0
+	// because precision (weakpoint) hits are the primary crit path.
+	if (USFEquipmentComponent* Equipment = OwnerCharacter->GetEquipmentComponent())
+	{
+		if (const USFWeaponData* WeaponData = Equipment->GetCurrentWeaponData())
+		{
+			if (WeaponData->CombatTuning.CriticalChance > 0.0f)
+			{
+				Spec->SetSetByCallerMagnitude(Tags.Data_BonusCritChance, WeaponData->CombatTuning.CriticalChance);
+			}
+			// CriticalMultiplier is a multiplier (>=1.0); the exec calc adds the
+			// Bonus value to the base multiplier, so subtract 1.0 here to make
+			// the data-asset value behave like "weapon contributes +N to the
+			// total multiplier." A weapon at 1.5 contributes +0.5 on top of the
+			// character's base 1.0 → final 1.5x. A weapon at 1.0 contributes 0.
+			const float WeaponMultBonus = FMath::Max(WeaponData->CombatTuning.CriticalMultiplier - 1.0f, 0.0f);
+			if (WeaponMultBonus > 0.0f)
+			{
+				Spec->SetSetByCallerMagnitude(Tags.Data_BonusCritMultiplier, WeaponMultBonus);
+			}
+		}
+	}
+
 	// Apply any result tags (e.g. State.Broken, HitReact.Direction.*) as dynamic granted tags
 	for (const FGameplayTag& Tag : ResolvedHit.ResultTagsOnTarget)
 	{

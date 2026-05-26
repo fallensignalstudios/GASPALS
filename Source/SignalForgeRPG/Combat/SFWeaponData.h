@@ -638,6 +638,22 @@ struct SIGNALFORGERPG_API FSFWeaponCombatTuning
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
 	FGameplayTag DamageTypeTag;
 
+	/**
+	 * RNG crit-roll probability per shot/swing for this weapon (0..1).
+	 * Destiny-style: most weapons leave this at 0 because crits come from
+	 * precision/weakpoint hits, not random rolls. Use this for weapons that
+	 * have an intrinsic "chance to crit" perk (auto-rifles with Rampage,
+	 * high-impact frames, etc.).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float CriticalChance = 0.0f;
+
+	/**
+	 * Damage multiplier applied when a hit crits (RNG roll OR weakpoint hit).
+	 * 1.0 = no bonus, 1.5 = +50%, 2.0 = double. Stacks additively above the
+	 * character's base CritMultiplier attribute via the Data.BonusCritMultiplier
+	 * SetByCaller channel.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", meta = (ClampMin = "1.0"))
 	float CriticalMultiplier = 1.5f;
 

@@ -634,6 +634,27 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 				SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_IsWeakpointHit, 1.0f);
 			}
 
+			// Per-weapon crit tuning: forward CombatTuning.Critical* into Bonus*
+			// SetByCallers so the exec calc stacks them on top of the attacker's
+			// base CritChance / CritMultiplier attributes. Destiny-style: most
+			// firearms leave CriticalChance at 0 — precision (headshot) hits are
+			// the main crit path and the exec calc auto-crits on weakpoint.
+			if (USFEquipmentComponent* Equipment = Character->GetEquipmentComponent())
+			{
+				if (const USFWeaponData* WeaponData = Equipment->GetCurrentWeaponData())
+				{
+					if (WeaponData->CombatTuning.CriticalChance > 0.0f)
+					{
+						SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_BonusCritChance, WeaponData->CombatTuning.CriticalChance);
+					}
+					const float WeaponMultBonus = FMath::Max(WeaponData->CombatTuning.CriticalMultiplier - 1.0f, 0.0f);
+					if (WeaponMultBonus > 0.0f)
+					{
+						SpecHandle.Data->SetSetByCallerMagnitude(Tags.Data_BonusCritMultiplier, WeaponMultBonus);
+					}
+				}
+			}
+
 			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
 		}
 	}

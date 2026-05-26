@@ -166,11 +166,6 @@ void USFDamageExecutionCalculation::Execute_Implementation(
 		Spec.GetSetByCallerMagnitude(Tags.Data_BonusCritMultiplier, false, 0.0f),
 		0.0f);
 
-	if (bIsWeakpointHit)
-	{
-		CritChance = FMath::Clamp(CritChance + 0.25f, 0.0f, 1.0f);
-	}
-
 	// 6) Dodge check on target
 	const bool bDodged = FMath::FRand() < DodgeChance;
 	if (bDodged)
@@ -178,11 +173,21 @@ void USFDamageExecutionCalculation::Execute_Implementation(
 		Damage = 0.0f;
 	}
 
-	// 7) Crit roll if we still have damage
+	// 7) Crit determination: weakpoint hits guarantee a crit (Destiny-style
+	// precision shots are geometry, not RNG). Otherwise roll against the
+	// accumulated crit chance.
 	bool bCrit = false;
 	if (Damage > 0.0f)
 	{
-		bCrit = FMath::FRand() < CritChance;
+		if (bIsWeakpointHit)
+		{
+			bCrit = true;
+		}
+		else
+		{
+			bCrit = FMath::FRand() < CritChance;
+		}
+
 		if (bCrit)
 		{
 			Damage *= CritMultiplier;
