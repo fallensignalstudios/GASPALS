@@ -134,6 +134,14 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("Data.IsWeakpointHit"),
 		TEXT("SetByCaller flag indicating whether the hit struck a weakpoint"));
 
+	GameplayTags.Data_IsCrit = TagManager.AddNativeGameplayTag(
+		FName("Data.IsCrit"),
+		TEXT("SetByCaller flag written back by the damage execution when a crit roll succeeds. Read by the attribute set to drive crit-styled damage floaters."));
+
+	GameplayTags.Data_FinalDamage = TagManager.AddNativeGameplayTag(
+		FName("Data.FinalDamage"),
+		TEXT("SetByCaller final post-mitigation damage written back by the damage execution. Read by damage floaters so the number shown matches what the execution computed."));
+
 	GameplayTags.Data_BonusCritChance = TagManager.AddNativeGameplayTag(
 		FName("Data.BonusCritChance"),
 		TEXT("SetByCaller bonus critical hit chance"));

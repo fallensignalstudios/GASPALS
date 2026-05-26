@@ -45,6 +45,12 @@ public:
 	FGameplayTag Data_AttackPowerScale;
 	FGameplayTag Data_AbilityPowerScale;
 	FGameplayTag Data_IsWeakpointHit;
+	/** SetByCaller flag written back by SFDamageExecutionCalculation when a crit fires.
+	 *  Consumed by SFAttributeSetBase to drive crit-styled damage floaters. */
+	FGameplayTag Data_IsCrit;
+	/** SetByCaller final post-mitigation damage written back by SFDamageExecutionCalculation.
+	 *  Drives the floater's displayed number even when shields soak part of it. */
+	FGameplayTag Data_FinalDamage;
 	FGameplayTag Data_BonusCritChance;
 	FGameplayTag Data_BonusCritMultiplier;
 	FGameplayTag Data_IgnoreArmor;

@@ -3,7 +3,14 @@
 #include "AbilitySystemComponent.h"
 #include "Characters/SFCharacterBase.h"
 #include "Components/SFStatRegenComponent.h"
+#include "Core/SignalForgeGameplayTags.h"
+#include "Engine/LocalPlayer.h"
+#include "Engine/World.h"
+#include "GameFramework/Pawn.h"
+#include "GameplayEffect.h"
 #include "GameplayEffectExtension.h"
+#include "Kismet/GameplayStatics.h"
+#include "UI/SFDamageNumberSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSFDamagePipeline, Log, All);
 
@@ -99,12 +106,66 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 		}
 
 		ApplyShieldedDamage(LocalDamage, Character);
+
+		// Destiny-style damage-number floater: only show when the local player
+		// was the instigator. Filtering here (rather than in the subsystem)
+		// keeps the spec-context lookup cheap and avoids spawning widgets on
+		// remote/AI damage events. Reads IsCrit / IsWeakpointHit / FinalDamage
+		// SetByCallers populated by SFDamageExecutionCalculation; falls back
+		// to LocalDamage if FinalDamage wasn't written (e.g. raw Damage meta
+		// hits that bypass the exec calc).
+		if (UWorld* World = GetWorld())
+		{
+			const FGameplayEffectSpec& Spec = Data.EffectSpec;
+			AActor* Instigator = Spec.GetContext().GetInstigator();
+			APawn* LocalPawn = UGameplayStatics::GetPlayerPawn(World, 0);
+			if (Instigator && LocalPawn && Instigator == LocalPawn)
+			{
+				const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+				const bool bCrit = Spec.GetSetByCallerMagnitude(Tags.Data_IsCrit, false, 0.0f) > 0.0f;
+				const bool bWeakpoint = Spec.GetSetByCallerMagnitude(Tags.Data_IsWeakpointHit, false, 0.0f) > 0.0f;
+				const float FinalDamage = Spec.GetSetByCallerMagnitude(Tags.Data_FinalDamage, false, LocalDamage);
+
+				// Prefer the actual impact point from the hit result for accurate
+				// placement; fall back to target center + half-height so floaters
+				// still appear above the head for AoE / projectile splash damage
+				// where no per-bone hit was recorded.
+				FVector ImpactLocation = FVector::ZeroVector;
+				if (const FHitResult* HitResult = Spec.GetContext().GetHitResult())
+				{
+					ImpactLocation = HitResult->ImpactPoint;
+				}
+				if (ImpactLocation.IsNearlyZero() && OwnerActor)
+				{
+					ImpactLocation = OwnerActor->GetActorLocation();
+					if (Character)
+					{
+						ImpactLocation.Z += Character->GetSimpleCollisionHalfHeight();
+					}
+				}
+
+				if (APlayerController* LocalPC = UGameplayStatics::GetPlayerController(World, 0))
+				{
+					if (ULocalPlayer* LP = LocalPC->GetLocalPlayer())
+					{
+						if (USFDamageNumberSubsystem* DN = LP->GetSubsystem<USFDamageNumberSubsystem>())
+						{
+							DN->ShowDamageNumber(FinalDamage, bCrit, bWeakpoint, ImpactLocation);
+						}
+					}
+				}
+			}
+		}
 	}
 	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
 	{
 		// Negative magnitude == incoming damage. Re-route through the shield-first pipeline
 		// so designer GEs that modify Health directly still observe shields, hit react,
-		// and death. Positive magnitudes (heals) are clamped and pass through unchanged.
+		// and death. Positive magnitudes (heals) are clamped and pass through unchanged --
+		// unless the same spec is also a damage spec (Data.BaseDamage SetByCaller), in which
+		// case the positive Health modifier is a designer mistake (e.g. a stray Health
+		// modifier alongside the Damage execution calculation) and we must revert it,
+		// otherwise every damage hit silently re-heals the target to MaxHealth.
 		const float Magnitude = Data.EvaluatedData.Magnitude;
 		UE_LOG(LogSFDamagePipeline, Log,
 			TEXT("PostGEExec Health branch: actor=%s Magnitude=%.2f HealthNow=%.2f MaxHealth=%.2f"),
@@ -121,6 +182,30 @@ void USFAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 			SetHealth(HealthBeforeRawHit);
 
 			ApplyShieldedDamage(-Magnitude, Character);
+		}
+		else if (Magnitude > 0.0f)
+		{
+			// Is this a damage spec? Damage specs carry the Data.BaseDamage SetByCaller
+			// magnitude (set by USFCombatComponent at apply time). If present, this positive
+			// Health modifier is a misconfiguration on the damage GE that would silently
+			// un-do the damage. Revert it so the Damage meta branch is the single source of
+			// truth for that hit.
+			const FGameplayEffectSpec& Spec = Data.EffectSpec;
+			const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
+			const bool bIsDamageSpec = Spec.GetSetByCallerMagnitude(SFTags.Data_BaseDamage, false, 0.0f) > 0.0f;
+			if (bIsDamageSpec)
+			{
+				const float HealthAfterRawWrite = GetHealth();
+				const float HealthBeforeRawWrite = FMath::Clamp(HealthAfterRawWrite - Magnitude, 0.0f, GetMaxHealth());
+				UE_LOG(LogSFDamagePipeline, Warning,
+					TEXT("  -> SUPPRESSED unintended heal: damage GE '%s' has a positive Health modifier (+%.2f). Reverting %.2f -> %.2f. Open the GE and remove the Health modifier; keep only the Damage execution calculation."),
+					*GetNameSafe(Spec.Def), Magnitude, HealthAfterRawWrite, HealthBeforeRawWrite);
+				SetHealth(HealthBeforeRawWrite);
+			}
+			else
+			{
+				SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
+			}
 		}
 		else
 		{

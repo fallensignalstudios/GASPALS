@@ -12,6 +12,7 @@ class USFAbilityBarWidgetController;
 class USFInventoryWidgetController;
 class USFEquipmentWidgetController;
 class ASFCharacterBase;
+class USFDamageNumberWidget;
 
 UCLASS()
 class SIGNALFORGERPG_API ASFPlayerController : public APlayerController
@@ -75,6 +76,17 @@ protected:
 	/** HUD widget type and instance */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI")
 	TSubclassOf<USFUserWidgetBase> PlayerHUDWidgetClass;
+
+public:
+	/**
+	 * Widget class used by USFDamageNumberSubsystem to spawn Destiny-style
+	 * damage floaters. Configure on the PC Blueprint; subsystem reads it via
+	 * GetOwningPlayerController().
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|DamageNumbers")
+	TSubclassOf<USFDamageNumberWidget> DamageNumberWidgetClass;
+
+protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
 	TObjectPtr<USFUserWidgetBase> PlayerHUDWidget = nullptr;
