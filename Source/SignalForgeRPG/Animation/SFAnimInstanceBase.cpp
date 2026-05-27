@@ -245,3 +245,33 @@ void USFAnimInstanceBase::RemoveOverrideLayer(float BlendOutTime)
     OverrideLayerBlendOutTime = BlendOutTime;
     // Optionally keep CurrentOverrideLayerTag for history, or clear it.
 }
+
+void USFAnimInstanceBase::NativeUninitializeAnimation()
+{
+    // Clear any pending override-layer blend-out timer so it doesn't fire
+    // after the anim instance is gone (would dereference a dead 'this').
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(TimerHandle_OverrideLayerBlendedOut);
+    }
+
+    OwningCharacter = nullptr;
+    MovementComponent = nullptr;
+
+    ResetRuntimeData();
+    ResetAnimationProfile();
+
+    Super::NativeUninitializeAnimation();
+}
+
+void USFAnimInstanceBase::OnOverrideLayerBlendedOut()
+{
+    // Finalize the blend-out: clear override-layer state so the ABP stops
+    // driving the linked layer. Subclasses can override to do more (e.g.
+    // unlink an instance class via UnlinkAnimClassLayers).
+    bHasOverrideLayer = false;
+    LastOverrideLayerTag = CurrentOverrideLayerTag;
+    CurrentOverrideLayerTag = FGameplayTag::EmptyTag;
+    OverrideLayerBlendInTime = 0.0f;
+    OverrideLayerBlendOutTime = 0.0f;
+}
