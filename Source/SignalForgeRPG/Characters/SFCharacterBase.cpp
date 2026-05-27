@@ -978,6 +978,38 @@ void ASFCharacterBase::OnWeaponEquipped_Implementation(const USFWeaponData* Weap
 // equipped weapon's data asset.
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Locomotion intent flags (aim, sprint)
+// -----------------------------------------------------------------------------
+// These are pure intent bits: "does the player/AI want to aim / sprint right
+// now?" — not gameplay-state ("is the aim ability currently active?"). Input
+// handlers and gameplay abilities both write through these setters; the
+// AnimGraph reads them via Property Access on either the character or the
+// AnimInstance mirror, and delegates fire on transition so abilities can
+// react to intent changes.
+
+void ASFCharacterBase::SetWantsToAim(bool bInWantsToAim)
+{
+	if (bWantsToAim == bInWantsToAim)
+	{
+		return;
+	}
+
+	bWantsToAim = bInWantsToAim;
+	OnWantsToAimChanged.Broadcast(bWantsToAim);
+}
+
+void ASFCharacterBase::SetWantsToSprint(bool bInWantsToSprint)
+{
+	if (bWantsToSprint == bInWantsToSprint)
+	{
+		return;
+	}
+
+	bWantsToSprint = bInWantsToSprint;
+	OnWantsToSprintChanged.Broadcast(bWantsToSprint);
+}
+
 void ASFCharacterBase::SetOverlayLinkedAnimLayer(TSubclassOf<UAnimInstance> NewLayerClass)
 {
 	const TSubclassOf<UAnimInstance> PreviousLayerClass = CurrentOverlayLinkedAnimLayerClass;

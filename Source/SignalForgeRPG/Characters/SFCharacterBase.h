@@ -245,6 +245,39 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Animation|Weapon")
 	bool GetUseUpperBodyOverlay() const { return bUseUpperBodyOverlay; }
 
+	/**
+	 * Returns whether the character currently wants to aim down sights / hold
+	 * an aim pose. Independent of whether an aim ability is actually active —
+	 * this is the player/AI intent, not the gameplay state. Animation graphs
+	 * read this (via Property Access on the AnimInstance mirror) to drive
+	 * overlay blends, AO blendspaces, and pose selection.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Animation|Locomotion")
+	bool GetWantsToAim() const { return bWantsToAim; }
+
+	/**
+	 * Set the aim-intent flag. Safe to spam every frame from input or from
+	 * a gameplay ability — the broadcast only fires on actual state change.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Animation|Locomotion")
+	void SetWantsToAim(bool bInWantsToAim);
+
+	UFUNCTION(BlueprintPure, Category = "Animation|Locomotion")
+	bool GetWantsToSprint() const { return bWantsToSprint; }
+
+	UFUNCTION(BlueprintCallable, Category = "Animation|Locomotion")
+	void SetWantsToSprint(bool bInWantsToSprint);
+
+	/** Fires on actual aim-intent change (not every set). */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSFWantsToAimChangedSignature, bool, bNewWantsToAim);
+	UPROPERTY(BlueprintAssignable, Category = "Animation|Locomotion")
+	FOnSFWantsToAimChangedSignature OnWantsToAimChanged;
+
+	/** Fires on actual sprint-intent change (not every set). */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSFWantsToSprintChangedSignature, bool, bNewWantsToSprint);
+	UPROPERTY(BlueprintAssignable, Category = "Animation|Locomotion")
+	FOnSFWantsToSprintChangedSignature OnWantsToSprintChanged;
+
 	UFUNCTION(BlueprintPure, Category = "Animation|Weapon")
 	const FSFWeaponAnimationProfile& GetCurrentWeaponAnimationProfile() const
 	{
@@ -499,6 +532,18 @@ protected:
 
 		UPROPERTY(Transient)
 		bool bUseUpperBodyOverlay = true;
+
+		/**
+		 * Player/AI intent flags. BlueprintReadOnly so Property Access in the
+		 * AnimGraph can read them off the character directly (thread-safe),
+		 * while SetWantsToAim / SetWantsToSprint own the write path on the
+		 * game thread and fire delegates on transition.
+		 */
+		UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+		bool bWantsToAim = false;
+
+		UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+		bool bWantsToSprint = false;
 
 		UPROPERTY(Transient)
 		FSFWeaponAnimationProfile CurrentWeaponAnimationProfile;
