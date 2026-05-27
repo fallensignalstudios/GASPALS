@@ -306,6 +306,23 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Animation|Weapon")
 	FOnOverlayLinkedAnimLayerChangedSignature OnOverlayLinkedAnimLayerChanged;
 
+	/**
+	 * Anim Blueprint applied to the main mesh on PostInitializeComponents.
+	 * Centralizes AnimClass assignment so subclass BPs don't each have to
+	 * configure it on their Mesh component. Set this once on a base
+	 * archetype BP (typically BP_SFCharacterBase) to your biped ABP
+	 * (e.g. ABP_Biped); every subclass inherits the value. Override per
+	 * subclass only when a character uses a different rig family
+	 * (quadruped, drone, etc.).
+	 *
+	 * If the mesh's AnimClass is already set to a *different* non-null class
+	 * at PostInitializeComponents time, the existing assignment wins — so
+	 * BPs that intentionally want a custom ABP still work without code
+	 * changes.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	TSubclassOf<UAnimInstance> DefaultAnimClass;
+
 	UFUNCTION(BlueprintPure, Category = "Animation|Weapon|Sequences")
 	UAnimSequenceBase* GetCurrentIdleOverlaySequence() const
 	{
@@ -343,6 +360,7 @@ public:
 	virtual void GetActorEyesViewPoint(FVector& OutLocation, FRotator& OutRotation) const override;
 
 protected:
+	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 

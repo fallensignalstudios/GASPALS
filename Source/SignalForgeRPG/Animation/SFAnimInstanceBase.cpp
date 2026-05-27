@@ -1,12 +1,10 @@
 #include "Animation/SFAnimInstanceBase.h"
 
-#include "AbilitySystemComponent.h"
-#include "Animation/AnimMontage.h"
 #include "Animation/AnimSequenceBase.h"
+#include "Animation/AnimMontage.h"
 #include "Characters/SFCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "KismetAnimationLibrary.h"
-#include "TimerManager.h"
 
 USFAnimInstanceBase::USFAnimInstanceBase()
 {
@@ -42,26 +40,6 @@ void USFAnimInstanceBase::NativeUpdateAnimation(float DeltaSeconds)
 
     UpdateMovementData(DeltaSeconds);
     UpdateAnimationStateFromCharacter(DeltaSeconds);
-}
-
-void USFAnimInstanceBase::NativeUninitializeAnimation()
-{
-    Super::NativeUninitializeAnimation();
-
-    if (OwningCharacter)
-    {
-        if (UAbilitySystemComponent* ASC = OwningCharacter->FindComponentByClass<UAbilitySystemComponent>())
-        {
-            if (ApplyTagsHandle.IsValid())
-            {
-                ASC->RemoveActiveGameplayEffect(ApplyTagsHandle);
-                ApplyTagsHandle.Invalidate();
-            }
-        }
-    }
-
-    OwningCharacter = nullptr;
-    MovementComponent = nullptr;
 }
 
 bool USFAnimInstanceBase::HasValidOwner() const
@@ -191,35 +169,32 @@ void USFAnimInstanceBase::UpdateAnimationStateFromCharacter(float DeltaSeconds)
     if (!HasValidOwner())
     {
         ResetAnimationProfile();
-        bWantsHeadLookAt = false;
-        HeadLookAtAlpha = 0.0f;
-        HeadLookAtLocationWS = FVector::ZeroVector;
-        HeadLookAtLocationLS = FVector::ZeroVector;
         return;
     }
 
-    UpperBodyOverlayWeight = bUseUpperBodyOverlay
-        ? FMath::FInterpTo(UpperBodyOverlayWeight, 1.0f, DeltaSeconds, OverlayBlendSpeed)
-        : FMath::FInterpTo(UpperBodyOverlayWeight, 0.0f, DeltaSeconds, OverlayBlendSpeed);
+    // Mirror the character's current animation state into the ABP every tick.
+    // Order matters: pull bUseUpperBodyOverlay from the character first so the
+    // weight interpolation below sees the correct target value. If a weapon
+    // profile is active, SetAnimationProfile will overwrite IdleOverride and
+    // the montages too — the upper-body flag from the profile takes priority
+    // over the bare character flag (Destiny-style: weapon dictates stance).
+    OverlayMode = OwningCharacter->GetCurrentOverlayMode();
+    CombatMode = OwningCharacter->GetCurrentCombatMode();
+    bUseUpperBodyOverlay = OwningCharacter->GetUseUpperBodyOverlay();
 
-    bool bCharacterWantsLookAt = false;
-    const FVector LookAtWS = OwningCharacter->GetHeadLookAtLocation(bCharacterWantsLookAt);
-
-    bWantsHeadLookAt = bCharacterWantsLookAt;
-    HeadLookAtLocationWS = LookAtWS;
-
-    if (USkeletalMeshComponent* MeshComp = GetSkelMeshComponent())
+    if (OwningCharacter->HasWeaponAnimationProfile())
     {
-        const FTransform MeshTransform = MeshComp->GetComponentTransform();
-        HeadLookAtLocationLS = MeshTransform.InverseTransformPosition(LookAtWS);
+        SetAnimationProfile(OwningCharacter->GetCurrentWeaponAnimationProfile(), DeltaSeconds);
     }
     else
     {
-        HeadLookAtLocationLS = FVector::ZeroVector;
+        // No weapon profile active — just blend the upper-body overlay weight
+        // based on the character flag. SetAnimationProfile would do this for
+        // us, but we don't want to stomp IdleOverride / montages with zeros.
+        UpperBodyOverlayWeight = bUseUpperBodyOverlay
+            ? FMath::FInterpTo(UpperBodyOverlayWeight, 1.0f, DeltaSeconds, OverlayBlendSpeed)
+            : FMath::FInterpTo(UpperBodyOverlayWeight, 0.0f, DeltaSeconds, OverlayBlendSpeed);
     }
-
-    const float TargetAlpha = bWantsHeadLookAt ? 1.0f : 0.0f;
-    HeadLookAtAlpha = FMath::FInterpTo(HeadLookAtAlpha, TargetAlpha, DeltaSeconds, HeadLookAtInterpSpeed);
 }
 
 void USFAnimInstanceBase::SetAnimationProfile(const FSFWeaponAnimationProfile& InProfile, float DeltaSeconds)
@@ -253,10 +228,9 @@ bool USFAnimInstanceBase::ApplyOverrideLayer(const FGameplayTag& LayerTag, float
     }
 
     bHasOverrideLayer = true;
-    LastOverrideLayerTag = CurrentOverrideLayerTag;
     CurrentOverrideLayerTag = LayerTag;
     OverrideLayerBlendInTime = BlendInTime;
-    OverrideLayerBlendOutTime = 0.0f;
+    // Your ABP can read these and drive a linked layer / state machine.
     return true;
 }
 
@@ -269,10 +243,5 @@ void USFAnimInstanceBase::RemoveOverrideLayer(float BlendOutTime)
 
     bHasOverrideLayer = false;
     OverrideLayerBlendOutTime = BlendOutTime;
-}
-
-void USFAnimInstanceBase::OnOverrideLayerBlendedOut()
-{
-    LastOverrideLayerTag = CurrentOverrideLayerTag;
-    CurrentOverrideLayerTag = FGameplayTag();
+    // Optionally keep CurrentOverrideLayerTag for history, or clear it.
 }

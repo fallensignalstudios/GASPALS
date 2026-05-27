@@ -5,8 +5,10 @@
 #include "Abilities/GameplayAbility.h"
 #include "AIController.h"
 #include "GameFramework/PlayerController.h"
+#include "Animation/AnimBlueprintGeneratedClass.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/SFAnimInstanceBase.h"
+#include "Engine/SkeletalMesh.h"
 #include "Combat/SFCombatComponent.h"
 #include "Combat/SFHitResolverInterface.h"
 #include "Components/CapsuleComponent.h"
@@ -141,6 +143,57 @@ void ASFCharacterBase::GetActorEyesViewPoint(FVector& OutLocation, FRotator& Out
 // -----------------------------------------------------------------------------
 // Lifecycle
 // -----------------------------------------------------------------------------
+
+void ASFCharacterBase::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	// Apply DefaultAnimClass centrally so subclass BPs don't each have to
+	// configure AnimClass on their Mesh component. The base archetype BP
+	// sets DefaultAnimClass = ABP_Biped once and every subclass inherits.
+	//
+	// If a subclass BP intentionally set a *different* non-null AnimClass on
+	// its Mesh component, that authored value wins — we only stamp our class
+	// when the mesh is currently unset or already matches.
+	if (DefaultAnimClass && GetMesh())
+	{
+		USkeletalMeshComponent* MeshComp = GetMesh();
+		const UClass* CurrentAnimClass = MeshComp->GetAnimClass();
+		if (CurrentAnimClass == nullptr || CurrentAnimClass == *DefaultAnimClass)
+		{
+			MeshComp->SetAnimInstanceClass(DefaultAnimClass);
+		}
+
+#if !UE_BUILD_SHIPPING
+		// Skeleton-mismatch diagnostic. UE silently no-ops when an ABP is bound
+		// to a mesh on the wrong skeleton (the character plays the ref pose
+		// with no editor warning), so log loudly when we detect the mismatch.
+		// This catches the most common cause of "ABP works on Sandbox but not
+		// on my new character" — the new character's mesh was assigned a
+		// different USkeleton than ABP_Biped was compiled against.
+		if (const USkeletalMesh* SkelMesh = MeshComp->GetSkeletalMeshAsset())
+		{
+			if (const UAnimBlueprintGeneratedClass* AnimBPClass =
+				Cast<UAnimBlueprintGeneratedClass>(DefaultAnimClass.Get()))
+			{
+				const USkeleton* MeshSkel = SkelMesh->GetSkeleton();
+				const USkeleton* AnimBPSkel = AnimBPClass->TargetSkeleton;
+				if (MeshSkel && AnimBPSkel && MeshSkel != AnimBPSkel)
+				{
+					UE_LOG(LogTemp, Warning,
+						TEXT("[%s] DefaultAnimClass %s expects skeleton %s but mesh ")
+						TEXT("uses %s — ABP will not run. Reassign the mesh to the ")
+						TEXT("correct skeleton or set a different DefaultAnimClass."),
+						*GetName(),
+						*DefaultAnimClass->GetName(),
+						*AnimBPSkel->GetName(),
+						*MeshSkel->GetName());
+				}
+			}
+		}
+#endif
+	}
+}
 
 void ASFCharacterBase::BeginPlay()
 {
