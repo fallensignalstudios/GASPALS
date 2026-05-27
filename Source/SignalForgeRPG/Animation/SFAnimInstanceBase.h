@@ -154,6 +154,19 @@ private:
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|State", meta = (AllowPrivateAccess = "true"))
     bool bUseUpperBodyOverlay = true;
 
+    /**
+     * Locomotion intent flags mirrored from ASFCharacterBase every tick.
+     * AnimGraphs use Property Access to read these directly off the
+     * AnimInstance (thread-safe, no cast required) instead of going through
+     * the character pointer. Cheaper and avoids the "Accessed None" cast
+     * spam if the character pointer briefly goes stale.
+     */
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+    bool bWantsToAim = false;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+    bool bWantsToSprint = false;
+
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|State", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UAnimSequenceBase> IdleOverride = nullptr;
 
