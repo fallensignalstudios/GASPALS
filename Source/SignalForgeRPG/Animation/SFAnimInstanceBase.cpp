@@ -124,11 +124,16 @@ void USFAnimInstanceBase::UpdateMovementData(float DeltaSeconds)
     bHasMovementInput = bIsAccelerating;
     bShouldMove = GroundSpeed > MoveThreshold && !bIsFalling;
 
-    const float MaxWalkSpeed = FMath::Max(MovementComponent->GetMaxSpeed(), 1.0f);
-    GroundSpeedNormalized = FMath::Clamp(GroundSpeed / MaxWalkSpeed, 0.0f, 1.0f);
+    // Normalize against the *configured* MaxWalkSpeed property (a stable value),
+    // not GetMaxSpeed() — GetMaxSpeed() is modulated by analog-input modifier,
+    // crouch, root motion, and movement-mode and therefore shimmers frame-to-frame.
+    // Feeding a shimmering normalized speed into Motion Matching produces visible
+    // stutter because the database picks a different pose every tick.
+    const float MaxReferenceSpeed = FMath::Max(MovementComponent->MaxWalkSpeed, 1.0f);
+    GroundSpeedNormalized = FMath::Clamp(GroundSpeed / MaxReferenceSpeed, 0.0f, 1.0f);
 
     const FVector CurrentAcceleration = MovementComponent->GetCurrentAcceleration();
-    MovementInputAmount = FMath::Clamp(CurrentAcceleration.Size() / MaxWalkSpeed, 0.0f, 1.0f);
+    MovementInputAmount = FMath::Clamp(CurrentAcceleration.Size() / MaxReferenceSpeed, 0.0f, 1.0f);
 
     if (DeltaSeconds > SMALL_NUMBER)
     {
@@ -142,6 +147,26 @@ void USFAnimInstanceBase::UpdateMovementData(float DeltaSeconds)
 
     PreviousActorRotation = ActorRotation;
 
+    // Locomotion state uses *proportional* thresholds against MaxWalkSpeed, not
+    // raw cm/s. Two reasons:
+    //   1) Strafe / backpedal speeds are clamped lower than forward by
+    //      CharacterMovement (lateral input modifier), so a flat "GroundSpeed
+    //      < WalkSpeedThreshold" comparison would snap a full-stick strafe
+    //      back to Walk even though forward at the same input is Jog. That's
+    //      the "strafe drops me back to walking" symptom.
+    //   2) Changing MaxWalkSpeed (sprint multiplier, ADS slowdown, crouch, etc.)
+    //      automatically rescales the bands instead of dragging the player
+    //      through Walk/Jog/Sprint as the cap changes.
+    //
+    // Hysteresis: once we're in a state, the band we have to drop below to
+    // exit it is slightly tighter than the band we had to cross to enter it.
+    // This is what kills MM pose-flicker at the band boundaries.
+    const float WalkPct = GroundSpeedNormalized;
+    constexpr float WalkUp     = 0.35f;
+    constexpr float WalkDown   = 0.30f;
+    constexpr float JogUp      = 0.85f;
+    constexpr float JogDown    = 0.80f;
+
     if (bIsFalling)
     {
         LocomotionState = ESFLocomotionState::InAir;
@@ -150,17 +175,55 @@ void USFAnimInstanceBase::UpdateMovementData(float DeltaSeconds)
     {
         LocomotionState = ESFLocomotionState::Idle;
     }
-    else if (GroundSpeed < WalkSpeedThreshold)
-    {
-        LocomotionState = ESFLocomotionState::Walk;
-    }
-    else if (GroundSpeed < JogSpeedThreshold)
-    {
-        LocomotionState = ESFLocomotionState::Jog;
-    }
     else
     {
-        LocomotionState = ESFLocomotionState::Sprint;
+        const ESFLocomotionState PrevState = LocomotionState;
+        ESFLocomotionState NextState = PrevState;
+
+        switch (PrevState)
+        {
+        case ESFLocomotionState::Sprint:
+            // Drop to Jog only if we've cleanly fallen below JogDown.
+            if (WalkPct < JogDown)
+            {
+                NextState = (WalkPct < WalkDown) ? ESFLocomotionState::Walk
+                                                 : ESFLocomotionState::Jog;
+            }
+            break;
+
+        case ESFLocomotionState::Jog:
+            if (WalkPct >= JogUp)
+            {
+                NextState = ESFLocomotionState::Sprint;
+            }
+            else if (WalkPct < WalkDown)
+            {
+                NextState = ESFLocomotionState::Walk;
+            }
+            break;
+
+        case ESFLocomotionState::Walk:
+            if (WalkPct >= JogUp)
+            {
+                NextState = ESFLocomotionState::Sprint;
+            }
+            else if (WalkPct >= WalkUp)
+            {
+                NextState = ESFLocomotionState::Jog;
+            }
+            break;
+
+        case ESFLocomotionState::Idle:
+        case ESFLocomotionState::InAir:
+        default:
+            // Coming out of Idle / InAir — pick the band on entry-thresholds.
+            if (WalkPct >= JogUp)        NextState = ESFLocomotionState::Sprint;
+            else if (WalkPct >= WalkUp)  NextState = ESFLocomotionState::Jog;
+            else                         NextState = ESFLocomotionState::Walk;
+            break;
+        }
+
+        LocomotionState = NextState;
     }
 }
 
