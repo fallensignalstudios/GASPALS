@@ -172,15 +172,29 @@ void USFAnimInstanceBase::UpdateAnimationStateFromCharacter(float DeltaSeconds)
         return;
     }
 
-    UpperBodyOverlayWeight = bUseUpperBodyOverlay
-        ? FMath::FInterpTo(UpperBodyOverlayWeight, 1.0f, DeltaSeconds, OverlayBlendSpeed)
-        : FMath::FInterpTo(UpperBodyOverlayWeight, 0.0f, DeltaSeconds, OverlayBlendSpeed);
+    // Mirror the character's current animation state into the ABP every tick.
+    // Order matters: pull bUseUpperBodyOverlay from the character first so the
+    // weight interpolation below sees the correct target value. If a weapon
+    // profile is active, SetAnimationProfile will overwrite IdleOverride and
+    // the montages too — the upper-body flag from the profile takes priority
+    // over the bare character flag (Destiny-style: weapon dictates stance).
+    OverlayMode = OwningCharacter->GetCurrentOverlayMode();
+    CombatMode = OwningCharacter->GetCurrentCombatMode();
+    bUseUpperBodyOverlay = OwningCharacter->GetUseUpperBodyOverlay();
 
-    // Later: query character API to drive overlay/combat/profile.
-    // OverlayMode = OwningCharacter->GetOverlayMode();
-    // CombatMode = OwningCharacter->GetCombatMode();
-    // FSFWeaponAnimationProfile Profile = OwningCharacter->GetWeaponAnimationProfile();
-    // SetAnimationProfile(Profile, DeltaSeconds);
+    if (OwningCharacter->HasWeaponAnimationProfile())
+    {
+        SetAnimationProfile(OwningCharacter->GetCurrentWeaponAnimationProfile(), DeltaSeconds);
+    }
+    else
+    {
+        // No weapon profile active — just blend the upper-body overlay weight
+        // based on the character flag. SetAnimationProfile would do this for
+        // us, but we don't want to stomp IdleOverride / montages with zeros.
+        UpperBodyOverlayWeight = bUseUpperBodyOverlay
+            ? FMath::FInterpTo(UpperBodyOverlayWeight, 1.0f, DeltaSeconds, OverlayBlendSpeed)
+            : FMath::FInterpTo(UpperBodyOverlayWeight, 0.0f, DeltaSeconds, OverlayBlendSpeed);
+    }
 }
 
 void USFAnimInstanceBase::SetAnimationProfile(const FSFWeaponAnimationProfile& InProfile, float DeltaSeconds)
