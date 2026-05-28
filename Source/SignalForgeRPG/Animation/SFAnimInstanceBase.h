@@ -158,6 +158,12 @@ private:
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
     bool bWantsToSprint = false;
 
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+    bool bWantsToWalk = false;
+
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+    bool bWantsToStrafe = false;
+
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|State", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UAnimSequenceBase> IdleOverride = nullptr;
 

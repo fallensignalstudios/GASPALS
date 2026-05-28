@@ -246,6 +246,8 @@ void USFAnimInstanceBase::UpdateAnimationStateFromCharacter(float DeltaSeconds)
     bUseUpperBodyOverlay = OwningCharacter->GetUseUpperBodyOverlay();
     bWantsToAim = OwningCharacter->GetWantsToAim();
     bWantsToSprint = OwningCharacter->GetWantsToSprint();
+    bWantsToWalk = OwningCharacter->GetWantsToWalk();
+    bWantsToStrafe = OwningCharacter->GetWantsToStrafe();
 
     if (OwningCharacter->HasWeaponAnimationProfile())
     {

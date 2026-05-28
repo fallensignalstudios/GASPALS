@@ -268,6 +268,30 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Animation|Locomotion")
 	void SetWantsToSprint(bool bInWantsToSprint);
 
+	/**
+	 * Walk-intent: when true, GetDesiredGait will clamp the chosen gait to Walk
+	 * even if full stick deflection would otherwise produce Run / Sprint. This
+	 * is the GASP "Wants to Walk" channel.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Animation|Locomotion")
+	bool GetWantsToWalk() const { return bWantsToWalk; }
+
+	UFUNCTION(BlueprintCallable, Category = "Animation|Locomotion")
+	void SetWantsToWalk(bool bInWantsToWalk);
+
+	/**
+	 * Strafe-intent: when true, UpdateRotation_PreCMC switches CMC out of
+	 * Orient-Rotation-To-Movement and into Use-Controller-Desired-Rotation, so
+	 * the character holds the control yaw while side / back-stepping. Aim-down
+	 * sights typically forces this on as well. This is the GASP "Wants to
+	 * Strafe" channel.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Animation|Locomotion")
+	bool GetWantsToStrafe() const { return bWantsToStrafe; }
+
+	UFUNCTION(BlueprintCallable, Category = "Animation|Locomotion")
+	void SetWantsToStrafe(bool bInWantsToStrafe);
+
 	/** Fires on actual aim-intent change (not every set). */
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSFWantsToAimChangedSignature, bool, bNewWantsToAim);
 	UPROPERTY(BlueprintAssignable, Category = "Animation|Locomotion")
@@ -277,6 +301,30 @@ public:
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSFWantsToSprintChangedSignature, bool, bNewWantsToSprint);
 	UPROPERTY(BlueprintAssignable, Category = "Animation|Locomotion")
 	FOnSFWantsToSprintChangedSignature OnWantsToSprintChanged;
+
+	/** Fires on actual walk-intent change (not every set). */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSFWantsToWalkChangedSignature, bool, bNewWantsToWalk);
+	UPROPERTY(BlueprintAssignable, Category = "Animation|Locomotion")
+	FOnSFWantsToWalkChangedSignature OnWantsToWalkChanged;
+
+	/** Fires on actual strafe-intent change (not every set). */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSFWantsToStrafeChangedSignature, bool, bNewWantsToStrafe);
+	UPROPERTY(BlueprintAssignable, Category = "Animation|Locomotion")
+	FOnSFWantsToStrafeChangedSignature OnWantsToStrafeChanged;
+
+	/**
+	 * Single chokepoint that fires after ANY of the four intent flags changes.
+	 * BP subclasses (e.g. CBP_SandboxCharacter) override this to push the C++
+	 * intent state into their BP "Character Input State" struct so the existing
+	 * GASP BP functions (UpdateRotation_PreCMC, GetDesiredGait, CanSprint,
+	 * CalculateMaxSpeed) continue to read a single source of truth.
+	 *
+	 * BlueprintNativeEvent so C++ subclasses can also implement it for AI
+	 * controllers or replicated companions.
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category = "Animation|Locomotion")
+	void OnLocomotionIntentChanged();
+	virtual void OnLocomotionIntentChanged_Implementation() {}
 
 	UFUNCTION(BlueprintPure, Category = "Animation|Weapon")
 	const FSFWeaponAnimationProfile& GetCurrentWeaponAnimationProfile() const
@@ -544,6 +592,12 @@ protected:
 
 		UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
 		bool bWantsToSprint = false;
+
+		UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+		bool bWantsToWalk = false;
+
+		UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+		bool bWantsToStrafe = false;
 
 		UPROPERTY(Transient)
 		FSFWeaponAnimationProfile CurrentWeaponAnimationProfile;
