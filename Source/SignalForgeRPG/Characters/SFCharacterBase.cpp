@@ -988,6 +988,18 @@ void ASFCharacterBase::OnWeaponEquipped_Implementation(const USFWeaponData* Weap
 // AnimInstance mirror, and delegates fire on transition so abilities can
 // react to intent changes.
 
+// Order inside every setter is the same:
+//   1. Early-return on no-change so callers can spam every frame.
+//   2. Update the bool first so any code triggered by the broadcasts (or by
+//      OnLocomotionIntentChanged) sees the new value via GetWantsToX().
+//   3. Broadcast the per-flag delegate for listeners that care about exactly
+//      one transition (abilities, UI, audio).
+//   4. Fire OnLocomotionIntentChanged() last. This is the chokepoint BP
+//      subclasses override to mirror the four flags into their BP
+//      "Character Input State" struct so the existing GASP BP functions
+//      (UpdateRotation_PreCMC, GetDesiredGait, CanSprint, CalculateMaxSpeed)
+//      keep reading a single source of truth.
+
 void ASFCharacterBase::SetWantsToAim(bool bInWantsToAim)
 {
 	if (bWantsToAim == bInWantsToAim)
@@ -997,6 +1009,7 @@ void ASFCharacterBase::SetWantsToAim(bool bInWantsToAim)
 
 	bWantsToAim = bInWantsToAim;
 	OnWantsToAimChanged.Broadcast(bWantsToAim);
+	OnLocomotionIntentChanged();
 }
 
 void ASFCharacterBase::SetWantsToSprint(bool bInWantsToSprint)
@@ -1008,6 +1021,31 @@ void ASFCharacterBase::SetWantsToSprint(bool bInWantsToSprint)
 
 	bWantsToSprint = bInWantsToSprint;
 	OnWantsToSprintChanged.Broadcast(bWantsToSprint);
+	OnLocomotionIntentChanged();
+}
+
+void ASFCharacterBase::SetWantsToWalk(bool bInWantsToWalk)
+{
+	if (bWantsToWalk == bInWantsToWalk)
+	{
+		return;
+	}
+
+	bWantsToWalk = bInWantsToWalk;
+	OnWantsToWalkChanged.Broadcast(bWantsToWalk);
+	OnLocomotionIntentChanged();
+}
+
+void ASFCharacterBase::SetWantsToStrafe(bool bInWantsToStrafe)
+{
+	if (bWantsToStrafe == bInWantsToStrafe)
+	{
+		return;
+	}
+
+	bWantsToStrafe = bInWantsToStrafe;
+	OnWantsToStrafeChanged.Broadcast(bWantsToStrafe);
+	OnLocomotionIntentChanged();
 }
 
 void ASFCharacterBase::SetOverlayLinkedAnimLayer(TSubclassOf<UAnimInstance> NewLayerClass)
