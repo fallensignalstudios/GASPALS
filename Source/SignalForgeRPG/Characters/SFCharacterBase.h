@@ -442,6 +442,14 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
+	/**
+	 * Diagnostic-only override: logs which controller class actually possesses
+	 * this pawn. Useful for tracking down BP overrides that point at the wrong
+	 * AIControllerClass without opening the BP. Lightweight -- fires once per
+	 * possess and just calls UE_LOG.
+	 */
+	virtual void PossessedBy(AController* NewController) override;
+
 	// -------------------------------------------------------------------------
 	// GAS setup helpers
 	// -------------------------------------------------------------------------
