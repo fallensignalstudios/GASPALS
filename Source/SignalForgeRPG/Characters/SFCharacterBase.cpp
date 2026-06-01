@@ -263,6 +263,18 @@ void ASFCharacterBase::BeginPlay()
 void ASFCharacterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// Drain the ASC input queue every frame for both players and AI-controlled NPCs.
+	// Without this, BT tasks (or any caller) that push presses via AbilityInputTagPressed
+	// would enqueue them forever because TryActivateAbility is only invoked from
+	// ProcessAbilityInput. The player previously did this in its own Tick; doing it
+	// here means NPCs get the same treatment so AI fire / melee / ability presses
+	// actually drive ability activation.
+	if (AbilitySystemComponent)
+	{
+		const bool bGamePaused = GetWorld() && GetWorld()->IsPaused();
+		AbilitySystemComponent->ProcessAbilityInput(DeltaTime, bGamePaused);
+	}
 }
 
 // -----------------------------------------------------------------------------
