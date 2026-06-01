@@ -82,8 +82,10 @@ namespace SFBTHelpers
 		{
 			return 6000.0f;
 		}
-		// Melee fallback: small range (the combat component traces ~150-250cm; pick 250).
-		return 250.0f;
+		// Melee fallback: the combat component traces ~150-250cm, but engage gates need
+		// a bit of slack so two capsules touching count as "in range". 300cm gives
+		// ~50cm slack on top of the actual swing reach.
+		return 300.0f;
 	}
 
 	bool HasLineOfSight(const ASFCharacterBase* From, const AActor* To)
@@ -108,9 +110,22 @@ namespace SFBTHelpers
 		FCollisionQueryParams Params(SCENE_QUERY_STAT(SFBTLineOfSight), false, From);
 		Params.AddIgnoredActor(To); // ignore the target so its own collision doesn't block
 
+		// Slack-radius LOS: a strict "any blocker" check fails too often when the
+		// player's own capsule, weapon, or a thin prop sits between the eye trace
+		// and the chest aim point. Instead, accept LOS if the trace either reaches
+		// the target unobstructed *or* the first blocker is within a small slack
+		// distance of the target (i.e. effectively "the AI can see the target's
+		// body even if a sliver of geometry clips the trace").
+		constexpr float LosSlackCm = 80.0f; // ~capsule half-width + a bit of grace
+
 		FHitResult Hit;
 		const bool bBlocked = World->LineTraceSingleByChannel(
 			Hit, EyeLoc, TargetLoc, ECC_Visibility, Params);
-		return !bBlocked;
+		if (!bBlocked)
+		{
+			return true;
+		}
+		const float DistFromBlockerToTarget = FVector::Dist(Hit.ImpactPoint, TargetLoc);
+		return DistFromBlockerToTarget <= LosSlackCm;
 	}
 }
