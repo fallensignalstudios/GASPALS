@@ -277,6 +277,21 @@ void ASFCharacterBase::Tick(float DeltaTime)
 	}
 }
 
+void ASFCharacterBase::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	// One-shot diagnostic: prints which controller class actually possessed this
+	// pawn so we can tell at a glance whether a BP override has redirected
+	// AIControllerClass away from the intended SF controller.
+	UE_LOG(LogTemp, Log,
+		TEXT("[SFCharacter] PossessedBy: pawn='%s' (class '%s') controller='%s' (class '%s')"),
+		*GetName(),
+		*GetClass()->GetName(),
+		NewController ? *NewController->GetName() : TEXT("<null>"),
+		NewController ? *NewController->GetClass()->GetName() : TEXT("<null>"));
+}
+
 // -----------------------------------------------------------------------------
 // IAbilitySystemInterface
 // -----------------------------------------------------------------------------
