@@ -870,6 +870,13 @@ FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitD
 		Result.bCauseStagger = true;
 		Result.bTriggerSlowMo = true;
 		Result.ResultTagsOnTarget.AddTag(GameplayTags.State_Broken);
+
+		// Close the parry window the moment it lands so a single tap can't parry
+		// multiple incoming hits in the same ParryWindowSeconds budget. The block
+		// ability's CloseParryWindow timer will still fire normally and start the
+		// cooldown; RemoveLooseGameplayTag is a no-op if already absent.
+		ASC->RemoveLooseGameplayTag(GameplayTags.State_ParryWindow);
+
 		return Result;
 	}
 
