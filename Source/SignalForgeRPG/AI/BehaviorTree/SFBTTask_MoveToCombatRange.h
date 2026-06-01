@@ -73,6 +73,7 @@ protected:
 	struct FMemory
 	{
 		float TimeSinceRepath = 0.0f;
+		float TimeSinceMoveCheck = 0.0f;
 		FVector LastTargetLoc = FVector::ZeroVector;
 		bool bMoveIssued = false;
 	};
