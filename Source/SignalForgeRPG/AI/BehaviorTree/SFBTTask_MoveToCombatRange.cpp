@@ -61,13 +61,44 @@ EBTNodeResult::Type USFBTTask_MoveToCombatRange::ExecuteTask(UBehaviorTreeCompon
 	const float DistNow = FVector::Dist(Self->GetActorLocation(), Mem->LastTargetLoc);
 	if (DistNow >= MinD && DistNow <= MaxD)
 	{
+		UE_LOG(LogTemp, Display,
+			TEXT("[SFBTTask_MoveToCombatRange] '%s' Execute: already in band. Dist=%.0fcm, Band=[%.0f..%.0f] -> Succeeded."),
+			*GetNameSafe(Self), DistNow, MinD, MaxD);
 		return EBTNodeResult::Succeeded;
 	}
 
-	const EPathFollowingRequestResult::Type MoveResult = AI->MoveToActor(Target, AcceptanceRadius, /*bStopOnOverlap*/ true, bUsePathfinding);
+	// CRITICAL: path follower's AcceptanceRadius determines how close MoveToActor
+	// gets the pawn to the target. If the user-authored AcceptanceRadius lands
+	// the pawn OUTSIDE our [MinD, MaxD] band, the task never succeeds and we
+	// deadlock. Clamp the effective radius into the band so the pawn always
+	// stops somewhere we count as success. Use MaxD - 10cm as the stopping
+	// distance: it's well inside the band and leaves slack for the path
+	// follower's own tolerance.
+	const float EffectiveAcceptanceRadius = FMath::Max(AcceptanceRadius, FMath::Max(MinD + 10.0f, MaxD - 10.0f));
+
+	const EPathFollowingRequestResult::Type MoveResult = AI->MoveToActor(Target, EffectiveAcceptanceRadius, /*bStopOnOverlap*/ true, bUsePathfinding);
+
+	UE_LOG(LogTemp, Display,
+		TEXT("[SFBTTask_MoveToCombatRange] '%s' Execute: Dist=%.0fcm, Band=[%.0f..%.0f], AcceptanceRadius=%.0fcm (authored=%.0f), MoveResult=%d."),
+		*GetNameSafe(Self), DistNow, MinD, MaxD, EffectiveAcceptanceRadius, AcceptanceRadius, (int32)MoveResult);
+
 	if (MoveResult == EPathFollowingRequestResult::Failed)
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SFBTTask_MoveToCombatRange] '%s' MoveToActor FAILED -- check NavMesh coverage around target '%s' at %s."),
+			*GetNameSafe(Self), *GetNameSafe(Target), *Target->GetActorLocation().ToString());
 		return EBTNodeResult::Failed;
+	}
+	if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+	{
+		// Path follower says we're at goal but our band check failed -- usually means
+		// the pawn is too close (DistNow < MinD). Succeed anyway: the BT will
+		// re-evaluate next tick and InWeaponRange (or whatever upstream gate) will
+		// pick the next branch. Better than deadlocking.
+		UE_LOG(LogTemp, Display,
+			TEXT("[SFBTTask_MoveToCombatRange] '%s' Execute: AlreadyAtGoal (Dist=%.0f outside band [%.0f..%.0f]) -> Succeeded to let BT re-evaluate."),
+			*GetNameSafe(Self), DistNow, MinD, MaxD);
+		return EBTNodeResult::Succeeded;
 	}
 	Mem->bMoveIssued = (MoveResult == EPathFollowingRequestResult::RequestSuccessful);
 	return EBTNodeResult::InProgress;
@@ -116,9 +147,31 @@ void USFBTTask_MoveToCombatRange::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 
 	if (DistNow >= MinD && DistNow <= MaxD)
 	{
+		UE_LOG(LogTemp, Display,
+			TEXT("[SFBTTask_MoveToCombatRange] '%s' Tick: in band. Dist=%.0fcm, Band=[%.0f..%.0f] -> Succeeded."),
+			*GetNameSafe(Self), DistNow, MinD, MaxD);
 		AI->StopMovement();
 		FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 		return;
+	}
+
+	// Watchdog: if the path follower has gone Idle but we're not in the band,
+	// either we overshot (too close) or path failed. Succeed-fallback so the
+	// BT can re-evaluate next tick instead of deadlocking here forever.
+	Mem->TimeSinceMoveCheck += DeltaSeconds;
+	if (Mem->TimeSinceMoveCheck >= 0.25f)
+	{
+		Mem->TimeSinceMoveCheck = 0.0f;
+		const bool bPathFollowingIdle = !AI->GetPathFollowingComponent()
+			|| AI->GetPathFollowingComponent()->GetStatus() == EPathFollowingStatus::Idle;
+		if (Mem->bMoveIssued && bPathFollowingIdle)
+		{
+			UE_LOG(LogTemp, Display,
+				TEXT("[SFBTTask_MoveToCombatRange] '%s' Tick: path follower Idle outside band (Dist=%.0f, Band=[%.0f..%.0f]) -> Succeeded to let BT re-evaluate."),
+				*GetNameSafe(Self), DistNow, MinD, MaxD);
+			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+			return;
+		}
 	}
 
 	Mem->TimeSinceRepath += DeltaSeconds;
@@ -131,10 +184,16 @@ void USFBTTask_MoveToCombatRange::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 	{
 		Mem->TimeSinceRepath = 0.0f;
 		Mem->LastTargetLoc = TargetLoc;
-		const EPathFollowingRequestResult::Type MoveResult = AI->MoveToActor(Target, AcceptanceRadius, true, bUsePathfinding);
+		const float EffectiveAcceptanceRadius = FMath::Max(AcceptanceRadius, FMath::Max(MinD + 10.0f, MaxD - 10.0f));
+		const EPathFollowingRequestResult::Type MoveResult = AI->MoveToActor(Target, EffectiveAcceptanceRadius, true, bUsePathfinding);
 		if (MoveResult == EPathFollowingRequestResult::Failed)
 		{
 			FinishLatentTask(OwnerComp, EBTNodeResult::Failed);
+			return;
+		}
+		if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+		{
+			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 			return;
 		}
 		Mem->bMoveIssued = (MoveResult == EPathFollowingRequestResult::RequestSuccessful);

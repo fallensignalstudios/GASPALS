@@ -100,8 +100,12 @@ EBTNodeResult::Type USFBTTask_FireWeapon::ExecuteTask(UBehaviorTreeComponent& Ow
 	ASFCharacterBase* Character = SFBTHelpers::GetControlledCharacter(AI);
 	if (!Character || !Character->GetAbilitySystemComponent())
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFBTTask_FireWeapon] Execute FAILED: no controlled character or no ASC."));
 		return EBTNodeResult::Failed;
 	}
+
+	UE_LOG(LogTemp, Display, TEXT("[SFBTTask_FireWeapon] '%s' Execute (style=%d)."),
+		*GetNameSafe(Character), (int32)CombatStyle);
 
 	FMemory* Mem = reinterpret_cast<FMemory*>(NodeMemory);
 	new (Mem) FMemory();
