@@ -4,6 +4,8 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Faction/SFFactionStatics.h"
+#include "GameplayTagContainer.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Hearing.h"
@@ -16,6 +18,11 @@ ASFNPCAIController::ASFNPCAIController()
 
 	Perception = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("Perception"));
 
+	// Sight: detect everyone at the engine layer. We deliberately do NOT rely on
+	// UE's affiliation flags (GenericTeamAgentInterface team IDs) -- our faction
+	// system is the source of truth. HandlePerceptionUpdated re-filters every
+	// stimulus through USFFactionStatics::AreHostile so faction relationships
+	// drive behavior, never per-character flags.
 	if (UAISenseConfig_Sight* Sight = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig")))
 	{
 		Sight->SightRadius = 1500.0f;
@@ -42,6 +49,13 @@ void ASFNPCAIController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
+	if (!InPawn)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFNPCAI] OnPossess: InPawn is null on %s -- BT will not start."),
+			*GetNameSafe(this));
+		return;
+	}
+
 	ControlledNPC = Cast<ASFNPCBase>(InPawn);
 
 	if (Perception && !Perception->OnTargetPerceptionUpdated.IsAlreadyBound(this, &ASFNPCAIController::HandlePerceptionUpdated))
@@ -60,6 +74,29 @@ void ASFNPCAIController::OnPossess(APawn* InPawn)
 		}
 		BehaviorTreeComponent->StartTree(*DefaultBehaviorTree);
 	}
+
+	// Anchor patrol / return-home behavior at the pawn's spawn point. Without this
+	// the patrol service has nothing to query and the alerted branch's MoveTo /
+	// LookAt targets stay invalid.
+	if (BlackboardComponent && !HomeLocationKeyName.IsNone())
+	{
+		BlackboardComponent->SetValueAsVector(HomeLocationKeyName, InPawn->GetActorLocation());
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[SFNPCAI] OnPossess: pawn='%s' faction='%s' BT='%s' BB='%s' HomeLoc=%s"),
+		*GetNameSafe(InPawn),
+		*USFFactionStatics::GetFactionTag(InPawn).ToString(),
+		*GetNameSafe(DefaultBehaviorTree),
+		DefaultBehaviorTree ? *GetNameSafe(DefaultBehaviorTree->BlackboardAsset) : TEXT("<no BT>"),
+		*InPawn->GetActorLocation().ToString());
+
+	// Force-acquire any pawn already inside our sight cone at possess time --
+	// UE's perception system only fires OnTargetPerceptionUpdated on STATE
+	// CHANGES, so a player who was already standing in front of us when we
+	// spawned never triggers a callback. Walk the currently-sensed list once
+	// after possess so they get routed through HandlePerceptionUpdated.
+	PrimeFromCurrentPerception();
 }
 
 void ASFNPCAIController::OnUnPossess()
@@ -81,15 +118,26 @@ void ASFNPCAIController::OnUnPossess()
 
 void ASFNPCAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
-	if (!Stimulus.WasSuccessfullySensed() || !ControlledNPC)
+	if (!ControlledNPC || !Actor)
 	{
 		return;
 	}
 
-	// Hostile-by-default NPCs flip immediately on sight; civilians could be
-	// extended here to flag fear, set blackboard targets, etc. Disposition
-	// changes are server-only; clients receive via the identity component's
-	// OnRep.
+	// Per-actor edge-triggered logging so we get one diagnostic line per state
+	// change instead of spamming the log every perception tick.
+	const uint32 ActorKey = Actor->GetUniqueID();
+	uint8& LastLogState = PerceptionLogStatePerActor.FindOrAdd(ActorKey);
+
+	if (!Stimulus.WasSuccessfullySensed())
+	{
+		// Lost sight / sound -- reset state so the next acquisition logs again.
+		LastLogState = 0;
+		return;
+	}
+
+	// Hostile-by-default disposition flip (legacy civilian/quest-NPC behavior).
+	// This is kept so disposition-aware dialogue still works for NPCs that opt
+	// in via bHostileByDefault -- it does NOT decide who the BT attacks.
 	if (USFNPCNarrativeIdentityComponent* Identity = ControlledNPC->FindComponentByClass<USFNPCNarrativeIdentityComponent>())
 	{
 		if (Identity->IsHostileByDefault() && Identity->GetDisposition() != ESFNPCDisposition::Hostile)
@@ -98,11 +146,111 @@ void ASFNPCAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stim
 		}
 	}
 
-	// Cache the latest perceived hostile actor on the blackboard so
-	// designer-authored BTs can react. The "TargetActor" key is a convention;
-	// designers can change it in the BB asset if they prefer.
-	if (BlackboardComponent && Actor)
+	// Faction system is the source of truth for combat hostility. Per the design
+	// (dual-protagonist, faction-driven enemies), a single NPC controller routes
+	// every pawn through AreHostile -- the same actor can be friend or foe across
+	// playthroughs without touching the BT or character class.
+	const bool bHostile = USFFactionStatics::AreHostile(ControlledNPC, Actor);
+	const uint8 NewLogState = bHostile ? 2 : 1;
+
+	if (!bHostile)
 	{
-		BlackboardComponent->SetValueAsObject(TEXT("TargetActor"), Actor);
+		if (LastLogState != NewLogState)
+		{
+			const FGameplayTag FromTag = USFFactionStatics::GetFactionTag(ControlledNPC);
+			const FGameplayTag ToTag = USFFactionStatics::GetFactionTag(Actor);
+			UE_LOG(LogTemp, Warning,
+				TEXT("[SFNPCAI Perception] '%s' SAW '%s' but faction system says NOT hostile -- TargetActor not written. "
+				     "FromFaction='%s' ToFaction='%s'. "
+				     "Check: (1) both actors have a USFFactionComponent with a Faction.* tag set, "
+				     "(2) DeveloperSettings -> SignalForge -> DefaultFactionRelationships asset is assigned, "
+				     "(3) the relationship asset has a row for FromFaction with a Hostile entry toward ToFaction."),
+				*GetNameSafe(ControlledNPC), *GetNameSafe(Actor),
+				*FromTag.ToString(), *ToTag.ToString());
+			LastLogState = NewLogState;
+		}
+		return;
+	}
+
+	if (BlackboardComponent && !TargetActorKeyName.IsNone())
+	{
+		BlackboardComponent->SetValueAsObject(TargetActorKeyName, Actor);
+		if (LastLogState != NewLogState)
+		{
+			UE_LOG(LogTemp, Log,
+				TEXT("[SFNPCAI Perception] '%s' acquired hostile target '%s' (key '%s')."),
+				*GetNameSafe(ControlledNPC), *GetNameSafe(Actor), *TargetActorKeyName.ToString());
+			LastLogState = NewLogState;
+		}
+	}
+	else if (LastLogState != NewLogState)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SFNPCAI Perception] '%s' saw hostile '%s' but cannot write TargetActor: "
+			     "BlackboardComponent=%s, TargetActorKeyName='%s'."),
+			*GetNameSafe(ControlledNPC), *GetNameSafe(Actor),
+			BlackboardComponent ? TEXT("valid") : TEXT("NULL"),
+			*TargetActorKeyName.ToString());
+		LastLogState = NewLogState;
+	}
+}
+
+void ASFNPCAIController::PrimeFromCurrentPerception()
+{
+	if (!Perception || !ControlledNPC)
+	{
+		return;
+	}
+
+	TArray<AActor*> AlreadyPerceived;
+	Perception->GetCurrentlyPerceivedActors(/*SenseToUse*/ nullptr, AlreadyPerceived);
+
+	UE_LOG(LogTemp, Log,
+		TEXT("[SFNPCAI] PrimeFromCurrentPerception: %d actor(s) already in perception on possess."),
+		AlreadyPerceived.Num());
+
+	for (AActor* Sensed : AlreadyPerceived)
+	{
+		if (!Sensed || Sensed == ControlledNPC)
+		{
+			continue;
+		}
+
+		// Skip synthesizing a stimulus -- the perception system's currently-perceived
+		// list already implies a successful sense. Run the faction check + BB write
+		// path directly, mirroring the hostile-acquired branch of HandlePerceptionUpdated.
+		const uint32 ActorKey = Sensed->GetUniqueID();
+		uint8& LastLogState = PerceptionLogStatePerActor.FindOrAdd(ActorKey);
+
+		const bool bHostile = USFFactionStatics::AreHostile(ControlledNPC, Sensed);
+		const uint8 NewLogState = bHostile ? 2 : 1;
+
+		if (!bHostile)
+		{
+			if (LastLogState != NewLogState)
+			{
+				const FGameplayTag FromTag = USFFactionStatics::GetFactionTag(ControlledNPC);
+				const FGameplayTag ToTag = USFFactionStatics::GetFactionTag(Sensed);
+				UE_LOG(LogTemp, Warning,
+					TEXT("[SFNPCAI Prime] '%s' already saw '%s' on possess but faction system says NOT hostile. "
+					     "FromFaction='%s' ToFaction='%s'."),
+					*GetNameSafe(ControlledNPC), *GetNameSafe(Sensed),
+					*FromTag.ToString(), *ToTag.ToString());
+				LastLogState = NewLogState;
+			}
+			continue;
+		}
+
+		if (BlackboardComponent && !TargetActorKeyName.IsNone())
+		{
+			BlackboardComponent->SetValueAsObject(TargetActorKeyName, Sensed);
+			if (LastLogState != NewLogState)
+			{
+				UE_LOG(LogTemp, Log,
+					TEXT("[SFNPCAI Prime] '%s' acquired hostile target '%s' on possess (key '%s')."),
+					*GetNameSafe(ControlledNPC), *GetNameSafe(Sensed), *TargetActorKeyName.ToString());
+				LastLogState = NewLogState;
+			}
+		}
 	}
 }

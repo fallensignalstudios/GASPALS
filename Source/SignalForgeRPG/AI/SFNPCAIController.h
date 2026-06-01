@@ -68,6 +68,31 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI")
 	TObjectPtr<UBehaviorTree> DefaultBehaviorTree = nullptr;
 
+	/** Blackboard key the controller writes the perceived hostile target into. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI")
+	FName TargetActorKeyName = TEXT("TargetActor");
+
+	/** Blackboard Vector key written once on possess so patrol / return-home logic has an anchor. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AI")
+	FName HomeLocationKeyName = TEXT("HomeLocation");
+
 	UFUNCTION()
 	void HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stimulus);
+
+	/**
+	 * Walk every currently-perceived actor and route them through the same
+	 * HandlePerceptionUpdated path. Called once after possess so pawns that
+	 * were already inside the sight cone at level start get acquired without
+	 * waiting for them to leave-and-re-enter.
+	 */
+	void PrimeFromCurrentPerception();
+
+private:
+	/**
+	 * Per-actor record of the last verdict we logged for them
+	 * (0 = none/cleared, 1 = sensed-not-hostile, 2 = sensed-hostile-written).
+	 * Used so warnings fire on edges only and don't spam the log while an
+	 * NPC continuously sees the same actor.
+	 */
+	TMap<uint32, uint8> PerceptionLogStatePerActor;
 };
