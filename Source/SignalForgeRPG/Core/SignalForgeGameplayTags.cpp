@@ -236,6 +236,10 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("State.ParryWindow"),
 		TEXT("Character is in the active parry timing window; incoming blockable hits convert to perfect parries"));
 
+	GameplayTags.State_ParryCooldown = TagManager.AddNativeGameplayTag(
+		FName("State.ParryCooldown"),
+		TEXT("Character recently attempted a parry; block ability re-activation is allowed but the parry window will not open"));
+
 	GameplayTags.State_Invulnerable = TagManager.AddNativeGameplayTag(
 		FName("State.Invulnerable"),
 		TEXT("Character is fully invulnerable to incoming damage"));

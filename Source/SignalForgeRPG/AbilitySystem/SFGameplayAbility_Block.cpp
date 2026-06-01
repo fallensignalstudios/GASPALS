@@ -3,7 +3,9 @@
 #include "AbilitySystemComponent.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Core/SignalForgeGameplayTags.h"
+#include "Engine/World.h"
 #include "GameplayEffect.h"
+#include "TimerManager.h"
 
 USFGameplayAbility_Block::USFGameplayAbility_Block()
 {
@@ -79,6 +81,12 @@ void USFGameplayAbility_Block::ActivateAbility(
 		? ActorInfo->AbilitySystemComponent.Get()
 		: nullptr;
 
+	// Fallen-Order-style: opening the block press also opens a brief parry
+	// window, unless the player just attempted one (State.ParryCooldown).
+	// The hold-block GE applies regardless — the parry window just sits on
+	// top for the first ParryWindowSeconds of the press.
+	OpenParryWindow();
+
 	if (ASC && BlockingEffectClass)
 	{
 		/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: applying blocking effect"));*/
@@ -132,6 +140,87 @@ void USFGameplayAbility_Block::OnInputReleased(float TimeHeld)
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
+void USFGameplayAbility_Block::OpenParryWindow()
+{
+	if (!CurrentActorInfo || !CurrentActorInfo->AbilitySystemComponent.IsValid())
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();
+	if (!ASC)
+	{
+		return;
+	}
+
+	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+
+	// Recent parry attempt? Allow the block to proceed, but skip the window.
+	// This is the gate that prevents mash-to-parry.
+	if (ASC->HasMatchingGameplayTag(Tags.State_ParryCooldown))
+	{
+		return;
+	}
+
+	if (ParryWindowSeconds <= 0.f)
+	{
+		return;
+	}
+
+	ASC->AddLooseGameplayTag(Tags.State_ParryWindow);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			ParryWindowTimerHandle,
+			FTimerDelegate::CreateUObject(this, &USFGameplayAbility_Block::CloseParryWindow),
+			ParryWindowSeconds,
+			false);
+	}
+}
+
+void USFGameplayAbility_Block::CloseParryWindow()
+{
+	if (!CurrentActorInfo || !CurrentActorInfo->AbilitySystemComponent.IsValid())
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* ASC = CurrentActorInfo->AbilitySystemComponent.Get();
+	if (!ASC)
+	{
+		return;
+	}
+
+	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+
+	// Remove the window if it's still on (resolver may have already cleared it
+	// on a successful parry; RemoveLooseGameplayTag is a no-op if absent).
+	ASC->RemoveLooseGameplayTag(Tags.State_ParryWindow);
+
+	if (ParryCooldownSeconds <= 0.f)
+	{
+		return;
+	}
+
+	ASC->AddLooseGameplayTag(Tags.State_ParryCooldown);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			ParryCooldownTimerHandle,
+			[ASCWeak = TWeakObjectPtr<UAbilitySystemComponent>(ASC)]()
+			{
+				if (UAbilitySystemComponent* PinnedASC = ASCWeak.Get())
+				{
+					PinnedASC->RemoveLooseGameplayTag(FSignalForgeGameplayTags::Get().State_ParryCooldown);
+				}
+			},
+			ParryCooldownSeconds,
+			false);
+	}
+}
+
 void USFGameplayAbility_Block::EndAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
@@ -148,6 +237,21 @@ void USFGameplayAbility_Block::EndAbility(
 	{
 		WaitInputReleaseTask->EndTask();
 		WaitInputReleaseTask = nullptr;
+	}
+
+	// If the player releases block before the parry window finishes ticking,
+	// close it immediately. Otherwise the window timer would happily continue
+	// firing on a dead ability instance and try to add cooldown to an ASC that
+	// may or may not still want it. The ParryCooldown timer itself is allowed
+	// to keep ticking — it operates on the ASC, not the ability, and clears
+	// itself via the weak-ptr lambda.
+	if (UWorld* World = GetWorld())
+	{
+		if (ParryWindowTimerHandle.IsValid() && World->GetTimerManager().IsTimerActive(ParryWindowTimerHandle))
+		{
+			World->GetTimerManager().ClearTimer(ParryWindowTimerHandle);
+			CloseParryWindow();
+		}
 	}
 
 	if (ActorInfo && ActorInfo->AbilitySystemComponent.IsValid())

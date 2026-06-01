@@ -79,6 +79,7 @@ public:
 	FGameplayTag State_Blocking;
 	FGameplayTag State_Broken;
 	FGameplayTag State_ParryWindow;
+	FGameplayTag State_ParryCooldown;
 	FGameplayTag State_Invulnerable;
 	FGameplayTag State_Healing;
 
