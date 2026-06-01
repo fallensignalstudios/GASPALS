@@ -74,6 +74,20 @@ void ASFNPCAIController::OnPossess(APawn* InPawn)
 		}
 		BehaviorTreeComponent->StartTree(*DefaultBehaviorTree);
 	}
+	else
+	{
+		// Loud failure path: if any of these are null the BT never runs and the
+		// controller silently does nothing. Surface exactly which piece is
+		// missing so the user can fix the BP / controller defaults.
+		UE_LOG(LogTemp, Warning,
+			TEXT("[SFNPCAI] OnPossess: BT NOT STARTED on pawn='%s'. "
+			     "DefaultBehaviorTree=%s, BehaviorTreeComponent=%s, BlackboardComponent=%s. "
+			     "Fix: open this controller's BP and set 'Default Behavior Tree' in Class Defaults."),
+			*GetNameSafe(InPawn),
+			DefaultBehaviorTree ? TEXT("set") : TEXT("NULL"),
+			BehaviorTreeComponent ? TEXT("valid") : TEXT("NULL"),
+			BlackboardComponent ? TEXT("valid") : TEXT("NULL"));
+	}
 
 	// Anchor patrol / return-home behavior at the pawn's spawn point. Without this
 	// the patrol service has nothing to query and the alerted branch's MoveTo /
@@ -83,7 +97,8 @@ void ASFNPCAIController::OnPossess(APawn* InPawn)
 		BlackboardComponent->SetValueAsVector(HomeLocationKeyName, InPawn->GetActorLocation());
 	}
 
-	UE_LOG(LogTemp, Log,
+	// Display verbosity so this never gets filtered out by category log levels.
+	UE_LOG(LogTemp, Display,
 		TEXT("[SFNPCAI] OnPossess: pawn='%s' faction='%s' BT='%s' BB='%s' HomeLoc=%s"),
 		*GetNameSafe(InPawn),
 		*USFFactionStatics::GetFactionTag(InPawn).ToString(),
@@ -177,9 +192,12 @@ void ASFNPCAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stim
 		BlackboardComponent->SetValueAsObject(TargetActorKeyName, Actor);
 		if (LastLogState != NewLogState)
 		{
-			UE_LOG(LogTemp, Log,
-				TEXT("[SFNPCAI Perception] '%s' acquired hostile target '%s' (key '%s')."),
-				*GetNameSafe(ControlledNPC), *GetNameSafe(Actor), *TargetActorKeyName.ToString());
+			const bool bBTRunning = BehaviorTreeComponent && BehaviorTreeComponent->IsRunning();
+			UE_LOG(LogTemp, Display,
+				TEXT("[SFNPCAI Perception] '%s' acquired hostile target '%s' (key '%s'). BT running=%s, BT asset='%s'"),
+				*GetNameSafe(ControlledNPC), *GetNameSafe(Actor), *TargetActorKeyName.ToString(),
+				bBTRunning ? TEXT("YES") : TEXT("NO -- pawn will not react"),
+				*GetNameSafe(DefaultBehaviorTree));
 			LastLogState = NewLogState;
 		}
 	}
