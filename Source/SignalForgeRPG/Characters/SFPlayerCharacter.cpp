@@ -418,10 +418,8 @@ void ASFPlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (AbilitySystemComponent)
-	{
-		AbilitySystemComponent->ProcessAbilityInput(DeltaTime, false);
-	}
+	// Note: ASC input drain (ProcessAbilityInput) now lives in ASFCharacterBase::Tick
+	// so it runs for both player and AI-controlled NPCs.
 
 	// Smooth camera zoom
 	if (GameplayCameraBoom)
