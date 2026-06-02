@@ -96,11 +96,24 @@ void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 	}
 
 	// Pressed input → OnInputTriggered abilities, or forwarded to active ones
+	if (InputPressedSpecHandles.Num() > 0 || InputReleasedSpecHandles.Num() > 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("ASC::ProcessAbilityInput on '%s': %d pressed, %d held, %d released"),
+			*GetNameSafe(GetOwnerActor()), InputPressedSpecHandles.Num(), InputHeldSpecHandles.Num(), InputReleasedSpecHandles.Num());
+	}
 	for (const FGameplayAbilitySpecHandle& SpecHandle : InputPressedSpecHandles)
 	{
 		FGameplayAbilitySpec* AbilitySpec = nullptr;
-		if (!TryGetSpec(SpecHandle, AbilitySpec) || !AbilitySpec->Ability)
+		if (!TryGetSpec(SpecHandle, AbilitySpec))
 		{
+			UE_LOG(LogTemp, Warning, TEXT("ASC::Pressed spec handle [%s] -> TryGetSpec FAILED (stale handle)."),
+				*SpecHandle.ToString());
+			continue;
+		}
+		if (!AbilitySpec->Ability)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("ASC::Pressed spec [%s] -> Ability is NULL."),
+				*SpecHandle.ToString());
 			continue;
 		}
 
