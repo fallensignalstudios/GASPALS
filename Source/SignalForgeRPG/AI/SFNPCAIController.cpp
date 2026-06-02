@@ -60,9 +60,9 @@ void ASFNPCAIController::Tick(float DeltaTime)
 	// to false, leaving the pawn tick-dormant and silently breaking AI
 	// ability activation. AIControllers always tick (the BT depends on it),
 	// so this is the reliable place to drive the drain for NPCs.
-	if (ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetPawn()))
+	if (ASFCharacterBase* SFChar = Cast<ASFCharacterBase>(GetPawn()))
 	{
-		if (USFAbilitySystemComponent* SFASC = Cast<USFAbilitySystemComponent>(Character->GetAbilitySystemComponent()))
+		if (USFAbilitySystemComponent* SFASC = Cast<USFAbilitySystemComponent>(SFChar->GetAbilitySystemComponent()))
 		{
 			const bool bGamePaused = GetWorld() && GetWorld()->IsPaused();
 			SFASC->ProcessAbilityInput(DeltaTime, bGamePaused);
