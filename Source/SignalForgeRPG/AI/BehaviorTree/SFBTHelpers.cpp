@@ -5,6 +5,7 @@
 #include "Characters/SFCharacterBase.h"
 #include "Combat/SFWeaponData.h"
 #include "Components/SFEquipmentComponent.h"
+#include "Core/SignalForgeTypes.h"
 #include "Engine/World.h"
 #include "Faction/SFFactionStatics.h"
 
@@ -65,6 +66,16 @@ namespace SFBTHelpers
 			return 0.0f;
 		}
 
+		// Melee mode is authoritative: hitscan/projectile fields on the weapon are
+		// irrelevant for swords (which trace from sockets, not via hitscan). Trust
+		// the designer-authored AIEngagementReach so the behavior tree drives the
+		// pawn to swing distance instead of some stray ranged horizon.
+		if (WeaponData->CombatMode == ESFCombatMode::Melee)
+		{
+			const float Authored = WeaponData->MeleeConfig.AIEngagementReach;
+			return Authored > 0.0f ? Authored : 300.0f;
+		}
+
 		// Prefer ranged hitscan range if the weapon has any ranged config authored.
 		const FSFRangedWeaponConfig& Ranged = WeaponData->RangedConfig;
 		if (Ranged.HitscanMaxRange > 0.0f)
@@ -82,10 +93,11 @@ namespace SFBTHelpers
 		{
 			return 6000.0f;
 		}
-		// Melee fallback: the combat component traces ~150-250cm, but engage gates need
-		// a bit of slack so two capsules touching count as "in range". 300cm gives
-		// ~50cm slack on top of the actual swing reach.
-		return 300.0f;
+		// Melee fallback when CombatMode wasn't explicitly set but no ranged/caster
+		// fields are authored. Use AIEngagementReach if set, otherwise a conservative
+		// 300cm so two capsules touching still count as "in range".
+		const float MeleeAuthored = WeaponData->MeleeConfig.AIEngagementReach;
+		return MeleeAuthored > 0.0f ? MeleeAuthored : 300.0f;
 	}
 
 	bool HasLineOfSight(const ASFCharacterBase* From, const AActor* To)
