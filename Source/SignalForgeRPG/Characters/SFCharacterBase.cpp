@@ -85,6 +85,7 @@ ASFCharacterBase::ASFCharacterBase()
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+		Capsule->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Block);  // MeleeTrace
 	}
 }
 
