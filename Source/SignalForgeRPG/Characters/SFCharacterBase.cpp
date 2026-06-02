@@ -199,6 +199,28 @@ void ASFCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// ASFCharacterBase::Tick is REQUIRED for both player and AI: it drains the ASC
+	// input queue (player input bindings push presses here; AI BT tasks do the same).
+	// A BP archetype that leaves "Start with Tick Enabled" unchecked silently breaks
+	// AI ability activation because BT-queued presses never get drained. Force the
+	// tick on unconditionally and log the BP-cooked state so we can spot the bad BP.
+	const bool bWasTickEnabledBefore = IsActorTickEnabled();
+	const bool bCanEverTickBefore = PrimaryActorTick.bCanEverTick;
+	const bool bStartWithTickEnabledBefore = PrimaryActorTick.bStartWithTickEnabled;
+	if (!bCanEverTickBefore)
+	{
+		PrimaryActorTick.bCanEverTick = true;
+	}
+	SetActorTickEnabled(true);
+	UE_LOG(LogSFCharacter, Log,
+		TEXT("[SFCharacter] BeginPlay tick state on '%s' (class '%s'): CanEverTick(before)=%d StartWithTickEnabled(before)=%d ActorTickEnabled(before)=%d -> ActorTickEnabled(after)=%d"),
+		*GetName(),
+		*GetClass()->GetName(),
+		bCanEverTickBefore ? 1 : 0,
+		bStartWithTickEnabledBefore ? 1 : 0,
+		bWasTickEnabledBefore ? 1 : 0,
+		IsActorTickEnabled() ? 1 : 0);
+
 	InitializeDefaultAttributes();
 
 	if (ProgressionComponent)
