@@ -108,6 +108,8 @@ void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 
 		if (AbilitySpec->IsActive())
 		{
+			UE_LOG(LogTemp, Warning, TEXT("ASC::Pressed spec [%s] is ALREADY ACTIVE -- forwarding press only."),
+				*GetNameSafe(AbilitySpec->Ability));
 			AbilitySpecInputPressed(*AbilitySpec);
 			continue;
 		}
@@ -124,11 +126,26 @@ void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 		{
 			AbilitiesToActivate.AddUnique(AbilitySpec->Handle);
 		}
+		else
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("ASC::Pressed spec [%s] has policy=%d (not OnInputTriggered) -- NOT activating on press."),
+				*GetNameSafe(AbilitySpec->Ability), (int32)SFAbility->GetActivationPolicy());
+		}
 	}
 
 	for (const FGameplayAbilitySpecHandle& AbilitySpecHandle : AbilitiesToActivate)
 	{
-		TryActivateAbility(AbilitySpecHandle);
+		// Diagnostic: log activation result + class so we can see which granted ability
+		// is being requested and whether TryActivateAbility actually succeeded. Helps
+		// distinguish 'input never reached the ability' from 'CanActivateAbility blocked'.
+		FGameplayAbilitySpec* DiagSpec = nullptr;
+		const FString DiagAbilityName = (TryGetSpec(AbilitySpecHandle, DiagSpec) && DiagSpec && DiagSpec->Ability)
+			? DiagSpec->Ability->GetClass()->GetName()
+			: TEXT("<unknown>");
+		const bool bActivated = TryActivateAbility(AbilitySpecHandle);
+		UE_LOG(LogTemp, Warning, TEXT("ASC::TryActivateAbility [%s] -> %s"),
+			*DiagAbilityName, bActivated ? TEXT("SUCCESS") : TEXT("FAILED"));
 	}
 
 	// Released input

@@ -69,29 +69,36 @@ bool USFGameplayAbility_WeaponMelee::CanActivateAbility(
 {
 	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
 	{
+		UE_LOG(LogSFWeaponMelee, Warning, TEXT("WeaponMelee::CanActivate FAILED: Super rejected (cost/cooldown/blocked-tag)."));
 		return false;
 	}
 
 	if (!ActorInfo || !ActorInfo->AvatarActor.IsValid())
 	{
+		UE_LOG(LogSFWeaponMelee, Warning, TEXT("WeaponMelee::CanActivate FAILED: no ActorInfo / AvatarActor."));
 		return false;
 	}
 
 	ASFCharacterBase* Character = Cast<ASFCharacterBase>(ActorInfo->AvatarActor.Get());
 	if (!Character)
 	{
+		UE_LOG(LogSFWeaponMelee, Warning, TEXT("WeaponMelee::CanActivate FAILED: avatar is not an ASFCharacterBase."));
 		return false;
 	}
 
 	USFEquipmentComponent* Equipment = Character->GetEquipmentComponent();
 	if (!Equipment)
 	{
+		UE_LOG(LogSFWeaponMelee, Warning, TEXT("WeaponMelee::CanActivate FAILED on '%s': no EquipmentComponent."),
+			*GetNameSafe(Character));
 		return false;
 	}
 
 	USFWeaponData* WeaponData = Equipment->GetCurrentWeaponData();
 	if (!WeaponData)
 	{
+		UE_LOG(LogSFWeaponMelee, Warning, TEXT("WeaponMelee::CanActivate FAILED on '%s': Equipment has no CurrentWeaponData."),
+			*GetNameSafe(Character));
 		return false;
 	}
 
@@ -102,7 +109,19 @@ bool USFGameplayAbility_WeaponMelee::CanActivateAbility(
 	const TArray<TObjectPtr<UAnimMontage>>& LaneMontages =
 		(this->Lane == ESFMeleeLane::Heavy) ? Cfg.HeavyComboMontages : Cfg.LightComboMontages;
 
-	return LaneMontages.Num() > 0;
+	if (LaneMontages.Num() == 0)
+	{
+		UE_LOG(LogSFWeaponMelee, Warning,
+			TEXT("WeaponMelee::CanActivate FAILED on '%s': weapon '%s' has 0 montages in lane=%s. Author %sComboMontages on the weapon data asset."),
+			*GetNameSafe(Character), *GetNameSafe(WeaponData),
+			(Lane == ESFMeleeLane::Heavy) ? TEXT("Heavy") : TEXT("Light"),
+			(Lane == ESFMeleeLane::Heavy) ? TEXT("Heavy") : TEXT("Light"));
+		return false;
+	}
+
+	UE_LOG(LogSFWeaponMelee, Verbose, TEXT("WeaponMelee::CanActivate OK on '%s' (lane=%d, %d montage(s))."),
+		*GetNameSafe(Character), (int32)Lane, LaneMontages.Num());
+	return true;
 }
 
 void USFGameplayAbility_WeaponMelee::ActivateAbility(
