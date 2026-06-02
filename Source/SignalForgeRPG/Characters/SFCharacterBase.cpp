@@ -290,6 +290,31 @@ void ASFCharacterBase::PossessedBy(AController* NewController)
 		*GetClass()->GetName(),
 		NewController ? *NewController->GetName() : TEXT("<null>"),
 		NewController ? *NewController->GetClass()->GetName() : TEXT("<null>"));
+
+	// Make our Tick run AFTER the controller's tick so the ASC input drain in
+	// ASFCharacterBase::Tick observes any input pressed/released the BehaviorTree
+	// queued this frame. Without this, AIControllers (which own the BTComponent)
+	// may tick AFTER their pawn in the same frame -- meaning the BT FireWeapon
+	// task pushes a press/release pair into InputPressedSpecHandles, and the
+	// character's next-frame drain sees an empty queue because the press got
+	// queued AFTER the drain ran. PlayerControllers don't hit this because their
+	// input bindings naturally establish controller-before-pawn ordering.
+	if (NewController)
+	{
+		AddTickPrerequisiteActor(NewController);
+	}
+}
+
+void ASFCharacterBase::UnPossessed()
+{
+	// Symmetric cleanup so a possessed-then-unpossessed pawn doesn't keep an old
+	// prerequisite around if a new controller takes over later.
+	if (AController* OldController = GetController())
+	{
+		RemoveTickPrerequisiteActor(OldController);
+	}
+
+	Super::UnPossessed();
 }
 
 // -----------------------------------------------------------------------------

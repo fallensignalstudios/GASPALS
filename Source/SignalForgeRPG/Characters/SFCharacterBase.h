@@ -449,6 +449,7 @@ protected:
 	 * possess and just calls UE_LOG.
 	 */
 	virtual void PossessedBy(AController* NewController) override;
+	virtual void UnPossessed() override;
 
 	// -------------------------------------------------------------------------
 	// GAS setup helpers
