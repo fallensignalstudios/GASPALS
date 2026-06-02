@@ -61,4 +61,8 @@ private:
 	TArray<FGameplayAbilitySpecHandle> InputHeldSpecHandles;
 
 	FSFOnAbilitiesChanged AbilitiesChangedDelegate;
+
+	// Diagnostic: accumulates DeltaTime for throttled heartbeat log in ProcessAbilityInput.
+	// Used to prove this ASC's drain is actually running on its owning actor.
+	float DiagHeartbeatAccumulator = 0.0f;
 };
