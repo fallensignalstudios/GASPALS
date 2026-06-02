@@ -1,9 +1,12 @@
 #include "AI/SFNPCAIController.h"
+#include "AbilitySystem/SFAbilitySystemComponent.h"
+#include "Characters/SFCharacterBase.h"
 #include "Characters/SFNPCBase.h"
 #include "Characters/SFNPCNarrativeIdentityComponent.h"
 #include "BehaviorTree/BehaviorTree.h"
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
+#include "Engine/World.h"
 #include "Faction/SFFactionStatics.h"
 #include "GameplayTagContainer.h"
 #include "Perception/AIPerceptionComponent.h"
@@ -42,6 +45,28 @@ ASFNPCAIController::ASFNPCAIController()
 		Hearing->DetectionByAffiliation.bDetectFriendlies = true;
 		Hearing->DetectionByAffiliation.bDetectNeutrals = true;
 		Perception->ConfigureSense(*Hearing);
+	}
+}
+
+void ASFNPCAIController::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// Drain the possessed pawn's ASC input queue from the controller's tick.
+	// AI BT tasks push presses via AbilityInputTagPressed; without this drain
+	// they sit in the queue forever and TryActivateAbility never fires. We
+	// run the drain here (instead of relying on the pawn's Tick) because
+	// several AI character BP archetypes cooked PrimaryActorTick.bCanEverTick
+	// to false, leaving the pawn tick-dormant and silently breaking AI
+	// ability activation. AIControllers always tick (the BT depends on it),
+	// so this is the reliable place to drive the drain for NPCs.
+	if (ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetPawn()))
+	{
+		if (USFAbilitySystemComponent* SFASC = Cast<USFAbilitySystemComponent>(Character->GetAbilitySystemComponent()))
+		{
+			const bool bGamePaused = GetWorld() && GetWorld()->IsPaused();
+			SFASC->ProcessAbilityInput(DeltaTime, bGamePaused);
+		}
 	}
 }
 
