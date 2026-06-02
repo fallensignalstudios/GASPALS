@@ -53,6 +53,19 @@ void USFAbilitySystemComponent::AbilityInputTagReleased(const FGameplayTag& Inpu
 
 void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGamePaused)
 {
+	// Heartbeat: ~once per 5s, prove that this ASC's ProcessAbilityInput is being
+	// driven at all. Without this we can't tell 'queue empty when we drain' from
+	// 'drain never runs on this actor'. Throttle to keep the log readable.
+	DiagHeartbeatAccumulator += DeltaTime;
+	if (DiagHeartbeatAccumulator >= 5.0f)
+	{
+		DiagHeartbeatAccumulator = 0.0f;
+		UE_LOG(LogTemp, Warning,
+			TEXT("ASC::ProcessAbilityInput HEARTBEAT on '%s' (paused=%d, blocked=%d, pressed=%d, held=%d, released=%d)"),
+			*GetNameSafe(GetOwnerActor()), bGamePaused ? 1 : 0, IsInputBlocked() ? 1 : 0,
+			InputPressedSpecHandles.Num(), InputHeldSpecHandles.Num(), InputReleasedSpecHandles.Num());
+	}
+
 	if (bGamePaused)
 	{
 		return;
