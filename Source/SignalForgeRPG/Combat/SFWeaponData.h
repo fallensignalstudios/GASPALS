@@ -403,6 +403,15 @@ struct SIGNALFORGERPG_API FSFMeleeWeaponConfig
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Hit Detection", meta = (ClampMin = "0.5"))
 	float TraceRadius = 6.0f;
 
+	/** Distance (cm) at which AI considers this weapon "in range" of a target.
+	 *  Used by AI behavior tree decorators (SF In Weapon Range) and tasks
+	 *  (SF Move To Combat Range with bUseWeaponRange=true). Roughly: the actor
+	 *  pivot-to-pivot distance at which a swing started right now would land
+	 *  before the player moves. For most one-handed swords ~250cm is right;
+	 *  for long polearms 350-400cm; for daggers 150cm. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|AI", meta = (ClampMin = "50.0", ClampMax = "1000.0"))
+	float AIEngagementReach = 250.0f;
+
 	/** Friendly-fire toggle. False is the standard FPS/coop default. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Melee|Hit Detection")
 	bool bCanFriendlyFire = false;
