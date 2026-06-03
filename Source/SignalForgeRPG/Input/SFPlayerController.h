@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Combat/SFWeaponInstanceTypes.h"
 #include "GameFramework/PlayerController.h"
+#include "Inventory/SFInventoryTypes.h"
 #include "Inventory/SFSlotTypes.h"
 #include "SFPlayerController.generated.h"
 
@@ -47,12 +48,17 @@ struct FSFRespawnLoadout
 	UPROPERTY()
 	ESFEquipmentSlot ActiveSlot = ESFEquipmentSlot::None;
 
+	/** Full inventory contents at the moment of death (items, stacks, instance metadata). */
+	UPROPERTY()
+	TArray<FSFInventoryEntry> InventoryEntries;
+
 	UPROPERTY()
 	bool bHasSnapshot = false;
 
 	void Reset()
 	{
 		Entries.Reset();
+		InventoryEntries.Reset();
 		ActiveSlot = ESFEquipmentSlot::None;
 		bHasSnapshot = false;
 	}

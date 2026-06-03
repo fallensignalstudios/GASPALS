@@ -84,13 +84,24 @@ void ASFPlayerController::InitializeUIControllers(ASFCharacterBase* PlayerCharac
 {
 	check(PlayerCharacter);
 
-	PlayerHUDWidgetController = NewObject<USFPlayerHUDWidgetController>(this);
+	// Reuse existing controllers when possible so the PlayerHUDWidget (which
+	// was handed a controller pointer in InitializeHUDWidget) keeps pointing
+	// at the SAME object across respawn. Each controller's Initialize() is
+	// idempotent and unbinds from the previous owner internally before binding
+	// to the new one -- see USFPlayerHUDWidgetController::Initialize.
+	if (!PlayerHUDWidgetController)
+	{
+		PlayerHUDWidgetController = NewObject<USFPlayerHUDWidgetController>(this);
+	}
 	if (PlayerHUDWidgetController)
 	{
 		PlayerHUDWidgetController->Initialize(PlayerCharacter);
 	}
 
-	AbilityBarWidgetController = NewObject<USFAbilityBarWidgetController>(this);
+	if (!AbilityBarWidgetController)
+	{
+		AbilityBarWidgetController = NewObject<USFAbilityBarWidgetController>(this);
+	}
 	if (AbilityBarWidgetController)
 	{
 		AbilityBarWidgetController->Initialize(PlayerCharacter);
@@ -113,7 +124,10 @@ void ASFPlayerController::InitializeUIControllers(ASFCharacterBase* PlayerCharac
 
 	if (InventoryComponent && EquipmentComponent)
 	{
-		InventoryWidgetController = NewObject<USFInventoryWidgetController>(this);
+		if (!InventoryWidgetController)
+		{
+			InventoryWidgetController = NewObject<USFInventoryWidgetController>(this);
+		}
 		if (InventoryWidgetController)
 		{
 			InventoryWidgetController->Initialize(InventoryComponent, EquipmentComponent);
@@ -122,7 +136,10 @@ void ASFPlayerController::InitializeUIControllers(ASFCharacterBase* PlayerCharac
 
 	if (EquipmentComponent)
 	{
-		EquipmentWidgetController = NewObject<USFEquipmentWidgetController>(this);
+		if (!EquipmentWidgetController)
+		{
+			EquipmentWidgetController = NewObject<USFEquipmentWidgetController>(this);
+		}
 		if (EquipmentWidgetController)
 		{
 			EquipmentWidgetController->Initialize(EquipmentComponent);
@@ -394,7 +411,18 @@ void ASFPlayerController::SnapshotLoadoutForRespawn(ASFCharacterBase* DyingChara
 	}
 
 	PendingRespawnLoadout.ActiveSlot = Equipment->GetActiveWeaponSlot();
-	PendingRespawnLoadout.bHasSnapshot = PendingRespawnLoadout.Entries.Num() > 0;
+
+	// Inventory snapshot. Mirrors SFPlayerSaveService's save path so the
+	// instance metadata (perks, rolls, stack counts) survives respawn rather
+	// than being silently reset on the fresh DefaultPawnClass instance.
+	if (USFInventoryComponent* Inventory = DyingCharacter->GetInventoryComponent())
+	{
+		PendingRespawnLoadout.InventoryEntries = Inventory->GetInventoryEntries();
+	}
+
+	PendingRespawnLoadout.bHasSnapshot =
+		PendingRespawnLoadout.Entries.Num() > 0
+		|| PendingRespawnLoadout.InventoryEntries.Num() > 0;
 }
 
 void ASFPlayerController::RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshCharacter)
@@ -405,11 +433,11 @@ void ASFPlayerController::RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshChar
 	}
 
 	USFEquipmentComponent* Equipment = FreshCharacter->GetEquipmentComponent();
-	if (!Equipment)
+	USFInventoryComponent* Inventory = FreshCharacter->GetInventoryComponent();
+	if (!Equipment || !Inventory)
 	{
-		// Pawn doesn't have equipment yet (probably mid-construction). Defer
-		// one tick and try again. We hold onto the snapshot until it lands.
-		FTimerHandle RetryHandle;
+		// Pawn doesn't have equipment/inventory yet (probably mid-construction).
+		// Defer one tick and try again. We hold onto the snapshot until it lands.
 		TWeakObjectPtr<ASFPlayerController> WeakSelf(this);
 		TWeakObjectPtr<ASFCharacterBase> WeakChar(FreshCharacter);
 		GetWorldTimerManager().SetTimerForNextTick(
@@ -421,6 +449,13 @@ void ASFPlayerController::RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshChar
 				}
 			}));
 		return;
+	}
+
+	// Restore inventory FIRST so equipment slots that reference inventory
+	// entries (via InventoryEntryId) line up with live entries.
+	if (PendingRespawnLoadout.InventoryEntries.Num() > 0)
+	{
+		Inventory->SetInventoryEntriesFromSave(PendingRespawnLoadout.InventoryEntries);
 	}
 
 	// Re-equip every slot. EquipWeaponInstance internally calls
