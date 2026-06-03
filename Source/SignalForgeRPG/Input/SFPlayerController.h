@@ -137,6 +137,13 @@ protected:
 	void RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshCharacter);
 
 	/**
+	 * Equip pass of the snapshot restore, deferred one tick so the fresh pawn's
+	 * AnimInstance has finished InitAnim before EquipWeaponInstance calls
+	 * LinkAnimClassLayers (otherwise the upper-body overlay silently no-ops).
+	 */
+	void ApplyEquipmentSnapshotToFreshPawn(ASFCharacterBase* FreshCharacter);
+
+	/**
 	 * Last snapshot of the player's loadout, captured in HandlePawnDied and
 	 * consumed in OnPossess. Lives on the controller because the pawn (and its
 	 * equipment component) is destroyed during respawn.
