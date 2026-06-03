@@ -48,11 +48,9 @@ void ASFPlayerController::BeginPlay()
 	InitializeUIControllers(PlayerCharacter);
 	InitializeHUDWidget();
 
-	// Hook death once at startup. The pawn pointer can change across
-	// possess/unpossess but for the local single-player session we only have
-	// one pawn; if you add seamless pawn swapping later, rebind in OnPossess
-	// instead.
-	PlayerCharacter->OnCharacterDied.AddDynamic(this, &ASFPlayerController::HandlePawnDied);
+	// Bind death; use AddUnique so OnPossess (which also binds, to cover the
+	// respawn pawn) doesn't double-fire on the initial possession.
+	PlayerCharacter->OnCharacterDied.AddUniqueDynamic(this, &ASFPlayerController::HandlePawnDied);
 
 	// Optional polling if you want it back later.
 	// if (AbilityBarWidgetController && !AbilityBarPollingTimerHandle.IsValid())
@@ -325,6 +323,137 @@ void ASFPlayerController::RefreshPlayerMenuPreview()
 
 	CachedPreviewCharacter->SyncFromSourceCharacter(ControlledCharacter);
 }
+void ASFPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	ASFCharacterBase* SFChar = Cast<ASFCharacterBase>(InPawn);
+	if (!SFChar)
+	{
+		return;
+	}
+
+	// New pawn = fresh OnCharacterDied delegate. AddUnique is idempotent so
+	// the initial possession (where BeginPlay also binds) doesn't double-fire.
+	SFChar->OnCharacterDied.AddUniqueDynamic(this, &ASFPlayerController::HandlePawnDied);
+
+	// If we're coming back from a death, the HUD widget controllers are still
+	// pointing at the destroyed pawn. Re-initialize them against the fresh
+	// pawn so health/echo/shields/stamina/ability/equipment bindings come
+	// from the new attribute set + components. Initialize() is idempotent
+	// and unbinds from the previous owner internally.
+	if (PendingRespawnLoadout.bHasSnapshot && IsLocalController())
+	{
+		InitializeUIControllers(SFChar);
+	}
+
+	// If we're coming back from a death, re-apply the loadout that was
+	// captured at the moment of death. Equipment/inventory live on the pawn,
+	// which got destroyed during RestartPlayerAtTransform; the controller is
+	// the only thing that survives, so it holds the snapshot.
+	if (PendingRespawnLoadout.bHasSnapshot)
+	{
+		RestoreLoadoutAfterRespawn(SFChar);
+	}
+}
+
+void ASFPlayerController::SnapshotLoadoutForRespawn(ASFCharacterBase* DyingCharacter)
+{
+	PendingRespawnLoadout.Reset();
+
+	if (!DyingCharacter)
+	{
+		return;
+	}
+
+	USFEquipmentComponent* Equipment = DyingCharacter->GetEquipmentComponent();
+	if (!Equipment)
+	{
+		return;
+	}
+
+	// Pull every populated slot. We use FSFWeaponInstanceData because that's
+	// what carries the perks/rolls -- equipping by raw WeaponData would lose
+	// the player's god-roll on respawn.
+	for (const TPair<ESFEquipmentSlot, FSFEquipmentSlotEntry>& Pair : Equipment->GetEquippedSlots())
+	{
+		if (!Pair.Value.bHasItemEquipped)
+		{
+			continue;
+		}
+
+		if (!Pair.Value.WeaponInstance.IsValid())
+		{
+			continue;
+		}
+
+		FSFRespawnLoadoutEntry Entry;
+		Entry.Slot = Pair.Key;
+		Entry.WeaponInstance = Pair.Value.WeaponInstance;
+		PendingRespawnLoadout.Entries.Add(Entry);
+	}
+
+	PendingRespawnLoadout.ActiveSlot = Equipment->GetActiveWeaponSlot();
+	PendingRespawnLoadout.bHasSnapshot = PendingRespawnLoadout.Entries.Num() > 0;
+}
+
+void ASFPlayerController::RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshCharacter)
+{
+	if (!FreshCharacter || !PendingRespawnLoadout.bHasSnapshot)
+	{
+		return;
+	}
+
+	USFEquipmentComponent* Equipment = FreshCharacter->GetEquipmentComponent();
+	if (!Equipment)
+	{
+		// Pawn doesn't have equipment yet (probably mid-construction). Defer
+		// one tick and try again. We hold onto the snapshot until it lands.
+		FTimerHandle RetryHandle;
+		TWeakObjectPtr<ASFPlayerController> WeakSelf(this);
+		TWeakObjectPtr<ASFCharacterBase> WeakChar(FreshCharacter);
+		GetWorldTimerManager().SetTimerForNextTick(
+			FTimerDelegate::CreateLambda([WeakSelf, WeakChar]()
+			{
+				if (WeakSelf.IsValid() && WeakChar.IsValid())
+				{
+					WeakSelf->RestoreLoadoutAfterRespawn(WeakChar.Get());
+				}
+			}));
+		return;
+	}
+
+	// Re-equip every slot. EquipWeaponInstance internally calls
+	// OnWeaponEquipped on the character, which runs ApplyWeaponAnimationFromData
+	// and re-establishes CurrentOverlayMode + the linked upper-body anim layer
+	// the anim instance reads from in NativeUpdateAnimation -- that is what
+	// restores the overlays.
+	const ESFEquipmentSlot SavedActiveSlot = PendingRespawnLoadout.ActiveSlot;
+
+	for (const FSFRespawnLoadoutEntry& Entry : PendingRespawnLoadout.Entries)
+	{
+		if (Entry.Slot == ESFEquipmentSlot::None || !Entry.WeaponInstance.IsValid())
+		{
+			continue;
+		}
+
+		Equipment->EquipWeaponInstance(Entry.WeaponInstance, Entry.Slot);
+	}
+
+	// Make sure the slot the player had drawn at the time of death is the one
+	// drawn now -- otherwise the overlay/abilities would reflect whichever
+	// slot was equipped last in the loop.
+	if (SavedActiveSlot != ESFEquipmentSlot::None
+		&& SavedActiveSlot != Equipment->GetActiveWeaponSlot())
+	{
+		Equipment->SetActiveWeaponSlot(SavedActiveSlot);
+	}
+
+	// Consumed -- a non-death possess later (e.g. a future cinematic body-swap)
+	// shouldn't replay this snapshot.
+	PendingRespawnLoadout.Reset();
+}
+
 void ASFPlayerController::HandlePawnDied(ASFCharacterBase* DeadCharacter, ASFCharacterBase* /*Killer*/)
 {
 	if (!DeadCharacter || DeadCharacter != GetPawn())
@@ -333,6 +462,12 @@ void ASFPlayerController::HandlePawnDied(ASFCharacterBase* DeadCharacter, ASFCha
 	}
 
 	LastDeathLocation = DeadCharacter->GetActorLocation();
+
+	// Snapshot the loadout NOW, before the death screen runs and the game mode
+	// destroys the pawn. The fresh pawn is built from DefaultPawnClass with no
+	// memory of what was equipped, so anim overlays (driven by the equipped
+	// weapon profile) would otherwise reset to Unarmed on respawn.
+	SnapshotLoadoutForRespawn(DeadCharacter);
 
 	// Dark-zone status is sticky for the death: we resolve it once here at
 	// the moment of death so a body sliding across the dark-zone boundary
