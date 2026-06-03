@@ -1,8 +1,10 @@
 #include "World/SFDarkZoneVolume.h"
 
 #include "Components/BrushComponent.h"
+#include "Engine/Brush.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Volume.h"
 
 ASFDarkZoneVolume::ASFDarkZoneVolume()
 {
