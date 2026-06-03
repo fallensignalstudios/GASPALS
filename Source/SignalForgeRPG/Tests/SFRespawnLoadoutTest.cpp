@@ -17,7 +17,8 @@ ASFRespawnLoadoutTest::ASFRespawnLoadoutTest()
 	// AFunctionalTest defaults are mostly fine; one second is enough for the
 	// scenario but designers can extend per-instance if they layer extra logic.
 	TimeLimit = 15.0f;
-	TimesUpMessage = TEXT("Respawn loadout test timed out before assertions could run.");
+	TimesUpMessage = NSLOCTEXT("SFRespawnLoadoutTest", "TimesUp",
+		"Respawn loadout test timed out before assertions could run.");
 	TimesUpResult = EFunctionalTestResult::Failed;
 }
 
