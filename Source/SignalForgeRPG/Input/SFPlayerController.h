@@ -1,7 +1,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/SFWeaponInstanceTypes.h"
 #include "GameFramework/PlayerController.h"
+#include "Inventory/SFSlotTypes.h"
 #include "SFPlayerController.generated.h"
 
 class ASFPlayerMenuPreviewScene;
@@ -14,6 +16,47 @@ class USFEquipmentWidgetController;
 class ASFCharacterBase;
 class USFDamageNumberWidget;
 class USFDeathScreenWidget;
+
+/**
+ * Snapshot of the player's equipment loadout taken at the moment of death so
+ * it can be re-applied to the freshly spawned pawn after respawn. The pawn
+ * itself is destroyed during RestartPlayerAtTransform, which drops the
+ * EquipmentComponent and its anim-overlay-driving state with it; the
+ * controller survives, so the snapshot lives here.
+ */
+USTRUCT(BlueprintType)
+struct FSFRespawnLoadoutEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	ESFEquipmentSlot Slot = ESFEquipmentSlot::None;
+
+	UPROPERTY()
+	FSFWeaponInstanceData WeaponInstance;
+};
+
+USTRUCT(BlueprintType)
+struct FSFRespawnLoadout
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FSFRespawnLoadoutEntry> Entries;
+
+	UPROPERTY()
+	ESFEquipmentSlot ActiveSlot = ESFEquipmentSlot::None;
+
+	UPROPERTY()
+	bool bHasSnapshot = false;
+
+	void Reset()
+	{
+		Entries.Reset();
+		ActiveSlot = ESFEquipmentSlot::None;
+		bHasSnapshot = false;
+	}
+};
 
 UCLASS()
 class SIGNALFORGERPG_API ASFPlayerController : public APlayerController
@@ -66,10 +109,34 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Death")
 	TSubclassOf<USFDeathScreenWidget> DeathScreenWidgetClass;
 
+	//~ Begin APlayerController interface
+	virtual void OnPossess(APawn* InPawn) override;
+	//~ End APlayerController interface
+
 protected:
 	/** Bound to the possessed pawn's OnCharacterDied; spawns the death widget. */
 	UFUNCTION()
 	void HandlePawnDied(ASFCharacterBase* DeadCharacter, ASFCharacterBase* Killer);
+
+	/**
+	 * Snapshot the dying pawn's equipped slots + active slot into PendingRespawnLoadout
+	 * so OnPossess can re-apply it to the fresh pawn (and the anim overlays come back).
+	 */
+	void SnapshotLoadoutForRespawn(ASFCharacterBase* DyingCharacter);
+
+	/**
+	 * Re-apply PendingRespawnLoadout onto the freshly possessed pawn and rebind
+	 * death/UI hooks. Safe to call when no snapshot is pending.
+	 */
+	void RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshCharacter);
+
+	/**
+	 * Last snapshot of the player's loadout, captured in HandlePawnDied and
+	 * consumed in OnPossess. Lives on the controller because the pawn (and its
+	 * equipment component) is destroyed during respawn.
+	 */
+	UPROPERTY()
+	FSFRespawnLoadout PendingRespawnLoadout;
 
 	UPROPERTY(BlueprintReadOnly, Category = "UI|Death")
 	TObjectPtr<USFDeathScreenWidget> DeathScreenWidget = nullptr;
