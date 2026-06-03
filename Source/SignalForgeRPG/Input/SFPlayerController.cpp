@@ -11,8 +11,11 @@
 #include "UI/SFPlayerMenuPreviewScene.h"
 #include "UI/SFPlayerMenuWidget.h"
 #include "UI/SFUserWidgetBase.h"
+#include "UI/SFDeathScreenWidget.h"
 #include "Inventory/SFInventoryWidgetController.h"
-#include "Save/SFPlayerSaveService.h"
+#include "Core/SFGameModeBase.h"
+#include "World/SFDarkZoneVolume.h"
+#include "Blueprint/UserWidget.h"
 
 namespace
 {
@@ -45,6 +48,12 @@ void ASFPlayerController::BeginPlay()
 	InitializeUIControllers(PlayerCharacter);
 	InitializeHUDWidget();
 
+	// Hook death once at startup. The pawn pointer can change across
+	// possess/unpossess but for the local single-player session we only have
+	// one pawn; if you add seamless pawn swapping later, rebind in OnPossess
+	// instead.
+	PlayerCharacter->OnCharacterDied.AddDynamic(this, &ASFPlayerController::HandlePawnDied);
+
 	// Optional polling if you want it back later.
 	// if (AbilityBarWidgetController && !AbilityBarPollingTimerHandle.IsValid())
 	// {
@@ -55,15 +64,6 @@ void ASFPlayerController::BeginPlay()
 	// 		0.15f,
 	// 		true);
 	// }
-
-	if (UGameInstance* GI = GetGameInstance())
-	{
-		if (USFPlayerSaveService* Save = GI->GetSubsystem<USFPlayerSaveService>())
-		{
-			// No-op when there is no pending load (i.e. New Game, normal play).
-			Save->ConsumePendingLoadAndApply();
-		}
-	}
 }
 
 void ASFPlayerController::InitializePlayerMenuPreviewScene()
@@ -324,4 +324,72 @@ void ASFPlayerController::RefreshPlayerMenuPreview()
 	}
 
 	CachedPreviewCharacter->SyncFromSourceCharacter(ControlledCharacter);
+}
+void ASFPlayerController::HandlePawnDied(ASFCharacterBase* DeadCharacter, ASFCharacterBase* /*Killer*/)
+{
+	if (!DeadCharacter || DeadCharacter != GetPawn())
+	{
+		return;
+	}
+
+	LastDeathLocation = DeadCharacter->GetActorLocation();
+
+	// Dark-zone status is sticky for the death: we resolve it once here at
+	// the moment of death so a body sliding across the dark-zone boundary
+	// during ragdoll doesn't flip the respawn rules under the player.
+	ASFDarkZoneVolume* ContainingZone = nullptr;
+	const bool bIsDarkZone = ASFDarkZoneVolume::IsLocationInDarkZone(this, LastDeathLocation, ContainingZone);
+
+	FText ZoneOrCheckpointName;
+	if (bIsDarkZone && ContainingZone)
+	{
+		ZoneOrCheckpointName = ContainingZone->DarkZoneDisplayName;
+	}
+
+	if (!DeathScreenWidgetClass)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SFPlayerController] HandlePawnDied: DeathScreenWidgetClass is not set on the PlayerController BP; respawning immediately."));
+		RespawnFromDeathScreen(bIsDarkZone);
+		return;
+	}
+
+	if (!DeathScreenWidget)
+	{
+		DeathScreenWidget = CreateWidget<USFDeathScreenWidget>(this, DeathScreenWidgetClass);
+	}
+
+	if (DeathScreenWidget)
+	{
+		DeathScreenWidget->InitializeDeathScreen(bIsDarkZone, ZoneOrCheckpointName);
+
+		if (!DeathScreenWidget->IsInViewport())
+		{
+			DeathScreenWidget->AddToViewport(100);
+		}
+
+		// Mouse + UI input so the player can click the respawn button.
+		// Game input stays off until the pawn is back; respawn flow toggles
+		// it via the inherited input mode helpers.
+		FInputModeUIOnly Mode;
+		Mode.SetWidgetToFocus(DeathScreenWidget->TakeWidget());
+		SetInputMode(Mode);
+		bShowMouseCursor = true;
+	}
+}
+
+void ASFPlayerController::RespawnFromDeathScreen(bool bRestartFromCheckpoint)
+{
+	if (DeathScreenWidget)
+	{
+		DeathScreenWidget->RemoveFromParent();
+		DeathScreenWidget = nullptr;
+	}
+
+	SetInputMode(FInputModeGameOnly());
+	bShowMouseCursor = false;
+
+	if (ASFGameModeBase* GM = GetWorld() ? GetWorld()->GetAuthGameMode<ASFGameModeBase>() : nullptr)
+	{
+		GM->HandlePlayerRespawnRequest(this, bRestartFromCheckpoint, LastDeathLocation);
+	}
 }

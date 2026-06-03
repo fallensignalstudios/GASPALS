@@ -133,6 +133,16 @@ protected:
 
 	virtual void Tick(float DeltaTime) override;
 
+	/**
+	 * Override character death to free the camera from the ragdoll. The base
+	 * implementation enables physics on the mesh; without this override the
+	 * spring arm (attached to the capsule root, which becomes the parent of
+	 * the ragdoll mesh) jerks around as the mesh tumbles. We detach the
+	 * boom and freeze it at its current world transform so the dead body
+	 * stays framed cleanly under the death screen.
+	 */
+	virtual void HandleDeath() override;
+
 	/** Drives the smooth recoil interpolation each frame. */
 	void UpdateRecoil(float DeltaTime);
 

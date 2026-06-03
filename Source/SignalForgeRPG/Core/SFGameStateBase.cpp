@@ -1,6 +1,7 @@
 #include "Core/SFGameStateBase.h"
 #include "Narrative/SFNarrativeReplicatorComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "World/SFCheckpoint.h"
 
 ASFGameStateBase::ASFGameStateBase()
 {
@@ -62,3 +63,13 @@ void ASFGameStateBase::OnRep_WorldPhase(FGameplayTag OldPhase)
 // Note: AGameStateBase::GetServerWorldTimeSeconds() is already exposed to
 // both C++ and Blueprint and replicates a server-authoritative world time.
 // We rely on the inherited implementation rather than shadowing it here.
+
+void ASFGameStateBase::SetActiveCheckpoint(ASFCheckpoint* NewCheckpoint, ASFPlayerCharacter* /*ActivatingPlayer*/)
+{
+	if (!NewCheckpoint || NewCheckpoint == ActiveCheckpoint)
+	{
+		return;
+	}
+
+	ActiveCheckpoint = NewCheckpoint;
+}

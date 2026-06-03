@@ -6,6 +6,8 @@
 #include "SFGameStateBase.generated.h"
 
 class USFNarrativeReplicatorComponent;
+class ASFCheckpoint;
+class ASFPlayerCharacter;
 
 /**
  * ASFGameStateBase
@@ -57,6 +59,20 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "World|Phase")
 	FSFWorldPhaseChanged OnWorldPhaseChanged;
 
+	/**
+	 * The most recently activated checkpoint. Used by the game mode to
+	 * respawn players that die inside a dark zone. Lives on game state so
+	 * it survives the destruction of the player's pawn during respawn and
+	 * so co-op shares progress. Not replicated -- checkpoint actors exist
+	 * on every machine, but the "which one was last" decision is server-
+	 * authoritative and the client doesn't need to know.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Checkpoint")
+	void SetActiveCheckpoint(ASFCheckpoint* NewCheckpoint, ASFPlayerCharacter* ActivatingPlayer);
+
+	UFUNCTION(BlueprintPure, Category = "Checkpoint")
+	ASFCheckpoint* GetActiveCheckpoint() const { return ActiveCheckpoint; }
+
 protected:
 	/** Replicator component — owns the shared FastArray narrative state. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Narrative")
@@ -68,6 +84,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_WorldPhase(FGameplayTag OldPhase);
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Checkpoint")
+	TObjectPtr<ASFCheckpoint> ActiveCheckpoint;
 
 private:
 	/** Cached previous phase used to fire OnWorldPhaseChanged on the server. */
