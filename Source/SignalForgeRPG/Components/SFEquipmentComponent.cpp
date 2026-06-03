@@ -99,6 +99,21 @@ bool USFEquipmentComponent::EquipWeaponInstance(const FSFWeaponInstanceData& Wea
 	ActiveWeaponSlot = InSlot;
 	CurrentWeaponInstance = WeaponInstance;
 
+	// Mirror the instance into the EquippedSlots map so SnapshotLoadoutForRespawn
+	// (and any other consumer that iterates GetEquippedSlots()) can see this
+	// equip. Direct EquipWeaponInstance callers -- BeginPlay's default-weapon
+	// equip and the test harness -- otherwise leave the slot map empty, which
+	// makes the respawn snapshot come back empty and the fresh pawn re-equips
+	// DefaultWeaponData instead of the pre-death weapon. We preserve any
+	// existing ItemDefinition / InventoryEntryId already recorded for the slot
+	// so an inventory-driven equip that round-trips through here keeps its link.
+	{
+		FSFEquipmentSlotEntry& Entry = EquippedSlots.FindOrAdd(InSlot);
+		Entry.Slot = InSlot;
+		Entry.WeaponInstance = CurrentWeaponInstance;
+		Entry.bHasItemEquipped = true;
+	}
+
 	// Auto-load the clip on first equip so a fresh weapon doesn't dry-fire on its first trigger
 	// pull. If the weapon has an AmmoType, draw from the carrier's reserve; otherwise (energy /
 	// reserve-less weapons) just top to ClipSize so the weapon is usable. Instances with prior
