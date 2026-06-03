@@ -432,9 +432,8 @@ void ASFPlayerController::RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshChar
 		return;
 	}
 
-	USFEquipmentComponent* Equipment = FreshCharacter->GetEquipmentComponent();
 	USFInventoryComponent* Inventory = FreshCharacter->GetInventoryComponent();
-	if (!Equipment || !Inventory)
+	if (!FreshCharacter->GetEquipmentComponent() || !Inventory)
 	{
 		// Pawn doesn't have equipment/inventory yet (probably mid-construction).
 		// Defer one tick and try again. We hold onto the snapshot until it lands.
@@ -452,10 +451,44 @@ void ASFPlayerController::RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshChar
 	}
 
 	// Restore inventory FIRST so equipment slots that reference inventory
-	// entries (via InventoryEntryId) line up with live entries.
+	// entries (via InventoryEntryId) line up with live entries. Inventory
+	// restore is safe to run immediately -- it doesn't touch animation.
 	if (PendingRespawnLoadout.InventoryEntries.Num() > 0)
 	{
 		Inventory->SetInventoryEntriesFromSave(PendingRespawnLoadout.InventoryEntries);
+	}
+
+	// Defer the equip pass by one tick. EquipWeaponInstance calls
+	// LinkAnimClassLayers on the mesh's AnimInstance via
+	// SetOverlayLinkedAnimLayer; if we run during OnPossess the AnimInstance
+	// may not yet have completed InitAnim, in which case the link silently
+	// no-ops and the upper-body overlay never engages on the fresh pawn.
+	// One tick is enough for the mesh's InitAnim to land.
+	TWeakObjectPtr<ASFPlayerController> WeakSelf(this);
+	TWeakObjectPtr<ASFCharacterBase> WeakChar(FreshCharacter);
+	GetWorldTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateLambda([WeakSelf, WeakChar]()
+		{
+			if (!WeakSelf.IsValid() || !WeakChar.IsValid())
+			{
+				return;
+			}
+			WeakSelf->ApplyEquipmentSnapshotToFreshPawn(WeakChar.Get());
+		}));
+}
+
+void ASFPlayerController::ApplyEquipmentSnapshotToFreshPawn(ASFCharacterBase* FreshCharacter)
+{
+	if (!FreshCharacter || !PendingRespawnLoadout.bHasSnapshot)
+	{
+		return;
+	}
+
+	USFEquipmentComponent* Equipment = FreshCharacter->GetEquipmentComponent();
+	if (!Equipment)
+	{
+		PendingRespawnLoadout.Reset();
+		return;
 	}
 
 	// Re-equip every slot. EquipWeaponInstance internally calls
@@ -477,12 +510,33 @@ void ASFPlayerController::RestoreLoadoutAfterRespawn(ASFCharacterBase* FreshChar
 
 	// Make sure the slot the player had drawn at the time of death is the one
 	// drawn now -- otherwise the overlay/abilities would reflect whichever
-	// slot was equipped last in the loop.
+	// slot was equipped last in the loop. SetActiveWeaponSlot routes through
+	// EquipWeaponInstance again, which will re-fire OnWeaponEquipped with the
+	// active slot's data, so ApplyWeaponAnimationFromData lands on the slot
+	// the player actually had drawn.
 	if (SavedActiveSlot != ESFEquipmentSlot::None
 		&& SavedActiveSlot != Equipment->GetActiveWeaponSlot())
 	{
 		Equipment->SetActiveWeaponSlot(SavedActiveSlot);
 	}
+	else if (SavedActiveSlot != ESFEquipmentSlot::None)
+	{
+		// Active slot already matches (e.g. the loop ended on it). Re-apply
+		// animation explicitly from the equipped weapon data so the freshly
+		// initialized AnimInstance picks up the overlay even if the equip
+		// call short-circuited because the instance id matched.
+		if (const USFWeaponData* ActiveWeaponData = Equipment->GetCurrentWeaponData())
+		{
+			FreshCharacter->ApplyWeaponAnimationFromData(ActiveWeaponData);
+		}
+	}
+
+	// Belt-and-suspenders: even after the equip pass above, force a refresh
+	// of the linked anim layer against whatever ended up active. This catches
+	// the edge case where the mesh's AnimInstance was rebuilt between the
+	// equip call and now (e.g. a BP-driven mesh swap on possess) which would
+	// otherwise drop the LinkAnimClassLayers state.
+	FreshCharacter->RefreshOverlayLinkedAnimLayer();
 
 	// Consumed -- a non-death possess later (e.g. a future cinematic body-swap)
 	// shouldn't replay this snapshot.
