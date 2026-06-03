@@ -27,7 +27,8 @@ public class SignalForgeRPG : ModuleRules
             "LevelSequence",
             "MovieScene",
             "DeveloperSettings",
-            "NetCore"
+            "NetCore",
+            "FunctionalTesting"
         });
 
         PublicIncludePaths.AddRange(new string[]
