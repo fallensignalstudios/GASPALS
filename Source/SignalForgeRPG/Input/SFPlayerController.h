@@ -13,6 +13,7 @@ class USFInventoryWidgetController;
 class USFEquipmentWidgetController;
 class ASFCharacterBase;
 class USFDamageNumberWidget;
+class USFDeathScreenWidget;
 
 UCLASS()
 class SIGNALFORGERPG_API ASFPlayerController : public APlayerController
@@ -52,6 +53,29 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "UI")
 	bool IsPlayerMenuOpen() const { return bIsPlayerMenuOpen; }
+
+	/**
+	 * Death-screen entry. Called by the death widget after the designer's
+	 * exit animation completes. Forwards to the game mode to do the actual
+	 * pawn respawn at either a checkpoint or near the death location.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "UI|Death")
+	void RespawnFromDeathScreen(bool bRestartFromCheckpoint);
+
+	/** Designer-assigned WBP_DeathScreen class. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "UI|Death")
+	TSubclassOf<USFDeathScreenWidget> DeathScreenWidgetClass;
+
+protected:
+	/** Bound to the possessed pawn's OnCharacterDied; spawns the death widget. */
+	UFUNCTION()
+	void HandlePawnDied(ASFCharacterBase* DeadCharacter, ASFCharacterBase* Killer);
+
+	UPROPERTY(BlueprintReadOnly, Category = "UI|Death")
+	TObjectPtr<USFDeathScreenWidget> DeathScreenWidget = nullptr;
+
+	/** Cached so we can hand it back to the game mode for non-dark-zone respawn. */
+	FVector LastDeathLocation = FVector::ZeroVector;
 
 protected:
 	/** Creates and wires all HUD-related widget controllers for the local player. */

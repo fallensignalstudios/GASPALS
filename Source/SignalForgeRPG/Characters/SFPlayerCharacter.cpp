@@ -1113,3 +1113,29 @@ UCameraComponent* ASFPlayerCharacter::GetGameplayCamera() const
 
 	return nullptr;
 }
+void ASFPlayerCharacter::HandleDeath()
+{
+	// Snapshot the boom's world transform BEFORE the base implementation
+	// starts ragdolling the mesh -- the spring arm is attached to the
+	// capsule root and is otherwise dragged around by every physics impulse
+	// the ragdoll picks up.
+	const bool bHadBoom = (GameplayCameraBoom != nullptr);
+	const FTransform PreDeathBoomTransform = bHadBoom
+		? GameplayCameraBoom->GetComponentTransform()
+		: FTransform::Identity;
+
+	Super::HandleDeath();
+
+	if (bHadBoom)
+	{
+		// Detach with KeepWorldTransform so the boom stays exactly where it
+		// was at the moment of death. Disabling pawn-control-rotation
+		// freezes any further view input from rotating the dead camera, and
+		// turning off the collision test stops the boom from springing
+		// forward as the ragdoll rolls past the camera.
+		GameplayCameraBoom->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+		GameplayCameraBoom->SetWorldTransform(PreDeathBoomTransform);
+		GameplayCameraBoom->bUsePawnControlRotation = false;
+		GameplayCameraBoom->bDoCollisionTest = false;
+	}
+}
