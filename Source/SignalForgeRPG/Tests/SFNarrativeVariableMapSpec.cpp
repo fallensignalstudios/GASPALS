@@ -5,7 +5,6 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "GameplayTagContainer.h"
-#include "GameplayTagsManager.h"
 #include "Narrative/SFNarrativeTypes.h"
 #include "Narrative/SFNarrativeVariableMap.h"
 
@@ -34,49 +33,45 @@
 namespace SFNarrativeVariableMapSpecTags
 {
 	/**
-	 * Resolve a gameplay tag by name, registering it natively if it isn't
-	 * already present. AddNativeGameplayTag is idempotent on repeat names
-	 * (the manager dedupes), and queries against an already-registered tag
-	 * succeed via RequestGameplayTag's fast path -- so try cheap first.
+	 * Resolve an already-registered native gameplay tag by name.
+	 *
+	 * IMPORTANT: we cannot call AddNativeGameplayTag from inside a spec --
+	 * by the time specs run, UGameplayTagsManager has been sealed via
+	 * DoneAddingNativeTags() and any new registration fires an ensure that
+	 * the automation framework escalates to a test failure. So we use tags
+	 * that the project registers itself in SignalForgeGameplayTags.cpp at
+	 * module startup. We only care about their *identity* here -- they are
+	 * opaque keys for the round-trip, not gameplay state.
 	 */
-	static FGameplayTag ResolveOrRegister(FName TagName, const TCHAR* DevComment)
+	static FGameplayTag Resolve(const TCHAR* TagName)
 	{
-		FGameplayTag Existing = FGameplayTag::RequestGameplayTag(TagName, /*ErrorIfNotFound=*/false);
-		if (Existing.IsValid())
-		{
-			return Existing;
-		}
-		return UGameplayTagsManager::Get().AddNativeGameplayTag(TagName, DevComment);
+		return FGameplayTag::RequestGameplayTag(FName(TagName), /*ErrorIfNotFound=*/false);
 	}
 
-	/** Lazily register a native gameplay tag for the spec to use as FactTagBase. */
+	/** Fact-tag base. Any well-known stable native tag works as an opaque key. */
 	static FGameplayTag GetBaseTag()
 	{
-		static FGameplayTag CachedTag = ResolveOrRegister(
-			FName(TEXT("Test.Narrative.SpecFact")),
-			TEXT("Test-only fact tag for FSFNarrativeVariableMap spec."));
-		return CachedTag;
+		return Resolve(TEXT("Attributes.Health"));
 	}
 
-	/**
-	 * Lazily register payload tags. These are the *contents* of variables --
-	 * e.g. the Tag value of a Tag-typed narrative variable. Distinct from the
-	 * fact base tag so we can prove the round-trip preserves them.
-	 */
+	/** Distinct from the fact tag -- used as the *value* of a Tag-typed variable. */
 	static FGameplayTag GetPayloadTagA()
 	{
-		static FGameplayTag CachedTag = ResolveOrRegister(
-			FName(TEXT("Test.Narrative.Payload.A")),
-			TEXT("Test-only payload tag A."));
-		return CachedTag;
+		return Resolve(TEXT("Attributes.MaxHealth"));
 	}
 
 	static FGameplayTag GetPayloadTagB()
 	{
-		static FGameplayTag CachedTag = ResolveOrRegister(
-			FName(TEXT("Test.Narrative.Payload.B")),
-			TEXT("Test-only payload tag B."));
-		return CachedTag;
+		return Resolve(TEXT("Attributes.Stamina"));
+	}
+
+	/**
+	 * Distinct fact tag for negative-path tests that need to prove the
+	 * restore side rejects mismatched fact tags.
+	 */
+	static FGameplayTag GetOtherFactTag()
+	{
+		return Resolve(TEXT("Attributes.MaxStamina"));
 	}
 }
 
@@ -98,6 +93,20 @@ void FSFNarrativeVariableMapSpec::Define()
 	{
 		Map = FSFNarrativeVariableMap();
 		FactBase = SFNarrativeVariableMapSpecTags::GetBaseTag();
+
+		// Stable native tags from SignalForgeGameplayTags.cpp. If they ever get
+		// renamed/removed, surface that loudly instead of letting every It fail
+		// with mystery 'expected 1, was 0' errors.
+		if (!FactBase.IsValid()
+			|| !SFNarrativeVariableMapSpecTags::GetPayloadTagA().IsValid()
+			|| !SFNarrativeVariableMapSpecTags::GetPayloadTagB().IsValid()
+			|| !SFNarrativeVariableMapSpecTags::GetOtherFactTag().IsValid())
+		{
+			AddError(TEXT(
+				"FSFNarrativeVariableMapSpec relies on Attributes.* native tags from "
+				"SignalForgeGameplayTags.cpp. One or more were not resolvable -- update "
+				"SFNarrativeVariableMapSpecTags::Get*Tag() to point at currently-registered tags."));
+		}
 	});
 
 	Describe("scalar round-trips (Int/Float/Bool/Name)", [this]()
@@ -310,8 +319,8 @@ void FSFNarrativeVariableMapSpec::Define()
 			TArray<FSFWorldFactSnapshot> Snapshots;
 			Map.BuildSnapshots(Snapshots, FactBase, NAME_None);
 
-			// Restore under a *different* fact tag (using payload tag as a stand-in).
-			const FGameplayTag OtherFact = SFNarrativeVariableMapSpecTags::GetPayloadTagA();
+			// Restore under a *different* fact tag.
+			const FGameplayTag OtherFact = SFNarrativeVariableMapSpecTags::GetOtherFactTag();
 			FSFNarrativeVariableMap Restored;
 			Restored.RestoreFromSnapshots(Snapshots, OtherFact, NAME_None);
 
