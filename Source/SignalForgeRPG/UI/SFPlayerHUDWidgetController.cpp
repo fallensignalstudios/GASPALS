@@ -8,6 +8,7 @@
 #include "Components/SFInteractableInterface.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Components/SFEquipmentComponent.h"
+#include "Core/SignalForgeLogChannels.h"
 
 
 
@@ -47,7 +48,7 @@ void USFPlayerHUDWidgetController::Initialize(ASFCharacterBase* InPlayerCharacte
 	OnShieldsChanged.Broadcast(CurrentShields, MaxShields);
 	OnStaminaChanged.Broadcast(CurrentStamina, MaxStamina);
 
-	UE_LOG(LogTemp, Display, TEXT("HUDWidgetController Initialize called: %s"), *GetNameSafe(InPlayerCharacter));
+	UE_LOG(LogSFUI, Display, TEXT("HUDWidgetController Initialize called: %s"), *GetNameSafe(InPlayerCharacter));
 
 	// Reset interaction HUD state
 	bHasInteractionPrompt = false;
@@ -67,7 +68,7 @@ void USFPlayerHUDWidgetController::Initialize(ASFCharacterBase* InPlayerCharacte
 			InteractionComponent->OnInteractableChanged.AddDynamic(
 				this, &USFPlayerHUDWidgetController::HandleInteractableChanged);
 
-			UE_LOG(LogTemp, Display,
+			UE_LOG(LogSFUI, Display,
 				TEXT("HUDWidgetController bound to InteractionComponent on '%s'"),
 				*GetNameSafe(PlayerPawn));
 
@@ -83,14 +84,14 @@ void USFPlayerHUDWidgetController::Initialize(ASFCharacterBase* InPlayerCharacte
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error,
+			UE_LOG(LogSFUI, Error,
 				TEXT("HUDWidgetController could not find InteractionComponent on '%s'."),
 				*GetNameSafe(PlayerPawn));
 		}
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error,
+		UE_LOG(LogSFUI, Error,
 			TEXT("HUDWidgetController PlayerCharacter was not ASFCharacterBase: %s (Class=%s)"),
 			*GetNameSafe(PlayerCharacter),
 			PlayerCharacter ? *PlayerCharacter->GetClass()->GetName() : TEXT("<null>"));
@@ -249,7 +250,7 @@ void USFPlayerHUDWidgetController::HandleInteractableChanged(
 	FSFInteractionOption PrimaryOption,
 	const TArray<FSFInteractionOption>& AllOptions)
 {
-	UE_LOG(LogTemp, Display, TEXT("HandleInteractableChanged. Actor: %s, Primary: '%s'"),
+	UE_LOG(LogSFUI, Display, TEXT("HandleInteractableChanged. Actor: %s, Primary: '%s'"),
 		*GetNameSafe(NewInteractableActor),
 		*PrimaryOption.PromptText.ToString());
 

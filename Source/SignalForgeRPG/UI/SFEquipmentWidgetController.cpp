@@ -3,6 +3,7 @@
 #include "Components/SFEquipmentComponent.h"
 #include "Combat/SFWeaponData.h"
 #include "Inventory/SFItemDefinition.h"
+#include "Core/SignalForgeLogChannels.h"
 
 void USFEquipmentWidgetController::Initialize(USFEquipmentComponent* InEquipmentComponent)
 {
@@ -115,7 +116,7 @@ FSFEquipmentDisplayEntry USFEquipmentWidgetController::BuildEntryForSlot(
 		Slot == ESFEquipmentSlot::SecondaryWeapon ||
 		Slot == ESFEquipmentSlot::HeavyWeapon;
 
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogSFUI, Warning,
 		TEXT("Equip UI: Slot=%d HasItem=%s ItemDef=%s ItemIcon=%s WeaponData=%s WeaponIcon=%s"),
 		(int32)Slot,
 		Entry.bHasItemEquipped ? TEXT("true") : TEXT("false"),

@@ -12,6 +12,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
+#include "Core/SignalForgeLogChannels.h"
 
 static TAutoConsoleVariable<int32> CVarSFInteractionDebug(
 	TEXT("sf.Interaction.Debug"),
@@ -31,7 +32,7 @@ void USFInteractionComponent::BeginPlay()
 	OwnerCharacter = Cast<ACharacter>(GetOwner());
 
 	// Unconditional log so we always know whether the component spawned.
-	UE_LOG(LogTemp, Display,
+	UE_LOG(LogSFUI, Display,
 		TEXT("SFInteractionComponent::BeginPlay on '%s' (Owner=%s, TickEnabled=%d, NetMode=%d)"),
 		*GetNameSafe(this),
 		*GetNameSafe(GetOwner()),
@@ -40,7 +41,7 @@ void USFInteractionComponent::BeginPlay()
 
 	if (!OwnerCharacter)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFUI, Warning,
 			TEXT("SFInteractionComponent owner is not a Character: %s. Tick disabled."),
 			*GetNameSafe(GetOwner()));
 		SetComponentTickEnabled(false);
@@ -73,7 +74,7 @@ void USFInteractionComponent::TickComponent(
 		if (Now - LastHeartbeatLogTime > 1.0)
 		{
 			LastHeartbeatLogTime = Now;
-			UE_LOG(LogTemp, Display,
+			UE_LOG(LogSFUI, Display,
 				TEXT("SFInteractionComponent: Tick alive (Enabled=%d, LocallyControlled=%d, Owner=%s)"),
 				bInteractionEnabled ? 1 : 0,
 				IsLocallyControlled() ? 1 : 0,
@@ -183,7 +184,7 @@ void USFInteractionComponent::UpdateCurrentInteractable()
 			{
 				const ESFInteractionAvailability Availability =
 					ISFInteractableInterface::Execute_GetInteractionAvailability(HitActor, NewContext);
-				UE_LOG(LogTemp, Display,
+				UE_LOG(LogSFUI, Display,
 					TEXT("SFInteractionComponent: trace hit '%s' but it was rejected (Availability=%d)."),
 					*GetNameSafe(HitActor),
 					static_cast<int32>(Availability));
@@ -191,14 +192,14 @@ void USFInteractionComponent::UpdateCurrentInteractable()
 		}
 		else if (IsValid(HitActor) && CVarSFInteractionDebug.GetValueOnGameThread() > 0)
 		{
-			UE_LOG(LogTemp, Display,
+			UE_LOG(LogSFUI, Display,
 				TEXT("SFInteractionComponent: trace hit '%s' which does not implement ISFInteractableInterface."),
 				*GetNameSafe(HitActor));
 		}
 	}
 	else if (CVarSFInteractionDebug.GetValueOnGameThread() > 0)
 	{
-		UE_LOG(LogTemp, Verbose, TEXT("SFInteractionComponent: trace did not hit any actor."));
+		UE_LOG(LogSFUI, Verbose, TEXT("SFInteractionComponent: trace did not hit any actor."));
 	}
 
 	SetCurrentInteractable(NewInteractableActor, NewContext);
@@ -292,7 +293,7 @@ void USFInteractionComponent::SetCurrentInteractable(
 			: ResolvePrimaryOption(FocusContext);
 	}
 
-	UE_LOG(LogTemp, Verbose,
+	UE_LOG(LogSFUI, Verbose,
 		TEXT("SFInteractionComponent: SetCurrentInteractable -> %s, prompt='%s', options=%d"),
 		*GetNameSafe(CurrentInteractableActor),
 		*CurrentPrimaryOption.PromptText.ToString(),

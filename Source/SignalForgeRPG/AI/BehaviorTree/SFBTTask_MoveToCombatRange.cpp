@@ -6,6 +6,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Characters/SFCharacterBase.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFBTTask_MoveToCombatRange::USFBTTask_MoveToCombatRange()
 {
@@ -61,7 +62,7 @@ EBTNodeResult::Type USFBTTask_MoveToCombatRange::ExecuteTask(UBehaviorTreeCompon
 	const float DistNow = FVector::Dist(Self->GetActorLocation(), Mem->LastTargetLoc);
 	if (DistNow >= MinD && DistNow <= MaxD)
 	{
-		UE_LOG(LogTemp, Display,
+		UE_LOG(LogSFAI, Display,
 			TEXT("[SFBTTask_MoveToCombatRange] '%s' Execute: already in band. Dist=%.0fcm, Band=[%.0f..%.0f] -> Succeeded."),
 			*GetNameSafe(Self), DistNow, MinD, MaxD);
 		return EBTNodeResult::Succeeded;
@@ -78,13 +79,13 @@ EBTNodeResult::Type USFBTTask_MoveToCombatRange::ExecuteTask(UBehaviorTreeCompon
 
 	const EPathFollowingRequestResult::Type MoveResult = AI->MoveToActor(Target, EffectiveAcceptanceRadius, /*bStopOnOverlap*/ true, bUsePathfinding);
 
-	UE_LOG(LogTemp, Display,
+	UE_LOG(LogSFAI, Display,
 		TEXT("[SFBTTask_MoveToCombatRange] '%s' Execute: Dist=%.0fcm, Band=[%.0f..%.0f], AcceptanceRadius=%.0fcm (authored=%.0f), MoveResult=%d."),
 		*GetNameSafe(Self), DistNow, MinD, MaxD, EffectiveAcceptanceRadius, AcceptanceRadius, (int32)MoveResult);
 
 	if (MoveResult == EPathFollowingRequestResult::Failed)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFAI, Warning,
 			TEXT("[SFBTTask_MoveToCombatRange] '%s' MoveToActor FAILED -- check NavMesh coverage around target '%s' at %s."),
 			*GetNameSafe(Self), *GetNameSafe(Target), *Target->GetActorLocation().ToString());
 		return EBTNodeResult::Failed;
@@ -95,7 +96,7 @@ EBTNodeResult::Type USFBTTask_MoveToCombatRange::ExecuteTask(UBehaviorTreeCompon
 		// the pawn is too close (DistNow < MinD). Succeed anyway: the BT will
 		// re-evaluate next tick and InWeaponRange (or whatever upstream gate) will
 		// pick the next branch. Better than deadlocking.
-		UE_LOG(LogTemp, Display,
+		UE_LOG(LogSFAI, Display,
 			TEXT("[SFBTTask_MoveToCombatRange] '%s' Execute: AlreadyAtGoal (Dist=%.0f outside band [%.0f..%.0f]) -> Succeeded to let BT re-evaluate."),
 			*GetNameSafe(Self), DistNow, MinD, MaxD);
 		return EBTNodeResult::Succeeded;
@@ -147,7 +148,7 @@ void USFBTTask_MoveToCombatRange::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 
 	if (DistNow >= MinD && DistNow <= MaxD)
 	{
-		UE_LOG(LogTemp, Display,
+		UE_LOG(LogSFAI, Display,
 			TEXT("[SFBTTask_MoveToCombatRange] '%s' Tick: in band. Dist=%.0fcm, Band=[%.0f..%.0f] -> Succeeded."),
 			*GetNameSafe(Self), DistNow, MinD, MaxD);
 		AI->StopMovement();
@@ -166,7 +167,7 @@ void USFBTTask_MoveToCombatRange::TickTask(UBehaviorTreeComponent& OwnerComp, ui
 			|| AI->GetPathFollowingComponent()->GetStatus() == EPathFollowingStatus::Idle;
 		if (Mem->bMoveIssued && bPathFollowingIdle)
 		{
-			UE_LOG(LogTemp, Display,
+			UE_LOG(LogSFAI, Display,
 				TEXT("[SFBTTask_MoveToCombatRange] '%s' Tick: path follower Idle outside band (Dist=%.0f, Band=[%.0f..%.0f]) -> Succeeded to let BT re-evaluate."),
 				*GetNameSafe(Self), DistNow, MinD, MaxD);
 			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);

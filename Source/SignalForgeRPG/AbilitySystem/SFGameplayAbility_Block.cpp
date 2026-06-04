@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "GameplayEffect.h"
 #include "TimerManager.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFGameplayAbility_Block::USFGameplayAbility_Block()
 {
@@ -29,7 +30,7 @@ bool USFGameplayAbility_Block::CanActivateAbility(
 	const bool bSuperResult = Super::CanActivateAbility(
 		Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags);
 
-	/*UE_LOG(LogTemp, Warning, TEXT("Block CanActivateAbility: Super=%s"),
+	/*UE_LOG(LogSFCombat, Warning, TEXT("Block CanActivateAbility: Super=%s"),
 		bSuperResult ? TEXT("true") : TEXT("false"));*/
 
 	if (!bSuperResult)
@@ -39,7 +40,7 @@ bool USFGameplayAbility_Block::CanActivateAbility(
 
 	if (!ActorInfo || !ActorInfo->AbilitySystemComponent.IsValid())
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("Block CanActivateAbility: invalid ActorInfo/ASC"));*/
+		/*UE_LOG(LogSFCombat, Warning, TEXT("Block CanActivateAbility: invalid ActorInfo/ASC"));*/
 		return false;
 	}
 
@@ -48,11 +49,11 @@ bool USFGameplayAbility_Block::CanActivateAbility(
 
 	if (ASC->HasMatchingGameplayTag(Tags.State_Broken))
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("Block CanActivateAbility: blocked by State.Broken"));*/
+		/*UE_LOG(LogSFCombat, Warning, TEXT("Block CanActivateAbility: blocked by State.Broken"));*/
 		return false;
 	}
 
-	/*UE_LOG(LogTemp, Warning, TEXT("Block CanActivateAbility: success"));*/
+	/*UE_LOG(LogSFCombat, Warning, TEXT("Block CanActivateAbility: success"));*/
 	return true;
 }
 
@@ -62,16 +63,16 @@ void USFGameplayAbility_Block::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
-	/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: entered"));*/
+	/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: entered"));*/
 
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: CommitAbility failed"));*/
+		/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: CommitAbility failed"));*/
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: CommitAbility succeeded"));*/
+	/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: CommitAbility succeeded"));*/
 
 	PlayAbilityMontage();
 	SpawnAbilityVFX();
@@ -89,7 +90,7 @@ void USFGameplayAbility_Block::ActivateAbility(
 
 	if (ASC && BlockingEffectClass)
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: applying blocking effect"));*/
+		/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: applying blocking effect"));*/
 		const FGameplayEffectSpecHandle SpecHandle =
 			MakeOutgoingGameplayEffectSpec(BlockingEffectClass, GetAbilityLevel());
 
@@ -101,39 +102,39 @@ void USFGameplayAbility_Block::ActivateAbility(
 				ActivationInfo,
 				SpecHandle);
 
-			/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: effect applied, handle valid=%s"),
+			/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: effect applied, handle valid=%s"),
 				BlockingEffectHandle.IsValid() ? TEXT("true") : TEXT("false"));*/
 		}
 		else
 		{
-			/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: effect spec invalid"));*/
+			/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: effect spec invalid"));*/
 		}
 	}
 	else
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: no ASC or no BlockingEffectClass"));*/
+		/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: no ASC or no BlockingEffectClass"));*/
 	}
 
 	WaitInputReleaseTask = UAbilityTask_WaitInputRelease::WaitInputRelease(this, true);
 	if (WaitInputReleaseTask)
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: wait input release task created"));*/
+		/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: wait input release task created"));*/
 		WaitInputReleaseTask->OnRelease.AddDynamic(this, &USFGameplayAbility_Block::OnInputReleased);
 		WaitInputReleaseTask->ReadyForActivation();
 	}
 	else
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("Block ActivateAbility: failed to create release task"));*/
+		/*UE_LOG(LogSFCombat, Warning, TEXT("Block ActivateAbility: failed to create release task"));*/
 	}
 }
 
 void USFGameplayAbility_Block::OnInputReleased(float TimeHeld)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Block OnInputReleased: TimeHeld=%f"), TimeHeld);
+	UE_LOG(LogSFCombat, Warning, TEXT("Block OnInputReleased: TimeHeld=%f"), TimeHeld);
 
 	if (!IsActive())
 	{
-		/*UE_LOG(LogTemp, Warning, TEXT("Block OnInputReleased: ability not active"));*/
+		/*UE_LOG(LogSFCombat, Warning, TEXT("Block OnInputReleased: ability not active"));*/
 		return;
 	}
 
@@ -230,7 +231,7 @@ void USFGameplayAbility_Block::EndAbility(
 {
 
 	StopAbilityMontage(0.15f);
-	/*UE_LOG(LogTemp, Warning, TEXT("Block EndAbility: WasCancelled=%s"),
+	/*UE_LOG(LogSFCombat, Warning, TEXT("Block EndAbility: WasCancelled=%s"),
 		bWasCancelled ? TEXT("true") : TEXT("false"));*/
 
 	if (WaitInputReleaseTask)
@@ -260,7 +261,7 @@ void USFGameplayAbility_Block::EndAbility(
 		{
 			if (BlockingEffectHandle.IsValid())
 			{
-				/*UE_LOG(LogTemp, Warning, TEXT("Block EndAbility: removing blocking effect"));*/
+				/*UE_LOG(LogSFCombat, Warning, TEXT("Block EndAbility: removing blocking effect"));*/
 				ASC->RemoveActiveGameplayEffect(BlockingEffectHandle);
 				BlockingEffectHandle.Invalidate();
 			}

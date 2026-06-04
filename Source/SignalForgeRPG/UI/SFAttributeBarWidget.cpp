@@ -1,4 +1,5 @@
 #include "UI/SFAttributeBarWidget.h"
+#include "Core/SignalForgeLogChannels.h"
 
 void USFAttributeBarWidget::SetCurrentAndMax(float InCurrentValue, float InMaxValue)
 {
@@ -7,7 +8,7 @@ void USFAttributeBarWidget::SetCurrentAndMax(float InCurrentValue, float InMaxVa
 
     if (CurrentAttribute == ESFTrackedAttribute::None || MaxAttribute == ESFTrackedAttribute::None)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Attribute bar widget has unassigned tracked attributes."));
+        UE_LOG(LogSFUI, Warning, TEXT("Attribute bar widget has unassigned tracked attributes."));
     }
 }
 

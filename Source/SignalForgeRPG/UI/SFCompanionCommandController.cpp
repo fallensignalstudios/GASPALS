@@ -7,6 +7,7 @@
 #include "Core/SFPlayerState.h"
 #include "Blueprint/UserWidget.h"
 #include "GameFramework/PlayerController.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFCompanionCommandController::USFCompanionCommandController()
 {
@@ -64,7 +65,7 @@ void USFCompanionCommandController::OpenWheel()
 
 	if (!WheelWidgetClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("USFCompanionCommandController: WheelWidgetClass not set"));
+		UE_LOG(LogSFUI, Warning, TEXT("USFCompanionCommandController: WheelWidgetClass not set"));
 		return;
 	}
 
@@ -230,7 +231,7 @@ void USFCompanionCommandController::DispatchSlot(const FSFRadialWheelSlot& Slot)
 				}
 				else
 				{
-					UE_LOG(LogTemp, Verbose, TEXT("Companion radial: MoveTo issued without a valid pending location"));
+					UE_LOG(LogSFUI, Verbose, TEXT("Companion radial: MoveTo issued without a valid pending location"));
 				}
 				break;
 			case ESFCompanionOrderType::AttackTarget:

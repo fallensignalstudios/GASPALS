@@ -11,6 +11,7 @@
 #include "Faction/SFFactionStatics.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFAutoAimComponent::USFAutoAimComponent()
 {
@@ -153,7 +154,7 @@ void USFAutoAimComponent::RefreshCachedTarget()
 
 		if (bVerboseLogging)
 		{
-			UE_LOG(LogTemp, Verbose, TEXT("[AutoAim] target=%s angle=%.2f\u00b0 score=%.3f"),
+			UE_LOG(LogSFCombat, Verbose, TEXT("[AutoAim] target=%s angle=%.2f\u00b0 score=%.3f"),
 				*BestTarget->GetName(),
 				FMath::RadiansToDegrees(BestAngleRad),
 				BestScore);
@@ -346,7 +347,7 @@ void USFAutoAimComponent::RequestReticleNudge()
 
 	if (bVerboseLogging)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[AutoAim] reticle nudge \u2192 %s (angle %.2f\u00b0)"),
+		UE_LOG(LogSFCombat, Log, TEXT("[AutoAim] reticle nudge \u2192 %s (angle %.2f\u00b0)"),
 			*Target->GetName(),
 			FMath::RadiansToDegrees(CachedTargetAngleRad));
 	}
@@ -452,7 +453,7 @@ void USFAutoAimComponent::RequestMeleeFacingSnap()
 	{
 		if (bVerboseLogging)
 		{
-			UE_LOG(LogTemp, Verbose, TEXT("[AutoAim] melee snap: no target inside cone (range=%.0f angle=%.1f\u00b0)"),
+			UE_LOG(LogSFCombat, Verbose, TEXT("[AutoAim] melee snap: no target inside cone (range=%.0f angle=%.1f\u00b0)"),
 				MeleeFacingMaxRange, MeleeFacingAngleDeg);
 		}
 		return;
@@ -473,7 +474,7 @@ void USFAutoAimComponent::RequestMeleeFacingSnap()
 
 	if (bVerboseLogging)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[AutoAim] melee snap \u2192 %s (dist=%.0f score=%.2f)"),
+		UE_LOG(LogSFCombat, Log, TEXT("[AutoAim] melee snap \u2192 %s (dist=%.0f score=%.2f)"),
 			*BestTarget->GetName(), FMath::Sqrt(BestScore), BestScore);
 	}
 }

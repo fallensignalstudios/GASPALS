@@ -16,6 +16,7 @@
 #include "Core/SFGameModeBase.h"
 #include "World/SFDarkZoneVolume.h"
 #include "Blueprint/UserWidget.h"
+#include "Core/SignalForgeLogChannels.h"
 
 namespace
 {
@@ -41,7 +42,7 @@ void ASFPlayerController::BeginPlay()
 	ASFCharacterBase* PlayerCharacter = Cast<ASFCharacterBase>(GetPawn());
 	if (!PlayerCharacter)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] BeginPlay: No ASFCharacterBase pawn on local controller."), *GetName());
+		UE_LOG(LogSFInput, Warning, TEXT("[%s] BeginPlay: No ASFCharacterBase pawn on local controller."), *GetName());
 		return;
 	}
 
@@ -112,13 +113,13 @@ void ASFPlayerController::InitializeUIControllers(ASFCharacterBase* PlayerCharac
 
 	if (!InventoryComponent)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] Could not find InventoryComponent on %s"),
+		UE_LOG(LogSFInput, Warning, TEXT("[%s] Could not find InventoryComponent on %s"),
 			*GetNameSafe(this), *GetNameSafe(PlayerCharacter));
 	}
 
 	if (!EquipmentComponent)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] Could not find EquipmentComponent on %s"),
+		UE_LOG(LogSFInput, Warning, TEXT("[%s] Could not find EquipmentComponent on %s"),
 			*GetNameSafe(this), *GetNameSafe(PlayerCharacter));
 	}
 
@@ -151,7 +152,7 @@ void ASFPlayerController::InitializeHUDWidget()
 {
 	if (!PlayerHUDWidgetClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] PlayerHUDWidgetClass is not set."), *GetName());
+		UE_LOG(LogSFInput, Warning, TEXT("[%s] PlayerHUDWidgetClass is not set."), *GetName());
 		return;
 	}
 
@@ -163,7 +164,7 @@ void ASFPlayerController::InitializeHUDWidget()
 	PlayerHUDWidget = CreateWidget<USFUserWidgetBase>(this, PlayerHUDWidgetClass);
 	if (!PlayerHUDWidget)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[%s] Failed to create PlayerHUDWidget."), *GetName());
+		UE_LOG(LogSFInput, Error, TEXT("[%s] Failed to create PlayerHUDWidget."), *GetName());
 		return;
 	}
 
@@ -175,7 +176,7 @@ void ASFPlayerController::InitializeHUDWidget()
 
 void ASFPlayerController::SetTrackedEnemy(ASFCharacterBase* InEnemyCharacter)
 {
-	UE_LOG(LogTemp, Verbose, TEXT("[%s] SetTrackedEnemy: %s"),
+	UE_LOG(LogSFInput, Verbose, TEXT("[%s] SetTrackedEnemy: %s"),
 		*GetName(),
 		InEnemyCharacter ? *InEnemyCharacter->GetName() : TEXT("None"));
 
@@ -185,7 +186,7 @@ void ASFPlayerController::SetTrackedEnemy(ASFCharacterBase* InEnemyCharacter)
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error,
+		UE_LOG(LogSFInput, Error,
 			TEXT("[%s] PlayerHUDWidgetController was null in SetTrackedEnemy."), *GetName());
 	}
 }
@@ -219,7 +220,7 @@ void ASFPlayerController::OpenPlayerMenu()
 
 	if (!PlayerMenuWidgetClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] OpenPlayerMenu called but PlayerMenuWidgetClass is null."), *GetName());
+		UE_LOG(LogSFInput, Warning, TEXT("[%s] OpenPlayerMenu called but PlayerMenuWidgetClass is null."), *GetName());
 		return;
 	}
 
@@ -249,7 +250,7 @@ void ASFPlayerController::OpenPlayerMenu()
 
 	if (!PlayerMenuWidget)
 	{
-		UE_LOG(LogTemp, Error, TEXT("[%s] Failed to create PlayerMenuWidget."), *GetName());
+		UE_LOG(LogSFInput, Error, TEXT("[%s] Failed to create PlayerMenuWidget."), *GetName());
 		return;
 	}
 
@@ -320,7 +321,7 @@ void ASFPlayerController::RefreshPlayerMenuPreview()
 {
 	if (!PlayerMenuPreviewScene)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFInput, Warning,
 			TEXT("[%s] PlayerMenuPreviewScene is not assigned."), *GetName());
 		return;
 	}
@@ -334,7 +335,7 @@ void ASFPlayerController::RefreshPlayerMenuPreview()
 	CachedPreviewCharacter = PlayerMenuPreviewScene->GetOrSpawnPreviewCharacter();
 	if (!CachedPreviewCharacter)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[%s] Failed to get or spawn preview character."), *GetName());
+		UE_LOG(LogSFInput, Warning, TEXT("[%s] Failed to get or spawn preview character."), *GetName());
 		return;
 	}
 
@@ -572,7 +573,7 @@ void ASFPlayerController::HandlePawnDied(ASFCharacterBase* DeadCharacter, ASFCha
 
 	if (!DeathScreenWidgetClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[SFPlayerController] HandlePawnDied: DeathScreenWidgetClass is not set on the PlayerController BP; respawning immediately."));
+		UE_LOG(LogSFInput, Warning, TEXT("[SFPlayerController] HandlePawnDied: DeathScreenWidgetClass is not set on the PlayerController BP; respawning immediately."));
 		RespawnFromDeathScreen(bIsDarkZone);
 		return;
 	}

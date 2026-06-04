@@ -29,6 +29,7 @@
 #include "Components/WidgetComponent.h"
 #include "Combat/SFWeaponAnimationSet.h"
 #include "UI/SFEnemyHealthBarWidget.h"
+#include "Core/SignalForgeLogChannels.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogSFCharacter, Log, All);
 
@@ -180,7 +181,7 @@ void ASFCharacterBase::PostInitializeComponents()
 				const USkeleton* AnimBPSkel = AnimBPClass->TargetSkeleton;
 				if (MeshSkel && AnimBPSkel && MeshSkel != AnimBPSkel)
 				{
-					UE_LOG(LogTemp, Warning,
+					UE_LOG(LogSFCharacter, Warning,
 						TEXT("[%s] DefaultAnimClass %s expects skeleton %s but mesh ")
 						TEXT("uses %s — ABP will not run. Reassign the mesh to the ")
 						TEXT("correct skeleton or set a different DefaultAnimClass."),
@@ -284,7 +285,7 @@ void ASFCharacterBase::PossessedBy(AController* NewController)
 	// One-shot diagnostic: prints which controller class actually possessed this
 	// pawn so we can tell at a glance whether a BP override has redirected
 	// AIControllerClass away from the intended SF controller.
-	UE_LOG(LogTemp, Log,
+	UE_LOG(LogSFCharacter, Log,
 		TEXT("[SFCharacter] PossessedBy: pawn='%s' (class '%s') controller='%s' (class '%s')"),
 		*GetName(),
 		*GetClass()->GetName(),
@@ -825,7 +826,7 @@ FGameplayAbilitySpecHandle ASFCharacterBase::GrantCharacterAbility(
 		}
 	}
 
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogSFCharacter, Warning,
 		TEXT("GrantCharacterAbility: class=%s InputTag=%s (CDO valid=%d)"),
 		*AbilityClass->GetName(),
 		GrantedInputTag.IsValid() ? *GrantedInputTag.ToString() : TEXT("<INVALID/EMPTY>"),

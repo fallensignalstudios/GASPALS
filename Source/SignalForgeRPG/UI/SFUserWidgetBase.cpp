@@ -3,6 +3,7 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/PanelWidget.h"
+#include "Core/SignalForgeLogChannels.h"
 
 static void PropagateControllerToSFChildren(
 	UWidget* Root,
@@ -41,7 +42,7 @@ void USFUserWidgetBase::SetPlayerHUDWidgetController(USFPlayerHUDWidgetControlle
 	NativeOnPlayerHUDWidgetControllerSet();
 	OnWidgetControllerSet();
 
-	UE_LOG(LogTemp, Display,
+	UE_LOG(LogSFUI, Display,
 		TEXT("USFUserWidgetBase '%s': SetPlayerHUDWidgetController(%s) — propagating to children"),
 		*GetNameSafe(this),
 		*GetNameSafe(InWidgetController));

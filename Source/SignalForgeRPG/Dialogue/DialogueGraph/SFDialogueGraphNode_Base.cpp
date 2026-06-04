@@ -1,5 +1,6 @@
 #include "Dialogue/DialogueGraph/SFDialogueGraphNode_Base.h"
 #include "EdGraph/EdGraphPin.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFDialogueGraphNode_Base::USFDialogueGraphNode_Base()
 {
@@ -76,7 +77,7 @@ void USFDialogueGraphNode_Base::PostLoad()
 	if (!NodeGuidValue.IsValid())
 	{
 		NodeGuidValue = FGuid::NewGuid();
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFUI, Warning,
 			TEXT("[SFDialogueGraphNode_Base] '%s' had no NodeGuidValue on load; generated a new one. Re-save the dialogue graph to persist it."),
 			*GetName());
 		MarkPackageDirty();

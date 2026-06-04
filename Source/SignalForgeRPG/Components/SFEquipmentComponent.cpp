@@ -17,6 +17,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "TimerManager.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFEquipmentComponent::USFEquipmentComponent()
 {
@@ -773,7 +774,7 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 	// has no visible mesh or always attaches to the hand socket instead of holster.
 	if (!WeaponData->WeaponActorClass)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("SFEquipment: WeaponActorClass is NULL on '%s' (slot %d) -- no mesh will be spawned. ")
 			TEXT("Assign a BP_Weapon_* class on the weapon data asset."),
 			*WeaponData->GetName(),
@@ -783,7 +784,7 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 
 	if (WeaponData->AttachSocketName == NAME_None)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("SFEquipment: AttachSocketName is NAME_None on '%s' (slot %d) -- weapon will attach to mesh root. ")
 			TEXT("Set the hand socket (e.g. 'GripPoint' / 'hand_r_socket') on the weapon data asset."),
 			*WeaponData->GetName(),
@@ -792,7 +793,7 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 
 	if (WeaponData->HolsteredAttachSocketName == NAME_None)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("SFEquipment: HolsteredAttachSocketName is NAME_None on '%s' (slot %d) -- holstered weapons will use the hand socket as a fallback. ")
 			TEXT("Set a holster socket (e.g. 'spine_03_holster_primary') on the weapon data asset to avoid weapons stacking in the hand."),
 			*WeaponData->GetName(),
@@ -852,12 +853,12 @@ void USFEquipmentComponent::RefreshEquippedWeaponActorForSlot(
 	// exclusive (the data-validator on USFWeaponData flags any DA that sets both).
 	if (WeaponData->bIsTwoHanded && WeaponData->bIsPairedWeapon)
 	{
-		UE_LOG(LogTemp, Error,
+		UE_LOG(LogSFEquipment, Error,
 			TEXT("SFEquipment: '%s' has BOTH bIsTwoHanded=true and bIsPairedWeapon=true. These are mutually exclusive -- treating as two-handed and skipping offhand spawn. Untick one of the flags on the Weapon DA."),
 			*WeaponData->GetName());
 	}
 
-	UE_LOG(LogTemp, Log,
+	UE_LOG(LogSFEquipment, Log,
 		TEXT("SFEquipment: mainhand spawned for '%s' (slot %d). bIsPairedWeapon=%d bIsTwoHanded=%d -- %s"),
 		*WeaponData->GetName(), static_cast<int32>(Slot),
 		WeaponData->bIsPairedWeapon ? 1 : 0,
@@ -880,7 +881,7 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 
 	if (!WeaponData || !WeaponData->bIsPairedWeapon)
 	{
-		UE_LOG(LogTemp, Verbose,
+		UE_LOG(LogSFEquipment, Verbose,
 			TEXT("SFEquipment: RefreshOffhand bailed -- WeaponData=%s bIsPairedWeapon=%d"),
 			*GetNameSafe(WeaponData),
 			WeaponData ? (WeaponData->bIsPairedWeapon ? 1 : 0) : 0);
@@ -895,7 +896,7 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 
 	if (!OffhandClass)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("SFEquipment: paired weapon '%s' has no OffhandWeaponActorClass and no WeaponActorClass fallback; offhand will be invisible."),
 			*WeaponData->GetName());
 		return;
@@ -903,7 +904,7 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 
 	if (WeaponData->OffhandAttachSocketName == NAME_None)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("SFEquipment: paired weapon '%s' has no OffhandAttachSocketName -- offhand will attach to mesh root. ")
 			TEXT("Set 'hand_l_socket' (or your left-hand grip socket) on the weapon data asset."),
 			*WeaponData->GetName());
@@ -913,7 +914,7 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 	UWorld* World = GetWorld();
 	if (!OwnerActor || !World)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("SFEquipment: cannot spawn offhand for '%s' -- OwnerActor=%s World=%s"),
 			*WeaponData->GetName(),
 			*GetNameSafe(OwnerActor),
@@ -931,7 +932,7 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 
 	if (!OffhandActor)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("SFEquipment: failed to spawn offhand actor for paired weapon '%s' (class=%s)."),
 			*WeaponData->GetName(), *GetNameSafe(OffhandClass));
 		return;
@@ -942,7 +943,7 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 	// keeps the mainhand mesh (symmetric dual swords / pistols).
 	OffhandActor->ApplyOffhandMeshOverride(WeaponData);
 
-	UE_LOG(LogTemp, Log,
+	UE_LOG(LogSFEquipment, Log,
 		TEXT("SFEquipment: spawned offhand actor '%s' for paired weapon '%s' (mainSkel=%s, offSkel=%s, offStatic=%s)."),
 		*OffhandActor->GetName(), *WeaponData->GetName(),
 		*GetNameSafe(WeaponData->SkeletalWeaponMesh),
@@ -964,13 +965,13 @@ void USFEquipmentComponent::RefreshOffhandWeaponActorForSlot(
 
 		OffhandActor->AttachToComponent(OwnerMesh, AttachRules, SocketName);
 		OffhandActor->SetActorRelativeTransform(RelativeXform);
-		UE_LOG(LogTemp, Log,
+		UE_LOG(LogSFEquipment, Log,
 			TEXT("SFEquipment: offhand attached to socket '%s' (bIsActiveSlot=%d, hasHolster=%d)."),
 			*SocketName.ToString(), bIsActiveSlot ? 1 : 0, bHasHolsterSocket ? 1 : 0);
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("SFEquipment: offhand spawned but owner has no skeletal mesh -- destroying offhand actor for '%s'."),
 			*WeaponData->GetName());
 		OffhandActor->Destroy();
@@ -1175,7 +1176,7 @@ bool USFEquipmentComponent::UnequipInventoryEntry(FGuid InventoryEntryId)
 }
 void USFEquipmentComponent::GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, USFWeaponData* WeaponData)
 {
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogSFEquipment, Warning,
 		TEXT("GrantWeaponAbilitiesForSlot: Slot=%d WeaponData=%s"),
 		(int32)Slot,
 		WeaponData ? *WeaponData->GetName() : TEXT("<NULL>"));
@@ -1185,7 +1186,7 @@ void USFEquipmentComponent::GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, U
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogSFEquipment, Warning,
 		TEXT("  PrimaryFireAbility=%s  SecondaryFireAbility=%s  ReloadAbility=%s  ExtraWeaponAbilities=%d"),
 		WeaponData->PrimaryFireAbility ? *WeaponData->PrimaryFireAbility->GetName() : TEXT("<NULL>"),
 		WeaponData->SecondaryFireAbility ? *WeaponData->SecondaryFireAbility->GetName() : TEXT("<NULL>"),
@@ -1195,14 +1196,14 @@ void USFEquipmentComponent::GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, U
 	ASFCharacterBase* Character = Cast<ASFCharacterBase>(GetOwner());
 	if (!Character)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("  -> aborting: owner is not ASFCharacterBase"));
+		UE_LOG(LogSFEquipment, Warning, TEXT("  -> aborting: owner is not ASFCharacterBase"));
 		return;
 	}
 
 	UAbilitySystemComponent* ASC = Character->GetAbilitySystemComponent();
 	if (!ASC || !ASC->IsOwnerActorAuthoritative())
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFEquipment, Warning,
 			TEXT("  -> aborting: ASC=%p IsAuthoritative=%d (clients receive specs via replication)"),
 			ASC,
 			ASC ? (ASC->IsOwnerActorAuthoritative() ? 1 : 0) : 0);
@@ -1355,7 +1356,7 @@ void USFEquipmentComponent::UpdateWeaponActorAttachmentForSlot(ESFEquipmentSlot 
 			OffhandActor->AttachToComponent(OwnerMesh, AttachRules, OffhandSocketName);
 			OffhandActor->SetActorRelativeTransform(OffhandRelativeXform);
 
-			UE_LOG(LogTemp, Log,
+			UE_LOG(LogSFEquipment, Log,
 				TEXT("SFEquipment: offhand re-attached on draw/sheathe for '%s' -> socket '%s' (bIsActiveSlot=%d, hasOffhandHolster=%d)."),
 				*WeaponData->GetName(), *OffhandSocketName.ToString(),
 				bIsActiveSlot ? 1 : 0, bOffhandHasHolsterSocket ? 1 : 0);

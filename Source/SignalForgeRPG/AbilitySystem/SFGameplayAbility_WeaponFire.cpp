@@ -25,6 +25,7 @@
 #include "TimerManager.h"
 #if !UE_BUILD_SHIPPING
 #include "DrawDebugHelpers.h"
+#include "Core/SignalForgeLogChannels.h"
 #endif
 
 USFGameplayAbility_WeaponFire::USFGameplayAbility_WeaponFire()
@@ -182,12 +183,12 @@ void USFGameplayAbility_WeaponFire::HandleTriggerPull()
 
 	if (!Character || !ResolveRangedContext(Character, Equipment, WeaponData, WeaponActor, Config))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("WeaponFire::HandleTriggerPull -> ResolveRangedContext FAILED (Character=%p)"), Character);
+		UE_LOG(LogSFCombat, Warning, TEXT("WeaponFire::HandleTriggerPull -> ResolveRangedContext FAILED (Character=%p)"), Character);
 		FinishAbility(true);
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogSFCombat, Warning,
 		TEXT("WeaponFire::HandleTriggerPull WeaponData=%s ClipSize=%d AmmoPerShot=%d AmmoInClip=%d FireMode=%d bHitscan=%d"),
 		*WeaponData->GetName(),
 		WeaponData->AmmoConfig.ClipSize,
@@ -202,7 +203,7 @@ void USFGameplayAbility_WeaponFire::HandleTriggerPull()
 		const FSFWeaponInstanceData CurrentInstance = Equipment->GetCurrentWeaponInstance();
 		if (CurrentInstance.AmmoInClip < FMath::Max(1, WeaponData->AmmoConfig.AmmoPerShot))
 		{
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("WeaponFire::HandleTriggerPull -> EMPTY CLICK (AmmoInClip=%d < AmmoPerShot=%d). Reload or set starting ammo."),
 				CurrentInstance.AmmoInClip,
 				FMath::Max(1, WeaponData->AmmoConfig.AmmoPerShot));
@@ -212,7 +213,7 @@ void USFGameplayAbility_WeaponFire::HandleTriggerPull()
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("WeaponFire::HandleTriggerPull -> firing (ammo OK)"));
+	UE_LOG(LogSFCombat, Warning, TEXT("WeaponFire::HandleTriggerPull -> firing (ammo OK)"));
 
 	CachedFireMode = Config.FireMode;
 
@@ -333,7 +334,7 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 		{
 			// Hitscan traces from the eye, so spread applies to the eye rotation.
 			const FRotator ShotRotation = ApplyConeSpread(EyeRotation, SpreadHalfAngle);
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("WeaponFire::FireOneShot -> HITSCAN branch (Config.bHitscan=true on %s). ")
 				TEXT("Uncheck 'Hitscan' on the weapon data asset to take the projectile branch."),
 				WeaponData ? *WeaponData->GetName() : TEXT("<null>"));
@@ -344,7 +345,7 @@ void USFGameplayAbility_WeaponFire::FireOneShot()
 			// Projectile spawns at the muzzle, so spread applies to the parallax-corrected
 			// muzzle rotation (muzzle aimed at what the crosshair sees, not parallel to the camera).
 			const FRotator ShotRotation = ApplyConeSpread(MuzzleRotation, SpreadHalfAngle);
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("WeaponFire::FireOneShot -> PROJECTILE branch on %s, ProjectileClass=%s"),
 				WeaponData ? *WeaponData->GetName() : TEXT("<null>"),
 				Config.ProjectileClass ? *Config.ProjectileClass->GetName() : TEXT("<null>"));
@@ -473,7 +474,7 @@ void USFGameplayAbility_WeaponFire::FireHitscanPellet(
 
 #if !UE_BUILD_SHIPPING
 	DrawDebugLine(World, TraceStart, bHit ? Hit.ImpactPoint : TraceEnd, bHit ? FColor::Red : FColor::Yellow, false, 2.0f, 0, 1.5f);
-	UE_LOG(LogTemp, Warning, TEXT("WeaponFire::Hitscan -> bHit=%s Target=%s"),
+	UE_LOG(LogSFCombat, Warning, TEXT("WeaponFire::Hitscan -> bHit=%s Target=%s"),
 		bHit ? TEXT("true") : TEXT("false"),
 		bHit && Hit.GetActor() ? *Hit.GetActor()->GetName() : TEXT("<none>"));
 #endif
@@ -501,7 +502,7 @@ void USFGameplayAbility_WeaponFire::FireProjectilePellet(
 		: DefaultProjectileClass;
 	if (!ProjectileClass)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFCombat, Warning,
 			TEXT("WeaponFire::FireProjectilePellet -> NO ProjectileClass set. ")
 			TEXT("Set Config.ProjectileClass on the weapon data (or DefaultProjectileClass on the ability) ")
 			TEXT("and make sure Config.bHitscan is FALSE so projectile path is taken."));
@@ -511,7 +512,7 @@ void USFGameplayAbility_WeaponFire::FireProjectilePellet(
 	UWorld* World = Character->GetWorld();
 	if (!World)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("WeaponFire::FireProjectilePellet -> no World, cannot spawn projectile."));
+		UE_LOG(LogSFCombat, Warning, TEXT("WeaponFire::FireProjectilePellet -> no World, cannot spawn projectile."));
 		return;
 	}
 
@@ -521,7 +522,7 @@ void USFGameplayAbility_WeaponFire::FireProjectilePellet(
 	SpawnParams.SpawnCollisionHandlingOverride =
 		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogSFCombat, Warning,
 		TEXT("WeaponFire::FireProjectilePellet -> spawning %s at %s"),
 		*ProjectileClass->GetName(),
 		*MuzzleLocation.ToCompactString());
@@ -531,7 +532,7 @@ void USFGameplayAbility_WeaponFire::FireProjectilePellet(
 
 	if (!Projectile)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFCombat, Warning,
 			TEXT("WeaponFire::FireProjectilePellet -> SpawnActor returned NULL for %s. ")
 			TEXT("Check the BP_Projectile collision setup / world settings."),
 			*ProjectileClass->GetName());

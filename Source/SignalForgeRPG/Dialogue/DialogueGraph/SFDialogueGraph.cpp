@@ -6,6 +6,7 @@
 
 #include "EdGraph/EdGraphNode.h"
 #include "UObject/ObjectSaveContext.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFDialogueGraph::USFDialogueGraph()
 {
@@ -67,11 +68,11 @@ void USFDialogueGraph::PreSave(FObjectPreSaveContext SaveContext)
 
 	for (const FString& ErrorString : Errors)
 	{
-		UE_LOG(LogTemp, Error, TEXT("Dialogue PreSave Compile Error: %s"), *ErrorString);
+		UE_LOG(LogSFUI, Error, TEXT("Dialogue PreSave Compile Error: %s"), *ErrorString);
 	}
 
 	for (const FString& WarningString : Warnings)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Dialogue PreSave Compile Warning: %s"), *WarningString);
+		UE_LOG(LogSFUI, Warning, TEXT("Dialogue PreSave Compile Warning: %s"), *WarningString);
 	}
 }

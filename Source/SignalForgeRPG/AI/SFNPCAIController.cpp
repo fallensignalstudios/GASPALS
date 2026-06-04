@@ -13,6 +13,7 @@
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISense_Sight.h"
+#include "Core/SignalForgeLogChannels.h"
 
 ASFNPCAIController::ASFNPCAIController()
 {
@@ -76,7 +77,7 @@ void ASFNPCAIController::OnPossess(APawn* InPawn)
 
 	if (!InPawn)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[SFNPCAI] OnPossess: InPawn is null on %s -- BT will not start."),
+		UE_LOG(LogSFAI, Warning, TEXT("[SFNPCAI] OnPossess: InPawn is null on %s -- BT will not start."),
 			*GetNameSafe(this));
 		return;
 	}
@@ -104,7 +105,7 @@ void ASFNPCAIController::OnPossess(APawn* InPawn)
 		// Loud failure path: if any of these are null the BT never runs and the
 		// controller silently does nothing. Surface exactly which piece is
 		// missing so the user can fix the BP / controller defaults.
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFAI, Warning,
 			TEXT("[SFNPCAI] OnPossess: BT NOT STARTED on pawn='%s'. "
 			     "DefaultBehaviorTree=%s, BehaviorTreeComponent=%s, BlackboardComponent=%s. "
 			     "Fix: open this controller's BP and set 'Default Behavior Tree' in Class Defaults."),
@@ -123,7 +124,7 @@ void ASFNPCAIController::OnPossess(APawn* InPawn)
 	}
 
 	// Display verbosity so this never gets filtered out by category log levels.
-	UE_LOG(LogTemp, Display,
+	UE_LOG(LogSFAI, Display,
 		TEXT("[SFNPCAI] OnPossess: pawn='%s' faction='%s' BT='%s' BB='%s' HomeLoc=%s"),
 		*GetNameSafe(InPawn),
 		*USFFactionStatics::GetFactionTag(InPawn).ToString(),
@@ -199,7 +200,7 @@ void ASFNPCAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stim
 		{
 			const FGameplayTag FromTag = USFFactionStatics::GetFactionTag(ControlledNPC);
 			const FGameplayTag ToTag = USFFactionStatics::GetFactionTag(Actor);
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFAI, Warning,
 				TEXT("[SFNPCAI Perception] '%s' SAW '%s' but faction system says NOT hostile -- TargetActor not written. "
 				     "FromFaction='%s' ToFaction='%s'. "
 				     "Check: (1) both actors have a USFFactionComponent with a Faction.* tag set, "
@@ -218,7 +219,7 @@ void ASFNPCAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stim
 		if (LastLogState != NewLogState)
 		{
 			const bool bBTRunning = BehaviorTreeComponent && BehaviorTreeComponent->IsRunning();
-			UE_LOG(LogTemp, Display,
+			UE_LOG(LogSFAI, Display,
 				TEXT("[SFNPCAI Perception] '%s' acquired hostile target '%s' (key '%s'). BT running=%s, BT asset='%s'"),
 				*GetNameSafe(ControlledNPC), *GetNameSafe(Actor), *TargetActorKeyName.ToString(),
 				bBTRunning ? TEXT("YES") : TEXT("NO -- pawn will not react"),
@@ -228,7 +229,7 @@ void ASFNPCAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus Stim
 	}
 	else if (LastLogState != NewLogState)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFAI, Warning,
 			TEXT("[SFNPCAI Perception] '%s' saw hostile '%s' but cannot write TargetActor: "
 			     "BlackboardComponent=%s, TargetActorKeyName='%s'."),
 			*GetNameSafe(ControlledNPC), *GetNameSafe(Actor),
@@ -248,7 +249,7 @@ void ASFNPCAIController::PrimeFromCurrentPerception()
 	TArray<AActor*> AlreadyPerceived;
 	Perception->GetCurrentlyPerceivedActors(/*SenseToUse*/ nullptr, AlreadyPerceived);
 
-	UE_LOG(LogTemp, Log,
+	UE_LOG(LogSFAI, Log,
 		TEXT("[SFNPCAI] PrimeFromCurrentPerception: %d actor(s) already in perception on possess."),
 		AlreadyPerceived.Num());
 
@@ -274,7 +275,7 @@ void ASFNPCAIController::PrimeFromCurrentPerception()
 			{
 				const FGameplayTag FromTag = USFFactionStatics::GetFactionTag(ControlledNPC);
 				const FGameplayTag ToTag = USFFactionStatics::GetFactionTag(Sensed);
-				UE_LOG(LogTemp, Warning,
+				UE_LOG(LogSFAI, Warning,
 					TEXT("[SFNPCAI Prime] '%s' already saw '%s' on possess but faction system says NOT hostile. "
 					     "FromFaction='%s' ToFaction='%s'."),
 					*GetNameSafe(ControlledNPC), *GetNameSafe(Sensed),
@@ -289,7 +290,7 @@ void ASFNPCAIController::PrimeFromCurrentPerception()
 			BlackboardComponent->SetValueAsObject(TargetActorKeyName, Sensed);
 			if (LastLogState != NewLogState)
 			{
-				UE_LOG(LogTemp, Log,
+				UE_LOG(LogSFAI, Log,
 					TEXT("[SFNPCAI Prime] '%s' acquired hostile target '%s' on possess (key '%s')."),
 					*GetNameSafe(ControlledNPC), *GetNameSafe(Sensed), *TargetActorKeyName.ToString());
 				LastLogState = NewLogState;

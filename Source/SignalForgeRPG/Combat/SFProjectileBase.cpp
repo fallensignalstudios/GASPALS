@@ -22,6 +22,7 @@
 
 #if !UE_BUILD_SHIPPING
 #include "DrawDebugHelpers.h"
+#include "Core/SignalForgeLogChannels.h"
 
 // Runtime-toggleable projectile diagnostics. Defaults to 0 so live play is clean; flip to 1 via
 // the console (`SF.Projectile.DrawDebug 1`) to re-enable the cyan trajectory line, red impact
@@ -139,7 +140,7 @@ void ASFProjectileBase::BeginPlay()
 		const bool bNotifyHit = CollisionSphere->GetBodyInstance() ? CollisionSphere->GetBodyInstance()->bNotifyRigidBodyCollision : false;
 		const FVector Vel = ProjectileMovement->Velocity;
 		const bool bDrawDebug = CVarSFProjectileDrawDebug.GetValueOnGameThread() > 0;
-		UE_LOG(LogTemp, Verbose,
+		UE_LOG(LogSFCombat, Verbose,
 			TEXT("SFProjectile::BeginPlay -> %s profile=%s collision=%d notifyHit=%d radius=%.1f initSpeed=%.1f velocity=%s |V|=%.1f source=%s owner=%s"),
 			*GetName(),
 			*ProfileName.ToString(),
@@ -173,7 +174,7 @@ void ASFProjectileBase::BeginPlay()
 			{
 				const FVector Loc = Self->GetActorLocation();
 				const FVector Vel = Self->ProjectileMovement ? Self->ProjectileMovement->Velocity : FVector::ZeroVector;
-				UE_LOG(LogTemp, Verbose,
+				UE_LOG(LogSFCombat, Verbose,
 					TEXT("SFProjectile::AliveAt+0.1s -> %s loc=%s |V|=%.1f vel=%s"),
 					*Self->GetName(), *Loc.ToCompactString(), Vel.Size(), *Vel.ToCompactString());
 			}
@@ -224,7 +225,7 @@ void ASFProjectileBase::OnProjectileHit(
 	const FHitResult& Hit)
 {
 #if !UE_BUILD_SHIPPING
-	UE_LOG(LogTemp, Verbose,
+	UE_LOG(LogSFCombat, Verbose,
 		TEXT("SFProjectile::OnHit -> %s OtherActor=%s OtherComp=%s ImpactPoint=%s source=%s owner=%s damageEffectClass=%s baseDamage=%.1f"),
 		*GetName(),
 		OtherActor ? *OtherActor->GetName() : TEXT("NULL"),
@@ -245,7 +246,7 @@ void ASFProjectileBase::OnProjectileHit(
 	if (!OtherActor || OtherActor == this || OtherActor == SourceActor || OtherActor == GetOwner())
 	{
 #if !UE_BUILD_SHIPPING
-		UE_LOG(LogTemp, Verbose,
+		UE_LOG(LogSFCombat, Verbose,
 			TEXT("SFProjectile::OnHit -> SELF-FILTER skipped this hit (other=%s)"),
 			OtherActor ? *OtherActor->GetName() : TEXT("NULL"));
 #endif
@@ -307,14 +308,14 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 		{
 			bSuppressDamage = true;
 #if !UE_BUILD_SHIPPING
-			UE_LOG(LogTemp, Warning, TEXT("SFProjectile::HandleImpact -> SUPPRESS (target dead): %s"), *HitCharacter->GetName());
+			UE_LOG(LogSFCombat, Warning, TEXT("SFProjectile::HandleImpact -> SUPPRESS (target dead): %s"), *HitCharacter->GetName());
 #endif
 		}
 		else if (!bAllowFriendlyFire && !USFFactionStatics::AreHostile(SourceActor, HitCharacter))
 		{
 			bSuppressDamage = true;
 #if !UE_BUILD_SHIPPING
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("SFProjectile::HandleImpact -> SUPPRESS (faction gate: not hostile). source=%s target=%s allowFF=%d"),
 				SourceActor ? *SourceActor->GetName() : TEXT("NULL"),
 				*HitCharacter->GetName(),
@@ -324,7 +325,7 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 	}
 
 #if !UE_BUILD_SHIPPING
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogSFCombat, Warning,
 		TEXT("SFProjectile::HandleImpact -> entering damage block: DEC=%s source=%s target=%s suppress=%d"),
 		DamageEffectClass ? *DamageEffectClass->GetName() : TEXT("NULL"),
 		SourceActor ? *SourceActor->GetName() : TEXT("NULL"),
