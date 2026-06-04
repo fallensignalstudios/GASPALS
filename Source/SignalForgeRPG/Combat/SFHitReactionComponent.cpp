@@ -3,6 +3,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Characters/SFCharacterBase.h"
+#include "Combat/SFCombatantInterface.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Core/SignalForgeGameplayTags.h"
 #include "Engine/World.h"
@@ -252,9 +253,10 @@ USkeletalMeshComponent* USFHitReactionComponent::GetTargetMesh() const
 
 bool USFHitReactionComponent::IsOwnerDead() const
 {
-	if (const ASFCharacterBase* Char = Cast<ASFCharacterBase>(GetOwner()))
+	AActor* Owner = GetOwner();
+	if (Owner && Owner->Implements<USFCombatantInterface>())
 	{
-		return Char->IsDead();
+		return ISFCombatantInterface::Execute_IsDead(Owner);
 	}
 	return false;
 }

@@ -9,6 +9,7 @@
 #include "Characters/SFCharacterBase.h"
 #include "Characters/SFPlayerCharacter.h"
 #include "Combat/SFAutoAimComponent.h"
+#include "Combat/SFCombatantInterface.h"
 #include "Combat/SFProjectileBase.h"
 #include "Combat/SFWeaponActor.h"
 #include "Combat/SFWeaponData.h"
@@ -562,17 +563,17 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 		return;
 	}
 
-	// Friend-foe gate: if we shot a non-hostile character, do not apply damage.
+	// Friend-foe gate: if we shot a non-hostile combatant, do not apply damage.
 	// (Allies, civilians, and ourselves all flow through here.) Weapons can opt-in to friendly
 	// fire via FSFRangedWeaponConfig::bAllowFriendlyFire, in which case the hostility check is
-	// skipped (we still skip dead characters so corpses don't soak shots).
-	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(TargetActor))
+	// skipped (we still skip dead combatants so corpses don't soak shots).
+	if (TargetActor->Implements<USFCombatantInterface>())
 	{
-		if (HitCharacter->IsDead())
+		if (ISFCombatantInterface::Execute_IsDead(TargetActor))
 		{
 			return;
 		}
-		if (!Config.bAllowFriendlyFire && !USFFactionStatics::AreHostile(Character, HitCharacter))
+		if (!Config.bAllowFriendlyFire && !USFFactionStatics::AreHostile(Character, TargetActor))
 		{
 			return;
 		}
@@ -660,10 +661,10 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 		}
 	}
 
-	// Last-damaging-character attribution -- now generalized to any character.
-	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(TargetActor))
+	// Last-damaging-character attribution -- generalized via combatant interface.
+	if (TargetActor->Implements<USFCombatantInterface>())
 	{
-		HitCharacter->SetLastDamagingCharacter(Character);
+		ISFCombatantInterface::Execute_RegisterDamageInstigator(TargetActor, Character);
 	}
 
 	// Hit cue on target ASC so the cinematic combat layer reacts (sparks, blood, etc.).

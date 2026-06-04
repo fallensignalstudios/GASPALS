@@ -1,6 +1,7 @@
 #include "Combat/SFAutoAimComponent.h"
 
 #include "Characters/SFCharacterBase.h"
+#include "Combat/SFCombatantInterface.h"
 #include "Combat/SFWeaponData.h"
 #include "Components/SFEquipmentComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -164,20 +165,18 @@ void USFAutoAimComponent::RefreshCachedTarget()
 
 float USFAutoAimComponent::ScoreCandidate(const AActor* Candidate, const FVector& EyeLoc, const FVector& EyeFwd, float AcceptConeRadians) const
 {
-	const ASFCharacterBase* CandChar = Cast<ASFCharacterBase>(Candidate);
-	if (!CandChar)
+	// Auto-aim only targets combatants (anything that implements ISFCombatantInterface).
+	if (!Candidate || !Candidate->Implements<USFCombatantInterface>())
 	{
 		return -1.0f;
 	}
 
-	// Dead pawns don't auto-aim. ASFCharacterBase exposes bIsDead via... actually we read it via
-	// the health attribute: a pawn at Health == 0 should be ignored. Defensive: GetAttributeSet may be null.
-	if (const USFAttributeSetBase* Attrs = CandChar->GetAttributeSet())
+	// Dead combatants don't auto-aim. Routed through the interface so any future combatant type
+	// (vehicles, mechs, etc.) can supply its own death predicate without touching auto-aim.
+	// Execute_IsDead requires non-const AActor*; cast away const for the dispatch \u2014 we don't mutate.
+	if (ISFCombatantInterface::Execute_IsDead(const_cast<AActor*>(Candidate)))
 	{
-		if (Attrs->GetHealth() <= 0.0f)
-		{
-			return -1.0f;
-		}
+		return -1.0f;
 	}
 
 	// Faction gate: must be hostile to self. If the faction system isn't wired up on either side,

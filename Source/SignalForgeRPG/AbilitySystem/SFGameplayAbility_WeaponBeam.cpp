@@ -8,6 +8,7 @@
 #include "Camera/CameraShakeBase.h"
 #include "Characters/SFCharacterBase.h"
 #include "Characters/SFPlayerCharacter.h"
+#include "Combat/SFCombatantInterface.h"
 #include "Combat/SFWeaponActor.h"
 #include "Combat/SFWeaponData.h"
 #include "Combat/SFWeaponInstanceTypes.h"
@@ -500,16 +501,16 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 		return;
 	}
 
-	// Friend-foe gate: skip non-hostile / dead characters unless the weapon opted into
+	// Friend-foe gate: skip non-hostile / dead combatants unless the weapon opted into
 	// friendly fire via FSFRangedWeaponConfig::bAllowFriendlyFire. Beams tick frequently, so
 	// rejecting early keeps us from spamming GE specs into allied ASCs.
-	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(TargetActor))
+	if (TargetActor->Implements<USFCombatantInterface>())
 	{
-		if (HitCharacter->IsDead())
+		if (ISFCombatantInterface::Execute_IsDead(TargetActor))
 		{
 			return;
 		}
-		if (!RangedConfig.bAllowFriendlyFire && !USFFactionStatics::AreHostile(Character, HitCharacter))
+		if (!RangedConfig.bAllowFriendlyFire && !USFFactionStatics::AreHostile(Character, TargetActor))
 		{
 			return;
 		}
@@ -594,11 +595,11 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 		}
 	}
 
-	// Last-damaging-character attribution -- generalized to any ASFCharacterBase so XP/credit
+	// Last-damaging-character attribution -- generalized via combatant interface so XP/credit
 	// flows for any faction matchup, not just legacy enemy actors.
-	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(TargetActor))
+	if (TargetActor->Implements<USFCombatantInterface>())
 	{
-		HitCharacter->SetLastDamagingCharacter(Character);
+		ISFCombatantInterface::Execute_RegisterDamageInstigator(TargetActor, Character);
 	}
 }
 

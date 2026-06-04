@@ -639,6 +639,51 @@ void ASFCharacterBase::SetLastDamagingCharacter(ASFCharacterBase* InCharacter)
 	LastDamagingCharacter = InCharacter;
 }
 
+// -----------------------------------------------------------------------------
+// ISFCombatantInterface
+// -----------------------------------------------------------------------------
+
+FVector ASFCharacterBase::GetCombatLocation_Implementation() const
+{
+	// Mid-capsule (center-of-mass) is a better aim target than actor origin (feet).
+	if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		return Capsule->GetComponentLocation();
+	}
+	return GetActorLocation();
+}
+
+FTransform ASFCharacterBase::GetCombatSocketTransform_Implementation(FName SocketName) const
+{
+	if (const USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		if (SocketName != NAME_None && SkelMesh->DoesSocketExist(SocketName))
+		{
+			return SkelMesh->GetSocketTransform(SocketName);
+		}
+	}
+	return GetActorTransform();
+}
+
+void ASFCharacterBase::GetCombatStateTags_Implementation(FGameplayTagContainer& OutTags) const
+{
+	if (const USFAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
+	{
+		ASC->GetOwnedGameplayTags(OutTags);
+	}
+}
+
+void ASFCharacterBase::RegisterDamageInstigator_Implementation(AActor* Instigator)
+{
+	// Only characters are tracked for XP/death attribution; non-character
+	// damage sources (turrets, traps) intentionally leave LastDamagingCharacter
+	// alone so the previous attacker still gets credit.
+	if (ASFCharacterBase* AsCharacter = Cast<ASFCharacterBase>(Instigator))
+	{
+		LastDamagingCharacter = AsCharacter;
+	}
+}
+
 int32 ASFCharacterBase::GetXPReward() const
 {
 	if (const USFProgressionComponent* Progression = GetProgressionComponent())

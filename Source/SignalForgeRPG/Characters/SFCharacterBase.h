@@ -9,6 +9,7 @@
 #include "Animation/SFAnimInstanceBase.h"
 #include "Combat/SFHitTypes.h"
 #include "Combat/SFHitResolverInterface.h"
+#include "Combat/SFCombatantInterface.h"
 #include "Animation/SFAnimationTypes.h"
 #include "Combat/SFWeaponData.h"
 #include "SFCharacterBase.generated.h"
@@ -47,7 +48,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	ASFCharacterBase*, Killer);
 
 UCLASS()
-class SIGNALFORGERPG_API ASFCharacterBase : public ACharacter, public IAbilitySystemInterface, public ISFHitResolverInterface, public IGenericTeamAgentInterface
+class SIGNALFORGERPG_API ASFCharacterBase : public ACharacter, public IAbilitySystemInterface, public ISFHitResolverInterface, public IGenericTeamAgentInterface, public ISFCombatantInterface
 {
 	GENERATED_BODY()
 
@@ -132,11 +133,22 @@ public:
 	// State queries
 	// -------------------------------------------------------------------------
 
-	UFUNCTION(BlueprintCallable, Category = "State")
-	bool IsDead() const { return bIsDead; }
+	// IsDead() is implemented via ISFCombatantInterface below. Direct C++ calls
+	// of the form `Character->IsDead()` still resolve to the interface virtual.
 
 	UFUNCTION(BlueprintPure, Category = "Movement")
 	bool IsSFCrouched() const { return bIsCrouched; }
+
+	// -------------------------------------------------------------------------
+	// ISFCombatantInterface
+	// -------------------------------------------------------------------------
+
+	virtual bool IsDead_Implementation() const override { return bIsDead; }
+	virtual bool IsBlocking_Implementation() const override { return bAnimIsBlocking; }
+	virtual FVector GetCombatLocation_Implementation() const override;
+	virtual FTransform GetCombatSocketTransform_Implementation(FName SocketName) const override;
+	virtual void GetCombatStateTags_Implementation(FGameplayTagContainer& OutTags) const override;
+	virtual void RegisterDamageInstigator_Implementation(AActor* Instigator) override;
 
 	// -------------------------------------------------------------------------
 	// Movement
