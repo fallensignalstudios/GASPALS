@@ -1,6 +1,6 @@
 ﻿// SFPlayerClassComponent.cpp
 
-#include "Classes/SFPlayerClassComponent.h"
+#include "PlayerClass/SFPlayerClassComponent.h"
 
 #include "AbilitySystem/SFAbilitySystemComponent.h"
 #include "AbilitySystem/SFGameplayAbility.h"

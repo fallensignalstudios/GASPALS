@@ -7,7 +7,7 @@
 #include "Core/SignalForgeGameplayTags.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
-#include "Classes/SFPlayerClassComponent.h"
+#include "PlayerClass/SFPlayerClassComponent.h"
 #include "SFPlayerCharacter.generated.h"
 
 class USFInteractionComponent;

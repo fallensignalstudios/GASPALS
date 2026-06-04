@@ -5,8 +5,8 @@
 #include "Components/ActorComponent.h"
 #include "GameplayAbilitySpecHandle.h"
 #include "ActiveGameplayEffectHandle.h"
-#include "Classes/SFClassDefinition.h"
-#include "Classes/SFDisciplineDefinition.h"
+#include "PlayerClass/SFClassDefinition.h"
+#include "PlayerClass/SFDisciplineDefinition.h"
 #include "SFPlayerClassComponent.generated.h"
 
 class USFAbilitySystemComponent;
