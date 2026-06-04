@@ -9,10 +9,10 @@
 #include "Core/SignalForgeGameplayTags.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Core/SignalForgeLogChannels.h"
 
 #define LOCTEXT_NAMESPACE "SFInventory"
 
-DEFINE_LOG_CATEGORY_STATIC(LogSFInventory, Log, All);
 
 USFInventoryComponent::USFInventoryComponent()
 {

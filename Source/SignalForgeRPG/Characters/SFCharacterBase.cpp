@@ -31,8 +31,6 @@
 #include "UI/SFEnemyHealthBarWidget.h"
 #include "Core/SignalForgeLogChannels.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogSFCharacter, Log, All);
-
 // -----------------------------------------------------------------------------
 // Construction
 // -----------------------------------------------------------------------------
