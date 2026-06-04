@@ -3,12 +3,13 @@
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "UI/SFPlayerHUDWidgetController.h"
+#include "Core/SignalForgeLogChannels.h"
 
 void USFInteractionPromptWidget::NativeOnPlayerHUDWidgetControllerSet()
 {
 	Super::NativeOnPlayerHUDWidgetControllerSet();
 
-	UE_LOG(LogTemp, Display,
+	UE_LOG(LogSFUI, Display,
 		TEXT("SFInteractionPromptWidget '%s': controller set to %s"),
 		*GetNameSafe(this),
 		*GetNameSafe(PlayerHUDWidgetController));
@@ -41,7 +42,7 @@ void USFInteractionPromptWidget::BindToController()
 {
 	if (!PlayerHUDWidgetController)
 	{
-		UE_LOG(LogTemp, Display,
+		UE_LOG(LogSFUI, Display,
 			TEXT("SFInteractionPromptWidget '%s': no controller assigned yet, bind deferred."),
 			*GetNameSafe(this));
 		return;
@@ -64,7 +65,7 @@ void USFInteractionPromptWidget::BindToController()
 	BoundController->OnInteractionOptionsChanged.AddDynamic(
 		this, &USFInteractionPromptWidget::HandleInteractionOptionsChanged);
 
-	UE_LOG(LogTemp, Display,
+	UE_LOG(LogSFUI, Display,
 		TEXT("SFInteractionPromptWidget '%s': bound to controller %s (PromptTextBlock=%s, PromptRoot=%s)"),
 		*GetNameSafe(this),
 		*GetNameSafe(BoundController),
@@ -112,7 +113,7 @@ void USFInteractionPromptWidget::HandleInteractionOptionsChanged(
 		&& !PrimaryOption.PromptText.IsEmpty()
 		&& (bAvailable || PrimaryOption.bShowPromptWhenUnavailable);
 
-	UE_LOG(LogTemp, Display,
+	UE_LOG(LogSFUI, Display,
 		TEXT("SFInteractionPromptWidget: options changed. HasInteractable=%d, Prompt='%s', Available=%d, ShowWhenUnavailable=%d -> bHasPrompt=%d"),
 		bHasInteractable ? 1 : 0,
 		*PrimaryOption.PromptText.ToString(),

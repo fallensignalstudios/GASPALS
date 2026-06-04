@@ -19,6 +19,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFGameplayAbility_WeaponBeam::USFGameplayAbility_WeaponBeam()
 {
@@ -88,7 +89,7 @@ bool USFGameplayAbility_WeaponBeam::CanActivateAbility(
 	// Misconfiguration: warn so designers spot it instead of silently no-op'ing.
 	if (WeaponData->RangedConfig.FireMode != ESFWeaponFireMode::Beam)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFCombat, Warning,
 			TEXT("WeaponBeam::CanActivateAbility -> '%s' is granted WeaponBeam ability but FireMode is %d, not Beam. ")
 			TEXT("Set RangedConfig.FireMode = Beam on the weapon data."),
 			*WeaponData->GetName(),
@@ -105,11 +106,11 @@ void USFGameplayAbility_WeaponBeam::ActivateAbility(
 	const FGameplayAbilityActivationInfo ActivationInfo,
 	const FGameplayEventData* TriggerEventData)
 {
-	UE_LOG(LogTemp, Log, TEXT("WeaponBeam::ActivateAbility -> entered"));
+	UE_LOG(LogSFCombat, Log, TEXT("WeaponBeam::ActivateAbility -> entered"));
 
 	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("WeaponBeam::ActivateAbility -> CommitAbility FAILED (cost/cooldown blocked?)"));
+		UE_LOG(LogSFCombat, Warning, TEXT("WeaponBeam::ActivateAbility -> CommitAbility FAILED (cost/cooldown blocked?)"));
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
@@ -203,7 +204,7 @@ void USFGameplayAbility_WeaponBeam::BeginBeam()
 
 	if (!ResolveBeamContext(Character, Equipment, WeaponData, WeaponActor, RangedConfig, BeamConfig))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("WeaponBeam::BeginBeam -> ResolveBeamContext FAILED"));
+		UE_LOG(LogSFCombat, Warning, TEXT("WeaponBeam::BeginBeam -> ResolveBeamContext FAILED"));
 		FinishAbility(true);
 		return;
 	}
@@ -218,7 +219,7 @@ void USFGameplayAbility_WeaponBeam::BeginBeam()
 		if (Instance.BeamBatteryCharge < ResumeThreshold)
 		{
 			// Locked out until battery recovers. Bail without lighting the beam.
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("WeaponBeam::BeginBeam -> overheat lockout active (charge=%.1f, resume>=%.1f)"),
 				Instance.BeamBatteryCharge, ResumeThreshold);
 			FinishAbility(false);
@@ -253,7 +254,7 @@ void USFGameplayAbility_WeaponBeam::BeginBeam()
 		}
 	}
 
-	UE_LOG(LogTemp, Log,
+	UE_LOG(LogSFCombat, Log,
 		TEXT("WeaponBeam::BeginBeam -> ignited (RPM=%.0f -> %.1f Hz, charge=%.1f / %.1f)"),
 		RangedConfig.RoundsPerMinute, CachedTicksPerSecond,
 		Instance.BeamBatteryCharge, BeamConfig.BatteryCapacity);

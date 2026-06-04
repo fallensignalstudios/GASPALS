@@ -1,4 +1,4 @@
-#include "Classes/SFDisciplineDefinition.h"
+#include "PlayerClass/SFDisciplineDefinition.h"
 
 #include "Misc/DataValidation.h"
 

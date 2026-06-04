@@ -7,6 +7,7 @@
 #include "BehaviorTree/BlackboardData.h"
 #include "Characters/SFCharacterBase.h"
 #include "NavigationSystem.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFBTService_PatrolPoint::USFBTService_PatrolPoint()
 {
@@ -65,7 +66,7 @@ bool USFBTService_PatrolPoint::TryRollPatrolPoint(UBehaviorTreeComponent& OwnerC
 	ASFCharacterBase* Self = SFBTHelpers::GetControlledCharacter(AI);
 	if (!Mem || !AI || !BB || !Self || PatrolPointKey.SelectedKeyName == NAME_None)
 	{
-		UE_LOG(LogTemp, Verbose, TEXT("[SFAI Patrol] Missing AI/BB/Self/key; skipping roll."));
+		UE_LOG(LogSFAI, Verbose, TEXT("[SFAI Patrol] Missing AI/BB/Self/key; skipping roll."));
 		return false;
 	}
 
@@ -92,12 +93,12 @@ bool USFBTService_PatrolPoint::TryRollPatrolPoint(UBehaviorTreeComponent& OwnerC
 	{
 		if (!bFallbackToCurrentLocation)
 		{
-			UE_LOG(LogTemp, Verbose,
+			UE_LOG(LogSFAI, Verbose,
 				TEXT("[SFAI Patrol] '%s' HomeLocation key invalid (%s) and fallback disabled; skipping roll."),
 				*GetNameSafe(Self), *Anchor.ToString());
 			return false;
 		}
-		UE_LOG(LogTemp, Verbose,
+		UE_LOG(LogSFAI, Verbose,
 			TEXT("[SFAI Patrol] '%s' HomeLocation key invalid (%s); falling back to current location."),
 			*GetNameSafe(Self), *Anchor.ToString());
 		Anchor = Self->GetActorLocation();
@@ -130,7 +131,7 @@ bool USFBTService_PatrolPoint::TryRollPatrolPoint(UBehaviorTreeComponent& OwnerC
 	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(Self->GetWorld());
 	if (!NavSys)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[SFAI Patrol] No NavigationSystemV1 in world for '%s' -- patrol cannot pick points."), *GetNameSafe(Self));
+		UE_LOG(LogSFAI, Warning, TEXT("[SFAI Patrol] No NavigationSystemV1 in world for '%s' -- patrol cannot pick points."), *GetNameSafe(Self));
 		return false;
 	}
 
@@ -141,13 +142,13 @@ bool USFBTService_PatrolPoint::TryRollPatrolPoint(UBehaviorTreeComponent& OwnerC
 		{
 			BB->SetValueAsVector(PatrolPointKey.SelectedKeyName, NavPt.Location);
 			Mem->SecondsSinceLastRoll = 0.0f;
-			UE_LOG(LogTemp, Verbose, TEXT("[SFAI Patrol] '%s' rolled patrol point %s (anchor %s)."),
+			UE_LOG(LogSFAI, Verbose, TEXT("[SFAI Patrol] '%s' rolled patrol point %s (anchor %s)."),
 				*GetNameSafe(Self), *NavPt.Location.ToString(), *Anchor.ToString());
 			return true;
 		}
 	}
 
-	UE_LOG(LogTemp, Warning,
+	UE_LOG(LogSFAI, Warning,
 		TEXT("[SFAI Patrol] '%s' could not find a reachable point within %.0fcm of %s after %d attempts. "
 		     "Check that a NavMeshBoundsVolume covers this area and that Anchor sits on or near the navmesh."),
 		*GetNameSafe(Self), PatrolRadius, *Anchor.ToString(), MaxAttempts);

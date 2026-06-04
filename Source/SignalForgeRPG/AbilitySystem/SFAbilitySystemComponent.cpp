@@ -6,6 +6,7 @@
 #include "AbilitySystemGlobals.h"
 #include "AbilitySystem/SFGameplayAbility.h"
 #include "UI/SFAbilitySlotUIData.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFAbilitySystemComponent::USFAbilitySystemComponent()
 {
@@ -17,7 +18,7 @@ USFAbilitySystemComponent::USFAbilitySystemComponent()
 void USFAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& InputTag)
 {
 
-	UE_LOG(LogTemp, Warning, TEXT("ASC::AbilityInputTagPressed: %s"), *InputTag.ToString());
+	UE_LOG(LogSFCombat, Warning, TEXT("ASC::AbilityInputTagPressed: %s"), *InputTag.ToString());
 
 	if (!InputTag.IsValid())
 	{
@@ -98,7 +99,7 @@ void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 	// Pressed input → OnInputTriggered abilities, or forwarded to active ones
 	if (InputPressedSpecHandles.Num() > 0 || InputReleasedSpecHandles.Num() > 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ASC::ProcessAbilityInput on '%s': %d pressed, %d held, %d released"),
+		UE_LOG(LogSFCombat, Warning, TEXT("ASC::ProcessAbilityInput on '%s': %d pressed, %d held, %d released"),
 			*GetNameSafe(GetOwnerActor()), InputPressedSpecHandles.Num(), InputHeldSpecHandles.Num(), InputReleasedSpecHandles.Num());
 	}
 	for (const FGameplayAbilitySpecHandle& SpecHandle : InputPressedSpecHandles)
@@ -106,13 +107,13 @@ void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 		FGameplayAbilitySpec* AbilitySpec = nullptr;
 		if (!TryGetSpec(SpecHandle, AbilitySpec))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("ASC::Pressed spec handle [%s] -> TryGetSpec FAILED (stale handle)."),
+			UE_LOG(LogSFCombat, Warning, TEXT("ASC::Pressed spec handle [%s] -> TryGetSpec FAILED (stale handle)."),
 				*SpecHandle.ToString());
 			continue;
 		}
 		if (!AbilitySpec->Ability)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("ASC::Pressed spec [%s] -> Ability is NULL."),
+			UE_LOG(LogSFCombat, Warning, TEXT("ASC::Pressed spec [%s] -> Ability is NULL."),
 				*SpecHandle.ToString());
 			continue;
 		}
@@ -121,7 +122,7 @@ void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 
 		if (AbilitySpec->IsActive())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("ASC::Pressed spec [%s] is ALREADY ACTIVE -- forwarding press only."),
+			UE_LOG(LogSFCombat, Warning, TEXT("ASC::Pressed spec [%s] is ALREADY ACTIVE -- forwarding press only."),
 				*GetNameSafe(AbilitySpec->Ability));
 			AbilitySpecInputPressed(*AbilitySpec);
 			continue;
@@ -141,7 +142,7 @@ void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("ASC::Pressed spec [%s] has policy=%d (not OnInputTriggered) -- NOT activating on press."),
 				*GetNameSafe(AbilitySpec->Ability), (int32)SFAbility->GetActivationPolicy());
 		}
@@ -157,7 +158,7 @@ void USFAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 			? DiagSpec->Ability->GetClass()->GetName()
 			: TEXT("<unknown>");
 		const bool bActivated = TryActivateAbility(AbilitySpecHandle);
-		UE_LOG(LogTemp, Warning, TEXT("ASC::TryActivateAbility [%s] -> %s"),
+		UE_LOG(LogSFCombat, Warning, TEXT("ASC::TryActivateAbility [%s] -> %s"),
 			*DiagAbilityName, bActivated ? TEXT("SUCCESS") : TEXT("FAILED"));
 	}
 
@@ -235,7 +236,7 @@ void USFAbilitySystemComponent::GetAbilityBarSlotData(TArray<FSFAbilitySlotUIDat
 
 	FScopedAbilityListLock ActiveScopeLock(*const_cast<USFAbilitySystemComponent*>(this));
 	const TArray<FGameplayAbilitySpec>& Specs = GetActivatableAbilities();
-	UE_LOG(LogTemp, Log,
+	UE_LOG(LogSFCombat, Log,
 		TEXT("[SF ASC] GetAbilityBarSlotData: %d activatable spec(s) on '%s'."),
 		Specs.Num(), *GetNameSafe(GetOwner()));
 
@@ -250,14 +251,14 @@ void USFAbilitySystemComponent::GetAbilityBarSlotData(TArray<FSFAbilitySlotUIDat
 
 		if (!AbilityCDO)
 		{
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("[SF ASC]   skip spec '%s' — not a USFGameplayAbility (class='%s')."),
 				*GetNameSafe(Spec.Ability), Spec.Ability ? *Spec.Ability->GetClass()->GetName() : TEXT("null"));
 			continue;
 		}
 		if (!AbilityCDO->ShouldShowInAbilityBar())
 		{
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("[SF ASC]   skip ability '%s' — bShowInAbilityBar=false."),
 				*GetNameSafe(AbilityCDO));
 			continue;
@@ -266,13 +267,13 @@ void USFAbilitySystemComponent::GetAbilityBarSlotData(TArray<FSFAbilitySlotUIDat
 		const FGameplayTag InputTag = AbilityCDO->GetInputTag();
 		if (!InputTag.IsValid())
 		{
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFCombat, Warning,
 				TEXT("[SF ASC]   skip ability '%s' — InputTag is not valid."),
 				*GetNameSafe(AbilityCDO));
 			continue;
 		}
 
-		UE_LOG(LogTemp, Log,
+		UE_LOG(LogSFCombat, Log,
 			TEXT("[SF ASC]   accept ability '%s' InputTag='%s' Icon=%s"),
 			*GetNameSafe(AbilityCDO), *InputTag.ToString(), *GetNameSafe(AbilityCDO->GetAbilityIcon()));
 
@@ -370,7 +371,7 @@ void USFAbilitySystemComponent::GatherAbilitySpecsWithInputTag(
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("GatherAbilitySpecsWithInputTag: [%s] found %d match(es)"),
+	UE_LOG(LogSFCombat, Warning, TEXT("GatherAbilitySpecsWithInputTag: [%s] found %d match(es)"),
 		*InputTag.ToString(), OutSpecHandles.Num());
 }
 

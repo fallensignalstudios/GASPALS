@@ -6,6 +6,7 @@
 #include "BehaviorTree/BehaviorTreeComponent.h"
 #include "Characters/SFCharacterBase.h"
 #include "Core/SignalForgeGameplayTags.h"
+#include "Core/SignalForgeLogChannels.h"
 
 USFBTTask_Reload::USFBTTask_Reload()
 {
@@ -91,7 +92,7 @@ void USFBTTask_Reload::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMe
 	Mem->ElapsedSeconds += DeltaSeconds;
 	if (Mem->ElapsedSeconds >= TimeoutSeconds)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFAI, Warning,
 			TEXT("[SFBTTask_Reload] '%s' timed out after %.2fs (SawReloadingTag=%d, ReloadingNow=%d). Reload ability may be missing or blocked."),
 			*GetNameSafe(Character), Mem->ElapsedSeconds, Mem->bSawReloadingTag ? 1 : 0, bReloadingNow ? 1 : 0);
 		FinishLatentTask(OwnerComp, EBTNodeResult::Failed);

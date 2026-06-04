@@ -9,6 +9,7 @@
 #include "UI/SFPlayerHUDWidgetController.h"
 #include "UI/SFPlayerInventoryWidget.h"
 #include "UI/SFPlayerQuestLogWidget.h"
+#include "Core/SignalForgeLogChannels.h"
 
 void USFPlayerMenuWidget::NativeConstruct()
 {
@@ -52,7 +53,7 @@ void USFPlayerMenuWidget::InitializeMenu(USFPlayerHUDWidgetController* InHUDWidg
 		ASFPlayerState* SFPlayerState = PlayerCharacter->GetPlayerState<ASFPlayerState>();
 		USFNarrativeComponent* NarrativeComponent = SFPlayerState ? SFPlayerState->GetNarrativeComponent() : nullptr;
 
-		UE_LOG(LogTemp, Log,
+		UE_LOG(LogSFUI, Log,
 			TEXT("[PlayerMenu] Initializing QuestLogPanel. PlayerCharacter=%s SFPlayerState=%s NarrativeComponent=%s"),
 			*GetNameSafe(PlayerCharacter),
 			*GetNameSafe(SFPlayerState),
@@ -62,7 +63,7 @@ void USFPlayerMenuWidget::InitializeMenu(USFPlayerHUDWidgetController* InHUDWidg
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFUI, Warning,
 			TEXT("[PlayerMenu] QuestLogPanel BindWidgetOptional is null. Drop a WBP_PlayerQuestLog into the menu UMG and rename it to 'QuestLogPanel' (Is Variable checked)."));
 	}
 

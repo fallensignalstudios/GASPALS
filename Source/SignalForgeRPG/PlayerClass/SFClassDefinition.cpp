@@ -1,4 +1,4 @@
-#include "Classes/SFClassDefinition.h"
+#include "PlayerClass/SFClassDefinition.h"
 
 #include "Misc/DataValidation.h"
 #include "AbilitySystem/SFGameplayAbility.h"

@@ -9,6 +9,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Hearing.h"
+#include "Core/SignalForgeLogChannels.h"
 
 ASFEnemyAIController::ASFEnemyAIController()
 {
@@ -52,14 +53,14 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 
 	if (!InPawn)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[SFAI] OnPossess: InPawn is null on %s -- BT will not start."), *GetNameSafe(this));
+		UE_LOG(LogSFAI, Warning, TEXT("[SFAI] OnPossess: InPawn is null on %s -- BT will not start."), *GetNameSafe(this));
 		return;
 	}
 
 	ControlledEnemy = Cast<ASFEnemyCharacter>(InPawn);
 	if (!ControlledEnemy)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFAI, Warning,
 			TEXT("[SFAI] OnPossess: pawn '%s' is class '%s' which is NOT an ASFEnemyCharacter. "
 			     "Reparent the BP to BP_EnemyCharacter (or ASFEnemyCharacter) so the controller can fetch its BehaviorTreeAsset."),
 			*GetNameSafe(InPawn), *GetNameSafe(InPawn->GetClass()));
@@ -75,7 +76,7 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 	UBehaviorTree* BehaviorTree = ControlledEnemy->GetBehaviorTreeAsset();
 	if (!BehaviorTree)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFAI, Warning,
 			TEXT("[SFAI] OnPossess: pawn '%s' has no BehaviorTreeAsset assigned. "
 			     "Open the BP, find Class Defaults -> AI -> Behavior Tree Asset and assign BT_NPC (or your tree)."),
 			*GetNameSafe(InPawn));
@@ -83,7 +84,7 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 	}
 	if (!BehaviorTree->BlackboardAsset)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFAI, Warning,
 			TEXT("[SFAI] OnPossess: BehaviorTree '%s' has no BlackboardAsset set. "
 			     "Open BT_NPC and assign BB_NPC in the asset details."),
 			*GetNameSafe(BehaviorTree));
@@ -93,7 +94,7 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 	UBlackboardComponent* BlackboardComp = nullptr;
 	if (!UseBlackboard(BehaviorTree->BlackboardAsset, BlackboardComp))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[SFAI] OnPossess: UseBlackboard failed for '%s'."), *GetNameSafe(BehaviorTree->BlackboardAsset));
+		UE_LOG(LogSFAI, Warning, TEXT("[SFAI] OnPossess: UseBlackboard failed for '%s'."), *GetNameSafe(BehaviorTree->BlackboardAsset));
 		return;
 	}
 
@@ -101,7 +102,7 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 
 	if (!RunBehaviorTree(BehaviorTree))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[SFAI] OnPossess: RunBehaviorTree failed for '%s'."), *GetNameSafe(BehaviorTree));
+		UE_LOG(LogSFAI, Warning, TEXT("[SFAI] OnPossess: RunBehaviorTree failed for '%s'."), *GetNameSafe(BehaviorTree));
 		return;
 	}
 
@@ -112,7 +113,7 @@ void ASFEnemyAIController::OnPossess(APawn* InPawn)
 		BlackboardComponent->SetValueAsVector(HomeLocationKeyName, InPawn->GetActorLocation());
 	}
 
-	UE_LOG(LogTemp, Log,
+	UE_LOG(LogSFAI, Log,
 		TEXT("[SFAI] OnPossess SUCCESS: pawn '%s' running BT '%s' with BB '%s'. HomeLocation = %s."),
 		*GetNameSafe(InPawn), *GetNameSafe(BehaviorTree), *GetNameSafe(BehaviorTree->BlackboardAsset),
 		*InPawn->GetActorLocation().ToString());
@@ -164,7 +165,7 @@ void ASFEnemyAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus St
 			// no FactionTag set, or the relationship asset is missing a Hostile entry.
 			const FGameplayTag FromTag = USFFactionStatics::GetFactionTag(ControlledEnemy);
 			const FGameplayTag ToTag = USFFactionStatics::GetFactionTag(Actor);
-			UE_LOG(LogTemp, Warning,
+			UE_LOG(LogSFAI, Warning,
 				TEXT("[SFAI Perception] '%s' SAW '%s' but faction system says NOT hostile -- TargetActor not written. "
 				     "FromFaction='%s' ToFaction='%s'. "
 				     "Check: (1) both actors have a USFFactionComponent with a Faction.* tag set, "
@@ -182,7 +183,7 @@ void ASFEnemyAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus St
 		BlackboardComponent->SetValueAsObject(TargetActorKeyName, Actor);
 		if (LastLogState != NewLogState)
 		{
-			UE_LOG(LogTemp, Log,
+			UE_LOG(LogSFAI, Log,
 				TEXT("[SFAI Perception] '%s' acquired hostile target '%s' (key '%s')."),
 				*GetNameSafe(ControlledEnemy), *GetNameSafe(Actor), *TargetActorKeyName.ToString());
 			LastLogState = NewLogState;
@@ -190,7 +191,7 @@ void ASFEnemyAIController::HandlePerceptionUpdated(AActor* Actor, FAIStimulus St
 	}
 	else if (LastLogState != NewLogState)
 	{
-		UE_LOG(LogTemp, Warning,
+		UE_LOG(LogSFAI, Warning,
 			TEXT("[SFAI Perception] '%s' saw hostile '%s' but cannot write TargetActor: "
 			     "BlackboardComponent=%s, TargetActorKeyName='%s'."),
 			*GetNameSafe(ControlledEnemy), *GetNameSafe(Actor),
