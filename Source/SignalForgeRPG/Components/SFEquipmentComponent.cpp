@@ -1176,7 +1176,7 @@ bool USFEquipmentComponent::UnequipInventoryEntry(FGuid InventoryEntryId)
 }
 void USFEquipmentComponent::GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, USFWeaponData* WeaponData)
 {
-	UE_LOG(LogSFEquipment, Warning,
+	UE_LOG(LogSFEquipment, Verbose,
 		TEXT("GrantWeaponAbilitiesForSlot: Slot=%d WeaponData=%s"),
 		(int32)Slot,
 		WeaponData ? *WeaponData->GetName() : TEXT("<NULL>"));
@@ -1186,7 +1186,7 @@ void USFEquipmentComponent::GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, U
 		return;
 	}
 
-	UE_LOG(LogSFEquipment, Warning,
+	UE_LOG(LogSFEquipment, Verbose,
 		TEXT("  PrimaryFireAbility=%s  SecondaryFireAbility=%s  ReloadAbility=%s  ExtraWeaponAbilities=%d"),
 		WeaponData->PrimaryFireAbility ? *WeaponData->PrimaryFireAbility->GetName() : TEXT("<NULL>"),
 		WeaponData->SecondaryFireAbility ? *WeaponData->SecondaryFireAbility->GetName() : TEXT("<NULL>"),
@@ -1203,7 +1203,7 @@ void USFEquipmentComponent::GrantWeaponAbilitiesForSlot(ESFEquipmentSlot Slot, U
 	UAbilitySystemComponent* ASC = Character->GetAbilitySystemComponent();
 	if (!ASC || !ASC->IsOwnerActorAuthoritative())
 	{
-		UE_LOG(LogSFEquipment, Warning,
+		UE_LOG(LogSFEquipment, Verbose,
 			TEXT("  -> aborting: ASC=%p IsAuthoritative=%d (clients receive specs via replication)"),
 			ASC,
 			ASC ? (ASC->IsOwnerActorAuthoritative() ? 1 : 0) : 0);

@@ -767,13 +767,13 @@ void ASFPlayerCharacter::StopSprintInput(const FInputActionValue& Value)
 
 void ASFPlayerCharacter::OnBlockPressed(const FInputActionValue& Value)
 {
-	UE_LOG(LogSFCharacter, Warning, TEXT("Player OnBlockPressed"));
+	UE_LOG(LogSFCharacter, Verbose, TEXT("Player OnBlockPressed"));
 	ProcessAbilityInputPressed(FSignalForgeGameplayTags::Get().Input_Ability_Block);
 }
 
 void ASFPlayerCharacter::OnBlockReleased(const FInputActionValue& Value)
 {
-	UE_LOG(LogSFCharacter, Warning, TEXT("Player OnBlockReleased"));
+	UE_LOG(LogSFCharacter, Verbose, TEXT("Player OnBlockReleased"));
 	ProcessAbilityInputReleased(FSignalForgeGameplayTags::Get().Input_Ability_Block);
 }
 

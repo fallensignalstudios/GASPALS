@@ -130,7 +130,7 @@ void USFGameplayAbility_Block::ActivateAbility(
 
 void USFGameplayAbility_Block::OnInputReleased(float TimeHeld)
 {
-	UE_LOG(LogSFCombat, Warning, TEXT("Block OnInputReleased: TimeHeld=%f"), TimeHeld);
+	UE_LOG(LogSFCombat, Verbose, TEXT("Block OnInputReleased: TimeHeld=%f"), TimeHeld);
 
 	if (!IsActive())
 	{
