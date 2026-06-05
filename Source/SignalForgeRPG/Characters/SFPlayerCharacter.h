@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Characters/SFCharacterBase.h"
+#include "Characters/SFPlayerAvatarInterface.h"
 #include "InputActionValue.h"
 #include "GameplayTagContainer.h"
 #include "Core/SignalForgeGameplayTags.h"
@@ -26,36 +27,30 @@ class USFQuestInstance;
 class ASFPlayerState;
 
 UCLASS()
-class SIGNALFORGERPG_API ASFPlayerCharacter : public ASFCharacterBase
+class SIGNALFORGERPG_API ASFPlayerCharacter : public ASFCharacterBase, public ISFPlayerAvatarInterface
 {
 	GENERATED_BODY()
 
 public:
 	ASFPlayerCharacter();
 
-	UFUNCTION(BlueprintPure, Category = "Dialogue")
-	USFDialogueComponent* GetDialogueComponent() const { return DialogueComponent; }
+	// GetDialogueComponent / GetDialogueCameraRoot / GetDialogueCamera /
+	// GetGameplayCamera / GetPortraitRenderTarget / ApplyRecoilKick are
+	// exposed via ISFPlayerAvatarInterface. UHT generates the BlueprintCallable
+	// wrappers from the interface; a redundant inline UFUNCTION here would
+	// trigger "function redefinition" (same pattern as Slice 1's IsDead and
+	// Slice 2's GetEquipmentComponent). Direct C++ callers still resolve
+	// through the UHT-generated virtual, and Blueprint nodes resolve to the
+	// same wrapper, so existing BP UI continues to work unchanged.
 
 	UFUNCTION(BlueprintPure, Category = "Dialogue")
 	USFDialogueCameraComponent* GetDialogueCameraComponent() const { return DialogueCameraComponent; }
-
-	UFUNCTION(BlueprintPure, Category = "Dialogue")
-	USceneComponent* GetDialogueCameraRoot() const { return DialogueCameraRoot; }
-
-	UFUNCTION(BlueprintPure, Category = "Dialogue")
-	UCameraComponent* GetDialogueCamera() const { return DialogueCamera; }
-
-	UFUNCTION(BlueprintPure, Category = "Camera")
-	UCameraComponent* GetGameplayCamera() const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Portrait")
 	TObjectPtr<USceneCaptureComponent2D> PortraitCaptureComponent;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Portrait")
 	TObjectPtr<UTextureRenderTarget2D> PortraitRenderTarget;
-
-	UFUNCTION(BlueprintPure, Category = "Portrait")
-	UTextureRenderTarget2D* GetPortraitRenderTarget() const { return PortraitRenderTarget; }
 
 	UFUNCTION(BlueprintCallable, Category = "Portrait")
 	void CapturePortrait();
@@ -114,18 +109,28 @@ public:
 	void SF_AbandonQuest(const FString& AssetIdString);
 
 public:
+	// -------------------------------------------------------------------------
+	// ISFPlayerAvatarInterface
+	// -------------------------------------------------------------------------
+
+	virtual USFDialogueComponent* GetDialogueComponent_Implementation() const override { return DialogueComponent; }
+	virtual USceneComponent* GetDialogueCameraRoot_Implementation() const override { return DialogueCameraRoot; }
+	virtual UCameraComponent* GetDialogueCamera_Implementation() const override { return DialogueCamera; }
+	virtual UCameraComponent* GetGameplayCamera_Implementation() const override;
+	virtual UTextureRenderTarget2D* GetPortraitRenderTarget_Implementation() const override { return PortraitRenderTarget; }
+
 	/** Queue a smoothly-interpolated recoil kick. Call this from the WeaponFire ability
 	 *  once per shot — the character ticks the pitch/yaw offset over time so the camera
 	 *  feels like it absorbs the kick instead of teleporting. PitchDegrees pushes the
 	 *  view UP (negative pitch in UE controller-space), YawDegrees may be positive or
 	 *  negative. InterpSpeed controls kick-on speed, RecoverySpeed controls return,
 	 *  RecoveryFraction is how much of the kick the return ultimately recovers. */
-	void ApplyRecoilKick(
+	virtual void ApplyRecoilKick_Implementation(
 		float PitchDegrees,
 		float YawDegrees,
 		float InterpSpeed,
 		float RecoverySpeed,
-		float RecoveryFraction);
+		float RecoveryFraction) override;
 
 protected:
 	virtual void BeginPlay() override;
