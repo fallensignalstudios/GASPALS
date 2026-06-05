@@ -12,6 +12,7 @@
 #include "Combat/SFCombatComponent.h"
 #include "Combat/SFHitResolverInterface.h"
 #include "Components/CapsuleComponent.h"
+#include "Combat/SFWeaponActor.h"
 #include "Components/SFEquipmentComponent.h"
 #include "Components/SFAmmoReserveComponent.h"
 #include "Components/SFInventoryComponent.h"
@@ -682,6 +683,31 @@ void ASFCharacterBase::RegisterDamageInstigator_Implementation(AActor* Instigato
 	{
 		LastDamagingCharacter = AsCharacter;
 	}
+}
+
+// -----------------------------------------------------------------------------
+// ISFWeaponHolderInterface
+// -----------------------------------------------------------------------------
+
+bool ASFCharacterBase::GetActiveMuzzleTransform_Implementation(FTransform& OutTransform) const
+{
+	// Default impl walks: this -> EquipmentComponent -> equipped ASFWeaponActor -> muzzle socket.
+	// Non-character holders (turrets, mounted guns) can override to provide a muzzle transform
+	// without going through the equipment component at all.
+	OutTransform = FTransform::Identity;
+	if (!EquipmentComponent)
+	{
+		return false;
+	}
+
+	ASFWeaponActor* WeaponActor = EquipmentComponent->GetEquippedWeaponActor();
+	if (!WeaponActor || !WeaponActor->HasValidMuzzleSocket())
+	{
+		return false;
+	}
+
+	OutTransform = FTransform(WeaponActor->GetMuzzleRotation(), WeaponActor->GetMuzzleLocation());
+	return true;
 }
 
 int32 ASFCharacterBase::GetXPReward() const

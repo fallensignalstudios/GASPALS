@@ -11,6 +11,7 @@
 #include "Combat/SFAutoAimComponent.h"
 #include "Combat/SFCombatantInterface.h"
 #include "Combat/SFProjectileBase.h"
+#include "Combat/SFWeaponHolderInterface.h"
 #include "Combat/SFWeaponActor.h"
 #include "Combat/SFWeaponData.h"
 #include "Combat/SFWeaponInstanceTypes.h"
@@ -72,13 +73,16 @@ bool USFGameplayAbility_WeaponFire::CanActivateAbility(
 		return false;
 	}
 
-	ASFCharacterBase* Character = Cast<ASFCharacterBase>(ActorInfo->AvatarActor.Get());
-	if (!Character)
+	// CanActivate only needs the equipment component to query "is a weapon equipped"; route
+	// through ISFWeaponHolder so future non-character holders (turrets, mounted guns) can
+	// activate weapon abilities too.
+	AActor* Avatar = ActorInfo->AvatarActor.Get();
+	if (!Avatar || !Avatar->Implements<USFWeaponHolderInterface>())
 	{
 		return false;
 	}
 
-	USFEquipmentComponent* Equipment = Character->GetEquipmentComponent();
+	USFEquipmentComponent* Equipment = ISFWeaponHolderInterface::Execute_GetEquipmentComponent(Avatar);
 	if (!Equipment)
 	{
 		return false;

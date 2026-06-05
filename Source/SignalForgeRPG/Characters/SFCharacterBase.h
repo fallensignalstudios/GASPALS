@@ -10,6 +10,7 @@
 #include "Combat/SFHitTypes.h"
 #include "Combat/SFHitResolverInterface.h"
 #include "Combat/SFCombatantInterface.h"
+#include "Combat/SFWeaponHolderInterface.h"
 #include "Animation/SFAnimationTypes.h"
 #include "Combat/SFWeaponData.h"
 #include "SFCharacterBase.generated.h"
@@ -48,7 +49,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	ASFCharacterBase*, Killer);
 
 UCLASS()
-class SIGNALFORGERPG_API ASFCharacterBase : public ACharacter, public IAbilitySystemInterface, public ISFHitResolverInterface, public IGenericTeamAgentInterface, public ISFCombatantInterface
+class SIGNALFORGERPG_API ASFCharacterBase : public ACharacter, public IAbilitySystemInterface, public ISFHitResolverInterface, public IGenericTeamAgentInterface, public ISFCombatantInterface, public ISFWeaponHolderInterface
 {
 	GENERATED_BODY()
 
@@ -82,11 +83,13 @@ public:
 	USFStatRegenComponent* GetStatRegenComponent()            const { return StatRegenComponent; }
 	USFProgressionComponent* GetProgressionComponent()        const { return ProgressionComponent; }
 
-	UFUNCTION(BlueprintPure, Category = "Components")
-	USFEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }
-
-	UFUNCTION(BlueprintPure, Category = "Components")
-	USFAmmoReserveComponent* GetAmmoReserveComponent() const { return AmmoReserveComponent; }
+	// GetEquipmentComponent / GetAmmoReserveComponent are now exposed via the
+	// ISFWeaponHolderInterface contract; UHT generates the BlueprintCallable
+	// wrappers from the interface declaration, so a redundant inline UFUNCTION
+	// here would trigger a "function redefinition" UHT error. The
+	// _Implementation overrides further below supply the bodies, and direct
+	// C++ callers (Char->GetEquipmentComponent()) still resolve through the
+	// virtual the interface emits.
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USFInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
@@ -149,6 +152,14 @@ public:
 	virtual FTransform GetCombatSocketTransform_Implementation(FName SocketName) const override;
 	virtual void GetCombatStateTags_Implementation(FGameplayTagContainer& OutTags) const override;
 	virtual void RegisterDamageInstigator_Implementation(AActor* Instigator) override;
+
+	// -------------------------------------------------------------------------
+	// ISFWeaponHolderInterface
+	// -------------------------------------------------------------------------
+
+	virtual USFEquipmentComponent* GetEquipmentComponent_Implementation() const override { return EquipmentComponent; }
+	virtual USFAmmoReserveComponent* GetAmmoReserveComponent_Implementation() const override { return AmmoReserveComponent; }
+	virtual bool GetActiveMuzzleTransform_Implementation(FTransform& OutTransform) const override;
 
 	// -------------------------------------------------------------------------
 	// Movement
