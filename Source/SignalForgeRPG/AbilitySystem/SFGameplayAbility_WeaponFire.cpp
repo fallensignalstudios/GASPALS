@@ -7,7 +7,7 @@
 #include "Animation/AnimMontage.h"
 #include "Camera/CameraShakeBase.h"
 #include "Characters/SFCharacterBase.h"
-#include "Characters/SFPlayerCharacter.h"
+#include "Characters/SFPlayerAvatarInterface.h"
 #include "Combat/SFAutoAimComponent.h"
 #include "Combat/SFCombatantInterface.h"
 #include "Combat/SFProjectileBase.h"
@@ -748,10 +748,10 @@ void USFGameplayAbility_WeaponFire::ApplyRecoilAndShake(
 		? FMath::Max(0.0f, Config.AdsRecoilMultiplier)
 		: 1.0f;
 
-	// Route the per-shot kick through the player character's smooth interpolator so the camera
-	// absorbs recoil over multiple frames instead of snapping. NPCs (no SFPlayerCharacter) just
-	// skip the camera kick — they don't have a player camera to nudge anyway.
-	if (ASFPlayerCharacter* PlayerChar = Cast<ASFPlayerCharacter>(Character))
+	// Route the per-shot kick through the avatar's smooth interpolator so the camera
+	// absorbs recoil over multiple frames instead of snapping. NPCs (no player-avatar
+	// interface) just skip the camera kick — they don't have a player camera to nudge.
+	if (Character->Implements<USFPlayerAvatarInterface>())
 	{
 		const float PitchKick = FMath::Max(0.0f, Config.VerticalRecoil) * RecoilScale;
 		float YawKick = 0.0f;
@@ -763,7 +763,8 @@ void USFGameplayAbility_WeaponFire::ApplyRecoilAndShake(
 
 		if (PitchKick > 0.0f || !FMath::IsNearlyZero(YawKick))
 		{
-			PlayerChar->ApplyRecoilKick(
+			ISFPlayerAvatarInterface::Execute_ApplyRecoilKick(
+				Character,
 				PitchKick,
 				YawKick,
 				Config.RecoilInterpSpeed,

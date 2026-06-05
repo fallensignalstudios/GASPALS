@@ -1,7 +1,7 @@
 #include "UI/SFPlayerHUDWidgetController.h"
 
 #include "Characters/SFCharacterBase.h"
-#include "Characters/SFPlayerCharacter.h"
+#include "Characters/SFPlayerAvatarInterface.h"
 #include "Core/SFAttributeSetBase.h"
 #include "UI/SFAttributeBarWidget.h"
 #include "Components/SFInteractionComponent.h"
@@ -315,9 +315,13 @@ void USFPlayerHUDWidgetController::OnInactivityTimerExpired()
 
 UTextureRenderTarget2D* USFPlayerHUDWidgetController::GetPortraitRenderTarget() const
 {
-	if (const ASFPlayerCharacter* PC = Cast<ASFPlayerCharacter>(PlayerCharacter))
+	// Execute_* dispatch requires non-const AActor*. This getter is const but the
+	// dispatch is logically a read of the avatar's render target -- const_cast
+	// matches the existing pattern (see line ~81 in this file).
+	if (PlayerCharacter && PlayerCharacter->Implements<USFPlayerAvatarInterface>())
 	{
-		return PC->GetPortraitRenderTarget();
+		return ISFPlayerAvatarInterface::Execute_GetPortraitRenderTarget(
+			const_cast<AActor*>(static_cast<const AActor*>(PlayerCharacter.Get())));
 	}
 	return nullptr;
 }

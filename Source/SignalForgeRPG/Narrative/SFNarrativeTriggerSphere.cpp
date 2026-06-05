@@ -6,7 +6,7 @@
 #include "Narrative/SFQuestDefinition.h"
 #include "Narrative/SFQuestInstance.h"
 #include "Narrative/SFQuestRuntime.h"
-#include "Characters/SFPlayerCharacter.h"
+#include "Characters/SFPlayerAvatarInterface.h"
 #include "Dialogue/Data/SFConversationDataAsset.h"
 #include "Components/SphereComponent.h"
 #include "Engine/AssetManager.h"
@@ -84,11 +84,13 @@ void ASFNarrativeTriggerSphere::HandleSphereBeginOverlap(
     const FHitResult& /*SweepResult*/)
 {
     // Player-only gate. Companions / NPCs / projectiles bounce off.
-    ASFPlayerCharacter* Player = Cast<ASFPlayerCharacter>(OtherActor);
-    if (!Player)
+    // Both protagonists implement ISFPlayerAvatarInterface; we don't care
+    // which concrete class showed up, only that this is a player avatar.
+    if (!OtherActor || !OtherActor->Implements<USFPlayerAvatarInterface>())
     {
         return;
     }
+    AActor* Player = OtherActor;
 
     BP_OnPlayerEntered(Player);
 
@@ -97,7 +99,7 @@ void ASFNarrativeTriggerSphere::HandleSphereBeginOverlap(
         return;
     }
 
-    USFNarrativeComponent* Narrative = Player->GetNarrativeComponent();
+    USFNarrativeComponent* Narrative = Player->FindComponentByClass<USFNarrativeComponent>();
     if (!Narrative)
     {
         UE_LOG(LogSFNarrativeTrigger, Warning,

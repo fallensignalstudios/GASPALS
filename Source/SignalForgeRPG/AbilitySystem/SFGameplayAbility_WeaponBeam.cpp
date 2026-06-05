@@ -7,7 +7,7 @@
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraShakeBase.h"
 #include "Characters/SFCharacterBase.h"
-#include "Characters/SFPlayerCharacter.h"
+#include "Characters/SFPlayerAvatarInterface.h"
 #include "Combat/SFCombatantInterface.h"
 #include "Combat/SFWeaponActor.h"
 #include "Combat/SFWeaponData.h"
@@ -623,7 +623,7 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamRecoilForTick(
 		? FMath::Max(0.0f, RangedConfig.AdsRecoilMultiplier)
 		: 1.0f;
 
-	if (ASFPlayerCharacter* PlayerChar = Cast<ASFPlayerCharacter>(Character))
+	if (Character->Implements<USFPlayerAvatarInterface>())
 	{
 		const float PitchKick = FMath::Max(0.0f, RangedConfig.VerticalRecoil) * AdsScale * PerTickPitchScale;
 		float YawKick = 0.0f;
@@ -635,7 +635,8 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamRecoilForTick(
 
 		if (PitchKick > 0.0f || !FMath::IsNearlyZero(YawKick))
 		{
-			PlayerChar->ApplyRecoilKick(
+			ISFPlayerAvatarInterface::Execute_ApplyRecoilKick(
+				Character,
 				PitchKick,
 				YawKick,
 				RangedConfig.RecoilInterpSpeed,

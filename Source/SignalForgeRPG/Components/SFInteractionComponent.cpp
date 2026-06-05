@@ -1,6 +1,6 @@
 #include "Components/SFInteractionComponent.h"
 
-#include "Characters/SFPlayerCharacter.h"
+#include "Characters/SFPlayerAvatarInterface.h"
 #include "Components/SFInteractableInterface.h"
 #include "Dialogue/Data/SFConversationSourceInterface.h"
 #include "Dialogue/Data/SFConversationDataAsset.h"
@@ -457,13 +457,15 @@ bool USFInteractionComponent::TryStartConversation(AActor* TargetActor)
 		return false;
 	}
 
-	ASFPlayerCharacter* PlayerCharacter = Cast<ASFPlayerCharacter>(OwnerCharacter);
-	if (!PlayerCharacter)
+	// OwnerCharacter is ASFCharacterBase*; route dialogue access through the
+	// player-avatar interface so non-player owners (or a future 2nd protagonist)
+	// either supply a dialogue component or cleanly fail this gate.
+	if (!OwnerCharacter || !OwnerCharacter->Implements<USFPlayerAvatarInterface>())
 	{
 		return false;
 	}
 
-	USFDialogueComponent* DialogueComponent = PlayerCharacter->GetDialogueComponent();
+	USFDialogueComponent* DialogueComponent = ISFPlayerAvatarInterface::Execute_GetDialogueComponent(OwnerCharacter);
 	if (!DialogueComponent || DialogueComponent->IsConversationActive())
 	{
 		return false;
