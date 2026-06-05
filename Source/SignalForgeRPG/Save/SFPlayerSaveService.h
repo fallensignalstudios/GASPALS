@@ -5,7 +5,6 @@
 #include "Save/SFPlayerSaveTypes.h"
 #include "SFPlayerSaveService.generated.h"
 
-class ASFPlayerCharacter;
 class ASFCharacterBase;
 class USFPlayerSaveGame;
 

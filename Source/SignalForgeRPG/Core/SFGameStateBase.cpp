@@ -64,7 +64,7 @@ void ASFGameStateBase::OnRep_WorldPhase(FGameplayTag OldPhase)
 // both C++ and Blueprint and replicates a server-authoritative world time.
 // We rely on the inherited implementation rather than shadowing it here.
 
-void ASFGameStateBase::SetActiveCheckpoint(ASFCheckpoint* NewCheckpoint, ASFPlayerCharacter* /*ActivatingPlayer*/)
+void ASFGameStateBase::SetActiveCheckpoint(ASFCheckpoint* NewCheckpoint, AActor* /*ActivatingActor*/)
 {
 	if (!NewCheckpoint || NewCheckpoint == ActiveCheckpoint)
 	{

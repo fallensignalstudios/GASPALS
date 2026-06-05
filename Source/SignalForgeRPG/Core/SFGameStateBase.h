@@ -7,7 +7,6 @@
 
 class USFNarrativeReplicatorComponent;
 class ASFCheckpoint;
-class ASFPlayerCharacter;
 
 /**
  * ASFGameStateBase
@@ -68,7 +67,7 @@ public:
 	 * authoritative and the client doesn't need to know.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Checkpoint")
-	void SetActiveCheckpoint(ASFCheckpoint* NewCheckpoint, ASFPlayerCharacter* ActivatingPlayer);
+	void SetActiveCheckpoint(ASFCheckpoint* NewCheckpoint, AActor* ActivatingActor);
 
 	UFUNCTION(BlueprintPure, Category = "Checkpoint")
 	ASFCheckpoint* GetActiveCheckpoint() const { return ActiveCheckpoint; }

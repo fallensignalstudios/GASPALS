@@ -7,7 +7,6 @@
 class UBillboardComponent;
 class UArrowComponent;
 class UCapsuleComponent;
-class ASFPlayerCharacter;
 
 /**
  * A respawn anchor designers drop in the level. The player overlap activates
@@ -41,8 +40,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Checkpoint")
 	bool bActivateOnPlayerOverlap = true;
 
+	/**
+	 * Mark this checkpoint as active. The activating actor is forwarded to
+	 * the game state for any downstream policy (currently unused but kept on
+	 * the signature for telemetry / future use). Accepts AActor* so either
+	 * protagonist (or a scripted trigger) can drive it without coupling to
+	 * a concrete pawn class.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "Checkpoint")
-	void ActivateCheckpoint(ASFPlayerCharacter* ActivatingPlayer);
+	void ActivateCheckpoint(AActor* ActivatingActor);
 
 protected:
 	virtual void BeginPlay() override;
