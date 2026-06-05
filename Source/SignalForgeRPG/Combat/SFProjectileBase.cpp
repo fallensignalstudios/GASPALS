@@ -15,6 +15,7 @@
 #include "Input/SFPlayerController.h"
 #include "Characters/SFCharacterBase.h"
 #include "Characters/SFEnemyCharacter.h"
+#include "Combat/SFCombatantInterface.h"
 #include "Core/SignalForgeGameplayTags.h"
 #include "Engine/OverlapResult.h"
 #include "Faction/SFFactionStatics.h"
@@ -302,23 +303,23 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 	// in world without being harmed). The projectile will still detonate per
 	// its normal lifecycle (radial impact + cleanup are handled by the caller).
 	bool bSuppressDamage = false;
-	if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(OtherActor))
+	if (OtherActor && OtherActor->Implements<USFCombatantInterface>())
 	{
-		if (HitCharacter->IsDead())
+		if (ISFCombatantInterface::Execute_IsDead(OtherActor))
 		{
 			bSuppressDamage = true;
 #if !UE_BUILD_SHIPPING
-			UE_LOG(LogSFCombat, Warning, TEXT("SFProjectile::HandleImpact -> SUPPRESS (target dead): %s"), *HitCharacter->GetName());
+			UE_LOG(LogSFCombat, Warning, TEXT("SFProjectile::HandleImpact -> SUPPRESS (target dead): %s"), *OtherActor->GetName());
 #endif
 		}
-		else if (!bAllowFriendlyFire && !USFFactionStatics::AreHostile(SourceActor, HitCharacter))
+		else if (!bAllowFriendlyFire && !USFFactionStatics::AreHostile(SourceActor, OtherActor))
 		{
 			bSuppressDamage = true;
 #if !UE_BUILD_SHIPPING
 			UE_LOG(LogSFCombat, Warning,
 				TEXT("SFProjectile::HandleImpact -> SUPPRESS (faction gate: not hostile). source=%s target=%s allowFF=%d"),
 				SourceActor ? *SourceActor->GetName() : TEXT("NULL"),
-				*HitCharacter->GetName(),
+				*OtherActor->GetName(),
 				bAllowFriendlyFire ? 1 : 0);
 #endif
 		}
@@ -381,15 +382,12 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 					SpecHandle.Data->SetSetByCallerMagnitude(SFTags.Data_FalloffMultiplier, FalloffMult);
 				}
 
-				// Attribute the kill to the shooter on ANY character that we damage,
-				// not just ASFEnemyCharacter. Faction hostility was already verified
-				// above, so this is the right place to record attribution.
-				if (ASFCharacterBase* SourceCharacter = Cast<ASFCharacterBase>(SourceActor))
+				// Attribute the kill to the shooter on ANY combatant we damage.
+				// Faction hostility was already verified above, so this is the
+				// right place to record attribution.
+				if (OtherActor && OtherActor->Implements<USFCombatantInterface>())
 				{
-					if (ASFCharacterBase* HitCharacterAttribute = Cast<ASFCharacterBase>(OtherActor))
-					{
-						HitCharacterAttribute->SetLastDamagingCharacter(SourceCharacter);
-					}
+					ISFCombatantInterface::Execute_RegisterDamageInstigator(OtherActor, SourceActor);
 				}
 
 				SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);

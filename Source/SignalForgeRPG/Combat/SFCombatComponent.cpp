@@ -173,23 +173,23 @@ void USFCombatComponent::HandleAttackHitInternal(ESFAttackType AttackType)
 			continue;
 		}
 
-		// Skip dead characters and non-hostile targets (friend-foe gate).
-		if (ASFCharacterBase* HitCharacter = Cast<ASFCharacterBase>(HitActor))
+		// Skip dead combatants and non-hostile targets (friend-foe gate).
+		if (HitActor->Implements<USFCombatantInterface>())
 		{
-			if (HitCharacter->IsDead())
+			if (ISFCombatantInterface::Execute_IsDead(HitActor))
 			{
 				continue;
 			}
 
-			// Faction friend-foe check: only damage hostile characters. Self-hits
+			// Faction friend-foe check: only damage hostile targets. Self-hits
 			// are also rejected here (faction statics returns Friendly for self).
-			if (OwnerCharacter && !USFFactionStatics::AreHostile(OwnerCharacter, HitCharacter))
+			if (OwnerCharacter && !USFFactionStatics::AreHostile(OwnerCharacter, HitActor))
 			{
 				continue;
 			}
 
 			// Attribute the eventual kill to OwnerCharacter so HandleDeath grants XP.
-			HitCharacter->SetLastDamagingCharacter(OwnerCharacter);
+			ISFCombatantInterface::Execute_RegisterDamageInstigator(HitActor, OwnerCharacter);
 		}
 
 		FSFHitData HitData = BuildHitDataFromResult(HitActor, HitResult, AttackType);

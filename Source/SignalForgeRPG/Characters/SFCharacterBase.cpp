@@ -12,6 +12,7 @@
 #include "Combat/SFCombatComponent.h"
 #include "Combat/SFHitResolverInterface.h"
 #include "Components/CapsuleComponent.h"
+#include "Combat/SFWeaponActor.h"
 #include "Components/SFEquipmentComponent.h"
 #include "Components/SFAmmoReserveComponent.h"
 #include "Components/SFInventoryComponent.h"
@@ -638,6 +639,76 @@ ETeamAttitude::Type ASFCharacterBase::GetTeamAttitudeTowards(const AActor& Other
 void ASFCharacterBase::SetLastDamagingCharacter(ASFCharacterBase* InCharacter)
 {
 	LastDamagingCharacter = InCharacter;
+}
+
+// -----------------------------------------------------------------------------
+// ISFCombatantInterface
+// -----------------------------------------------------------------------------
+
+FVector ASFCharacterBase::GetCombatLocation_Implementation() const
+{
+	// Mid-capsule (center-of-mass) is a better aim target than actor origin (feet).
+	if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		return Capsule->GetComponentLocation();
+	}
+	return GetActorLocation();
+}
+
+FTransform ASFCharacterBase::GetCombatSocketTransform_Implementation(FName SocketName) const
+{
+	if (const USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		if (SocketName != NAME_None && SkelMesh->DoesSocketExist(SocketName))
+		{
+			return SkelMesh->GetSocketTransform(SocketName);
+		}
+	}
+	return GetActorTransform();
+}
+
+void ASFCharacterBase::GetCombatStateTags_Implementation(FGameplayTagContainer& OutTags) const
+{
+	if (const USFAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
+	{
+		ASC->GetOwnedGameplayTags(OutTags);
+	}
+}
+
+void ASFCharacterBase::RegisterDamageInstigator_Implementation(AActor* Instigator)
+{
+	// Only characters are tracked for XP/death attribution; non-character
+	// damage sources (turrets, traps) intentionally leave LastDamagingCharacter
+	// alone so the previous attacker still gets credit.
+	if (ASFCharacterBase* AsCharacter = Cast<ASFCharacterBase>(Instigator))
+	{
+		LastDamagingCharacter = AsCharacter;
+	}
+}
+
+// -----------------------------------------------------------------------------
+// ISFWeaponHolderInterface
+// -----------------------------------------------------------------------------
+
+bool ASFCharacterBase::GetActiveMuzzleTransform_Implementation(FTransform& OutTransform) const
+{
+	// Default impl walks: this -> EquipmentComponent -> equipped ASFWeaponActor -> muzzle socket.
+	// Non-character holders (turrets, mounted guns) can override to provide a muzzle transform
+	// without going through the equipment component at all.
+	OutTransform = FTransform::Identity;
+	if (!EquipmentComponent)
+	{
+		return false;
+	}
+
+	ASFWeaponActor* WeaponActor = EquipmentComponent->GetEquippedWeaponActor();
+	if (!WeaponActor || !WeaponActor->HasValidMuzzleSocket())
+	{
+		return false;
+	}
+
+	OutTransform = FTransform(WeaponActor->GetMuzzleRotation(), WeaponActor->GetMuzzleLocation());
+	return true;
 }
 
 int32 ASFCharacterBase::GetXPReward() const
