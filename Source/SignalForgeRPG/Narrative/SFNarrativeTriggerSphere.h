@@ -9,7 +9,6 @@
 #include "SFNarrativeTriggerSphere.generated.h"
 
 class AActor;
-class ASFPlayerCharacter;
 class USphereComponent;
 class USFConversationDataAsset;
 class USFNarrativeComponent;

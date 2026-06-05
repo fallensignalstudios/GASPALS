@@ -11,7 +11,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDialogueDisplayDataChangedSignatu
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDialoguePauseChangedSignature, bool, bIsPaused);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDialogueEventForwardedSignature, FGameplayTag, EventTag);
 
-class ASFPlayerCharacter;
 class USFDialogueComponent;
 class AActor;
 
@@ -21,8 +20,13 @@ class SIGNALFORGERPG_API USFDialogueWidgetController : public UObject
 	GENERATED_BODY()
 
 public:
+	/**
+	 * Bind this controller to a player-avatar actor. The actor must implement
+	 * ISFPlayerAvatarInterface (both protagonists do). Accepts AActor* so the
+	 * second protagonist works without recompiling Blueprint callers.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "UI")
-	void Initialize(ASFPlayerCharacter* InPlayerCharacter);
+	void Initialize(AActor* InPlayerAvatar);
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void AdvanceDialogue();
@@ -57,8 +61,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "UI")
 	int32 GetCurrentChoiceCount() const { return CurrentDisplayData.Choices.Num(); }
 
+	/** The avatar actor we're bound to. Read-only on BP side; implements ISFPlayerAvatarInterface. */
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
-	TObjectPtr<ASFPlayerCharacter> PlayerCharacter;
+	TObjectPtr<AActor> PlayerAvatar;
 
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
 	TObjectPtr<USFDialogueComponent> DialogueComponent;

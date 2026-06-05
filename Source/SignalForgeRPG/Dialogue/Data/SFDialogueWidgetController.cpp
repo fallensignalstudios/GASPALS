@@ -1,21 +1,21 @@
 #include "Dialogue/Data/SFDialogueWidgetController.h"
 
-#include "Characters/SFPlayerCharacter.h"
+#include "Characters/SFPlayerAvatarInterface.h"
 #include "Dialogue/Data/SFDialogueComponent.h"
 
-void USFDialogueWidgetController::Initialize(ASFPlayerCharacter* InPlayerCharacter)
+void USFDialogueWidgetController::Initialize(AActor* InPlayerAvatar)
 {
-	PlayerCharacter = InPlayerCharacter;
+	PlayerAvatar = InPlayerAvatar;
 	DialogueComponent = nullptr;
 	bIsDialogueActive = false;
 	CurrentDisplayData = FSFDialogueDisplayData();
 
-	if (!PlayerCharacter)
+	if (!PlayerAvatar || !PlayerAvatar->Implements<USFPlayerAvatarInterface>())
 	{
 		return;
 	}
 
-	DialogueComponent = PlayerCharacter->GetDialogueComponent();
+	DialogueComponent = ISFPlayerAvatarInterface::Execute_GetDialogueComponent(PlayerAvatar);
 	if (!DialogueComponent)
 	{
 		return;

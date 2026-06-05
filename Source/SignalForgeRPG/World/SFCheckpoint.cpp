@@ -1,6 +1,6 @@
 #include "World/SFCheckpoint.h"
 
-#include "Characters/SFPlayerCharacter.h"
+#include "Characters/SFPlayerAvatarInterface.h"
 #include "Components/ArrowComponent.h"
 #include "Components/BillboardComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -47,13 +47,16 @@ void ASFCheckpoint::BeginPlay()
 
 void ASFCheckpoint::HandleOverlapBegin(UPrimitiveComponent* /*OverlappedComp*/, AActor* OtherActor, UPrimitiveComponent* /*OtherComp*/, int32 /*OtherBodyIndex*/, bool /*bFromSweep*/, const FHitResult& /*SweepResult*/)
 {
-	if (ASFPlayerCharacter* Player = Cast<ASFPlayerCharacter>(OtherActor))
+	// Only player avatars activate checkpoints. Companions, NPCs, and
+	// projectiles bounce off. Both protagonists implement the avatar
+	// interface; we don't care which concrete class showed up.
+	if (OtherActor && OtherActor->Implements<USFPlayerAvatarInterface>())
 	{
-		ActivateCheckpoint(Player);
+		ActivateCheckpoint(OtherActor);
 	}
 }
 
-void ASFCheckpoint::ActivateCheckpoint(ASFPlayerCharacter* ActivatingPlayer)
+void ASFCheckpoint::ActivateCheckpoint(AActor* ActivatingActor)
 {
 	UWorld* World = GetWorld();
 	if (!World)
@@ -66,7 +69,7 @@ void ASFCheckpoint::ActivateCheckpoint(ASFPlayerCharacter* ActivatingPlayer)
 		// Game state owns the "last touched checkpoint" so it survives
 		// pawn destruction during respawn and is reachable from both the
 		// player controller (to query) and game mode (to respawn against).
-		GS->SetActiveCheckpoint(this, ActivatingPlayer);
+		GS->SetActiveCheckpoint(this, ActivatingActor);
 	}
 }
 
