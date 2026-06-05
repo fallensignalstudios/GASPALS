@@ -132,6 +132,29 @@ public:
 		float RecoverySpeed,
 		float RecoveryFraction) override;
 
+	// -------------------------------------------------------------------------
+	// Camera zoom (single-writer model)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Read the current camera-boom zoom target. ASFPlayerCharacter::Tick is the
+	 * sole writer to GameplayCameraBoom->TargetArmLength (smoothly interping it
+	 * toward this value at ZoomInterpSpeed). All other systems that want to push
+	 * the camera in or out (e.g. ADS) must go through SetTargetZoomDistance so
+	 * the interp source-of-truth stays single-owner.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Camera")
+	float GetTargetZoomDistance() const { return TargetZoomDistance; }
+
+	/**
+	 * Override the target zoom distance. If bRespectScrollLimits is true (the
+	 * default — used by scroll-wheel input) the value is clamped to
+	 * [MinZoomDistance, MaxZoomDistance]. Gameplay systems like ADS that need
+	 * to drive the camera tighter than the scroll floor should pass false.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Camera")
+	void SetTargetZoomDistance(float NewTargetDistance, bool bRespectScrollLimits = true);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

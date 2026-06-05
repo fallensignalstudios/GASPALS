@@ -1092,10 +1092,22 @@ void ASFPlayerCharacter::CapturePortrait()
 void ASFPlayerCharacter::HandleCameraZoom(const FInputActionValue& Value)
 {
 	const float ScrollValue = Value.Get<float>();
-	TargetZoomDistance = FMath::Clamp(
-		TargetZoomDistance - (ScrollValue * ZoomSpeed),
-		MinZoomDistance,
-		MaxZoomDistance);
+	SetTargetZoomDistance(TargetZoomDistance - (ScrollValue * ZoomSpeed));
+}
+
+void ASFPlayerCharacter::SetTargetZoomDistance(float NewTargetDistance, bool bRespectScrollLimits)
+{
+	if (bRespectScrollLimits)
+	{
+		NewTargetDistance = FMath::Clamp(NewTargetDistance, MinZoomDistance, MaxZoomDistance);
+	}
+	else
+	{
+		// Hard floor at 0 so we can't invert the spring arm, but otherwise let gameplay
+		// systems (ADS) drive tighter than the scroll-wheel floor.
+		NewTargetDistance = FMath::Max(NewTargetDistance, 0.0f);
+	}
+	TargetZoomDistance = NewTargetDistance;
 }
 
 UCameraComponent* ASFPlayerCharacter::GetGameplayCamera_Implementation() const

@@ -101,6 +101,13 @@ private:
 	// --- Baseline (pre-ADS) ---
 	float BaselineCameraFOV = 90.0f;
 	float BaselineArmLength = 350.0f;
+	/**
+	 * Player-character pre-ADS zoom target. We route the arm-length pull-in through
+	 * ASFPlayerCharacter::SetTargetZoomDistance so the player's Tick stays the single
+	 * writer of GameplayCameraBoom->TargetArmLength (otherwise ADS' per-tick write and
+	 * the player's per-tick interp fight every frame and oscillate the camera).
+	 */
+	float BaselineZoomDistance = 350.0f;
 	FVector BaselineSocketOffset = FVector::ZeroVector;
 	float BaselineMaxWalkSpeed = 450.0f;
 

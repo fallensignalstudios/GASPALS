@@ -731,6 +731,26 @@ void ASFCharacterBase::HandleDeath()
 	bIsDead = true;
 	StopCrouch();
 
+	// Tag the ASC as dead BEFORE broadcasting / cleanup so any reactive logic
+	// (offensive abilities, AI ticks, behaviour-tree decorators, status
+	// applicators) that wakes up inside OnCharacterDied sees the dead state.
+	// Listed as a BlockedTag on every offensive ability so corpses can't keep
+	// firing weapons or swinging melee.
+	if (AbilitySystemComponent)
+	{
+		const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+		if (Tags.State_Dead.IsValid())
+		{
+			AbilitySystemComponent->AddLooseGameplayTag(Tags.State_Dead);
+		}
+
+		// Hard-stop any abilities currently mid-activation (fire bursts, beam
+		// tick loops, melee montages). The State.Dead BlockedTag prevents new
+		// activations; this kills the ones already running.
+		FGameplayTagContainer CancelAllAbilities;
+		AbilitySystemComponent->CancelAbilities(&CancelAllAbilities, nullptr, nullptr);
+	}
+
 	// Broadcast death AS EARLY AS POSSIBLE -- listeners (loot droppers,
 	// quest objectives, kill feeds, achievements) typically want the dying
 	// actor still fully present (location, mesh, transform) when they run.

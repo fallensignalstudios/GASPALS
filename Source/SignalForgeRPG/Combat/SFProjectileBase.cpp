@@ -15,7 +15,9 @@
 #include "Input/SFPlayerController.h"
 #include "Characters/SFCharacterBase.h"
 #include "Characters/SFEnemyCharacter.h"
+#include "AbilitySystem/SFGameplayAbility.h"
 #include "Combat/SFCombatantInterface.h"
+#include "Core/SFAttributeSetBase.h"
 #include "Core/SignalForgeGameplayTags.h"
 #include "Engine/OverlapResult.h"
 #include "Faction/SFFactionStatics.h"
@@ -359,6 +361,12 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 		UAbilitySystemComponent* TargetASC =
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor);
 
+		// Snapshot shields BEFORE damage so we can fire shield-impact/break cues
+		// from the projectile hit site once damage resolves.
+		const float ShieldsBefore = TargetASC
+			? TargetASC->GetNumericAttribute(USFAttributeSetBase::GetShieldsAttribute())
+			: 0.0f;
+
 		if (SourceASC && TargetASC)
 		{
 			FGameplayEffectContextHandle EffectContext = SourceASC->MakeEffectContext();
@@ -413,6 +421,10 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 		if (UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor))
 		{
 			TargetASC->ExecuteGameplayCue(ImpactCueTag, CueParams);
+
+			// Shield impact / break VFX share the same hit context. Helper no-ops if
+			// shields did not move (no shields on target, or hit went straight to health).
+			USFGameplayAbility::DispatchShieldHitCues(TargetASC, ShieldsBefore, CueParams);
 		}
 		else if (UGameplayCueManager* CueMgr = UAbilitySystemGlobals::Get().GetGameplayCueManager())
 		{

@@ -16,6 +16,7 @@
 #include "Combat/SFWeaponData.h"
 #include "Combat/SFWeaponInstanceTypes.h"
 #include "Components/SFEquipmentComponent.h"
+#include "Core/SFAttributeSetBase.h"
 #include "Core/SignalForgeGameplayTags.h"
 #include "Engine/World.h"
 #include "GameFramework/Character.h"
@@ -50,6 +51,7 @@ USFGameplayAbility_WeaponFire::USFGameplayAbility_WeaponFire()
 	FGameplayTagContainer BlockedTags;
 	BlockedTags.AddTag(Tags.State_Weapon_Switching);
 	BlockedTags.AddTag(Tags.State_Weapon_MeleeSwinging);
+	BlockedTags.AddTag(Tags.State_Dead);
 	ActivationBlockedTags = BlockedTags;
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -613,6 +615,12 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 	const float DamageBase = Config.BaseDamage > 0.0f ? Config.BaseDamage : DefaultDamage;
 	const float FinalDamage = DamageBase * FalloffMult * HeadshotMult;
 
+	// Snapshot shields BEFORE applying damage so we can detect shield-impact vs.
+	// shield-break on the way out and fire the corresponding cues at the hit site.
+	const float ShieldsBefore = TargetASC
+		? TargetASC->GetNumericAttribute(USFAttributeSetBase::GetShieldsAttribute())
+		: 0.0f;
+
 	if (SourceASC && TargetASC && EffectClass)
 	{
 		FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
@@ -683,6 +691,10 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 		CueParams.PhysicalMaterial = Hit.PhysMaterial;
 		CueParams.RawMagnitude = FinalDamage;
 		TargetASC->ExecuteGameplayCue(Tags.Cue_Hit_Impact, CueParams);
+
+		// Same hit context drives shield-impact / shield-break VFX. Helper no-ops if
+		// shields did not move (e.g. headshot through health, target had no shields).
+		DispatchShieldHitCues(TargetASC, ShieldsBefore, CueParams);
 	}
 }
 

@@ -4,6 +4,7 @@
 #include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Characters/SFCharacterBase.h"
+#include "Characters/SFPlayerCharacter.h"
 #include "Combat/SFAutoAimComponent.h"
 #include "Combat/SFWeaponData.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -268,9 +269,21 @@ void USFGameplayAbility_ADS::EndAbility(
 			Camera->SetFieldOfView(BaselineCameraFOV);
 		}
 
-		if (Boom)
+		// Hand the camera back to the player's pre-ADS zoom target. The player's
+		// Tick interp will then smoothly pull Boom->TargetArmLength back to it
+		// (single-writer, no oscillation). For non-player avatars we still snap
+		// the arm length directly since they have no zoom-interp tick.
+		if (ASFPlayerCharacter* PlayerChar = Cast<ASFPlayerCharacter>(Character))
+		{
+			PlayerChar->SetTargetZoomDistance(BaselineZoomDistance, /*bRespectScrollLimits=*/false);
+		}
+		else if (Boom)
 		{
 			Boom->TargetArmLength = BaselineArmLength;
+		}
+
+		if (Boom)
+		{
 			Boom->SocketOffset = BaselineSocketOffset;
 		}
 
@@ -328,14 +341,29 @@ void USFGameplayAbility_ADS::TickAdsBlend()
 		Camera->SetFieldOfView(NewFOV);
 	}
 
-	if (Boom)
+	// Arm-length: route through ASFPlayerCharacter::SetTargetZoomDistance so the
+	// player's Tick is the single writer of Boom->TargetArmLength (its FInterpTo
+	// will smoothly pull the camera toward our ADS target at ZoomInterpSpeed).
+	// Writing Boom->TargetArmLength here too would fight that interp every frame
+	// and produce the visible "snap back and forth between zoomed and normal"
+	// oscillation. Overriding the target every tick also blocks the scroll wheel
+	// from yanking the camera out while the player is aiming.
+	if (ASFPlayerCharacter* PlayerChar = Cast<ASFPlayerCharacter>(Character))
 	{
+		PlayerChar->SetTargetZoomDistance(TargetArmLength, /*bRespectScrollLimits=*/false);
+	}
+	else if (Boom)
+	{
+		// Non-player avatar (no zoom interp on Tick): blend directly like before.
 		Boom->TargetArmLength = FMath::FInterpTo(
 			Boom->TargetArmLength,
 			TargetArmLength,
 			InterpTickInterval,
 			Speed);
+	}
 
+	if (Boom)
+	{
 		Boom->SocketOffset = FMath::VInterpTo(
 			Boom->SocketOffset,
 			TargetSocketOffset,
@@ -358,6 +386,18 @@ void USFGameplayAbility_ADS::CaptureBaselineState(ASFCharacterBase* Character)
 	BaselineCameraFOV = Camera ? Camera->FieldOfView : 90.0f;
 	BaselineArmLength = Boom ? Boom->TargetArmLength : 350.0f;
 	BaselineSocketOffset = Boom ? Boom->SocketOffset : FVector::ZeroVector;
+
+	// Cache the player's pre-ADS zoom target so EndAbility can hand the camera back
+	// to whatever the player was running before they aimed. NPCs / non-player avatars
+	// just fall back to BaselineArmLength via the spring-arm restore path below.
+	if (ASFPlayerCharacter* PlayerChar = Cast<ASFPlayerCharacter>(Character))
+	{
+		BaselineZoomDistance = PlayerChar->GetTargetZoomDistance();
+	}
+	else
+	{
+		BaselineZoomDistance = BaselineArmLength;
+	}
 
 	BaselineMaxWalkSpeed = Character->GetCharacterMovement()
 		? Character->GetCharacterMovement()->MaxWalkSpeed
