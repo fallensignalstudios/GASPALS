@@ -674,12 +674,14 @@ void ASFCharacterBase::GetCombatStateTags_Implementation(FGameplayTagContainer& 
 	}
 }
 
-void ASFCharacterBase::RegisterDamageInstigator_Implementation(AActor* Instigator)
+void ASFCharacterBase::RegisterDamageInstigator_Implementation(AActor* InInstigator)
 {
 	// Only characters are tracked for XP/death attribution; non-character
 	// damage sources (turrets, traps) intentionally leave LastDamagingCharacter
 	// alone so the previous attacker still gets credit.
-	if (ASFCharacterBase* AsCharacter = Cast<ASFCharacterBase>(Instigator))
+	// (Parameter is InInstigator -- not Instigator -- to avoid shadowing
+	// AActor::Instigator under MSVC /WX.)
+	if (ASFCharacterBase* AsCharacter = Cast<ASFCharacterBase>(InInstigator))
 	{
 		LastDamagingCharacter = AsCharacter;
 	}

@@ -151,7 +151,7 @@ public:
 	virtual FVector GetCombatLocation_Implementation() const override;
 	virtual FTransform GetCombatSocketTransform_Implementation(FName SocketName) const override;
 	virtual void GetCombatStateTags_Implementation(FGameplayTagContainer& OutTags) const override;
-	virtual void RegisterDamageInstigator_Implementation(AActor* Instigator) override;
+	virtual void RegisterDamageInstigator_Implementation(AActor* InInstigator) override;
 
 	// -------------------------------------------------------------------------
 	// ISFWeaponHolderInterface

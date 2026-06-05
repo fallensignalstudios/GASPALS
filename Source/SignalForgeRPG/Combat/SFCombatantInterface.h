@@ -55,6 +55,7 @@ public:
 	void GetCombatStateTags(FGameplayTagContainer& OutTags) const;
 
 	/** Called by the hit resolver after damage is applied so the target can remember who hit it (XP, death attribution). */
+	/* InInstigator is named with the In-prefix to avoid shadowing AActor::Instigator (the TObjectPtr<APawn> on every actor). */
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Combat|Combatant")
-	void RegisterDamageInstigator(AActor* Instigator);
+	void RegisterDamageInstigator(AActor* InInstigator);
 };
