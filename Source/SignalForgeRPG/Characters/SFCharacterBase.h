@@ -40,6 +40,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(
 	TSubclassOf<UAnimInstance>, NewLayerClass,
 	TSubclassOf<UAnimInstance>, PreviousLayerClass);
 
+// ESFGait and FSFGaitSpeedProfile live in SFAnimationTypes.h so the anim
+// instance can mirror Gait as a UPROPERTY without a circular include.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSFGaitChangedSignature, ESFGait, NewGait, ESFGait, PreviousGait);
+
 // Broadcast once at the top of HandleDeath(). Listeners receive the
 // character that died and the character that dealt the killing blow
 // (Killer may be null for environmental / scripted deaths).
@@ -357,6 +361,68 @@ public:
 	void OnLocomotionIntentChanged();
 	virtual void OnLocomotionIntentChanged_Implementation() {}
 
+	// -------------------------------------------------------------------------
+	// Gait (agnostic locomotion surface)
+	//
+	// Lifted out of CBP_SandboxCharacter so ABP_Biped can read gait through
+	// USFAnimInstanceBase::Gait without casting to any specific BP class.
+	// Player BP overrides UpdateMovement_PreCMC for its GASP curve graph;
+	// NPCs work out-of-the-box with the C++ default implementation.
+	// -------------------------------------------------------------------------
+
+	/** Per-character movement tuning bundle. Editable per CDO / BP. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Locomotion|Gait")
+	FSFGaitSpeedProfile GaitProfile;
+
+	/** Current locomotion gait. Read on the game thread; mirrored into the anim instance per tick. */
+	UFUNCTION(BlueprintPure, Category = "Animation|Locomotion|Gait")
+	ESFGait GetCurrentGait() const { return CurrentGait; }
+
+	/** Authoritative gait setter. Fires OnGaitChanged on transition only. */
+	UFUNCTION(BlueprintCallable, Category = "Animation|Locomotion|Gait")
+	void SetCurrentGait(ESFGait NewGait);
+
+	UPROPERTY(BlueprintAssignable, Category = "Animation|Locomotion|Gait")
+	FOnSFGaitChangedSignature OnGaitChanged;
+
+	/** GaitProfile lookup keyed by gait. CrouchSpeed lives outside the switch (CMC handles bIsCrouched separately). */
+	UFUNCTION(BlueprintPure, Category = "Animation|Locomotion|Gait")
+	float GetMaxSpeedForGait(ESFGait Gait) const;
+
+	/**
+	 * Compute the gait the character would like to be in right now based on
+	 * intent flags and CanSprint(). BlueprintNativeEvent so the player BP can
+	 * substitute its own curve-driven evaluator if desired.
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Animation|Locomotion|Gait")
+	ESFGait GetDesiredGait() const;
+	virtual ESFGait GetDesiredGait_Implementation() const;
+
+	/**
+	 * Gate the Sprint state. Default: not dead, not falling, not crouched.
+	 * Subclasses can layer stamina / status-effect gates on top.
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Animation|Locomotion|Gait")
+	bool CanSprint() const;
+	virtual bool CanSprint_Implementation() const;
+
+	/**
+	 * Per-tick locomotion brain. Called from ASFCharacterBase::Tick BEFORE the
+	 * CharacterMovementComponent ticks (hence _PreCMC), so any speed / accel /
+	 * friction change lands in the same frame's movement update.
+	 *
+	 * Default implementation:
+	 *   1. SetCurrentGait(GetDesiredGait())
+	 *   2. Push GaitProfile values into the CharacterMovementComponent.
+	 *
+	 * CBP_SandboxCharacter overrides this in BP to keep its existing GASP
+	 * curve graph; just have the override call SetCurrentGait(GetDesiredGait())
+	 * at the top.
+	 */
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Animation|Locomotion|Gait")
+	void UpdateMovement_PreCMC(float DeltaTime);
+	virtual void UpdateMovement_PreCMC_Implementation(float DeltaTime);
+
 	UFUNCTION(BlueprintPure, Category = "Animation|Weapon")
 	const FSFWeaponAnimationProfile& GetCurrentWeaponAnimationProfile() const
 	{
@@ -610,6 +676,11 @@ protected:
 	bool bIsDead = false;
 
 	private:
+
+		// Authoritative gait state. Read via GetCurrentGait(); written via
+		// SetCurrentGait() so OnGaitChanged fires on transition only.
+		UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion|Gait", meta = (AllowPrivateAccess = "true"))
+		ESFGait CurrentGait = ESFGait::Run;
 
 		// Animation-facing weapon state shared by all characters
 		UPROPERTY(Transient)

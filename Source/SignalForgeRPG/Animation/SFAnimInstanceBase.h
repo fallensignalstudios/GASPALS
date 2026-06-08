@@ -164,6 +164,14 @@ private:
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
     bool bWantsToStrafe = false;
 
+    /**
+     * Mirrored from ASFCharacterBase::GetCurrentGait() every tick so ABP_Biped
+     * can read gait through Property Access without casting to any specific
+     * character BP class. Driven by ASFCharacterBase::UpdateMovement_PreCMC.
+     */
+    UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|Locomotion", meta = (AllowPrivateAccess = "true"))
+    ESFGait Gait = ESFGait::Run;
+
     UPROPERTY(Transient, BlueprintReadOnly, Category = "Animation|State", meta = (AllowPrivateAccess = "true"))
     TObjectPtr<UAnimSequenceBase> IdleOverride = nullptr;
 
