@@ -23,7 +23,7 @@
 
 struct FSFHitData;
 
-UINTERFACE(MinimalAPI, Blueprintable)
+UINTERFACE(MinimalAPI)
 class USFCombatantInterface : public UInterface
 {
 	GENERATED_BODY()
@@ -34,28 +34,32 @@ class SIGNALFORGERPG_API ISFCombatantInterface
 	GENERATED_BODY()
 
 public:
+	// NOTE on call convention:
+	//   Plain C++ pure-virtuals, NOT BlueprintNativeEvents. The codebase has
+	//   dozens of direct "Char->IsDead()" call sites (AI BT, regen tick, HUD,
+	//   companion state machine, ...). UFUNCTION + BlueprintNativeEvent on a
+	//   UInterface would route those direct calls through the UHT-generated
+	//   event stub, which asserts at runtime ("Do not directly call Event
+	//   functions in Interfaces. Call Execute_... instead."). Tripped first by
+	//   SFStatRegenComponent::TickRegen() on the very first stat regen tick.
+	//   See SFWeaponHolderInterface.h for the same pattern / rationale.
+
 	/** True if this combatant has been killed and should not be re-damaged or re-targeted. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Combat|Combatant")
-	bool IsDead() const;
+	virtual bool IsDead() const = 0;
 
 	/** True if the combatant is currently in a defensive block stance. Read-only -- damage gating is decided by the hit resolver, not here. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Combat|Combatant")
-	bool IsBlocking() const;
+	virtual bool IsBlocking() const = 0;
 
 	/** World location to aim at (auto-aim, projectile homing). Default impl returns actor location; characters override to center-of-mass. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Combat|Combatant")
-	FVector GetCombatLocation() const;
+	virtual FVector GetCombatLocation() const = 0;
 
 	/** Best-effort socket lookup for hit FX / targeting (e.g. "head", "spine_03"). Returns actor transform if socket is unknown. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Combat|Combatant")
-	FTransform GetCombatSocketTransform(FName SocketName) const;
+	virtual FTransform GetCombatSocketTransform(FName SocketName) const = 0;
 
 	/** Read combatant state as a tag container (useful for ability activation policies). */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Combat|Combatant")
-	void GetCombatStateTags(FGameplayTagContainer& OutTags) const;
+	virtual void GetCombatStateTags(FGameplayTagContainer& OutTags) const = 0;
 
 	/** Called by the hit resolver after damage is applied so the target can remember who hit it (XP, death attribution). */
 	/* InInstigator is named with the In-prefix to avoid shadowing AActor::Instigator (the TObjectPtr<APawn> on every actor). */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Combat|Combatant")
-	void RegisterDamageInstigator(AActor* InInstigator);
+	virtual void RegisterDamageInstigator(AActor* InInstigator) = 0;
 };

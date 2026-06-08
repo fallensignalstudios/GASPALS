@@ -315,13 +315,11 @@ void USFPlayerHUDWidgetController::OnInactivityTimerExpired()
 
 UTextureRenderTarget2D* USFPlayerHUDWidgetController::GetPortraitRenderTarget() const
 {
-	// Execute_* dispatch requires non-const AActor*. This getter is const but the
-	// dispatch is logically a read of the avatar's render target -- const_cast
-	// matches the existing pattern (see line ~81 in this file).
-	if (PlayerCharacter && PlayerCharacter->Implements<USFPlayerAvatarInterface>())
+	// GetPortraitRenderTarget() is const on the interface, so we route through a
+	// const ISFPlayerAvatarInterface* without any const_cast trickery.
+	if (const ISFPlayerAvatarInterface* AvatarInterface = Cast<const ISFPlayerAvatarInterface>(PlayerCharacter.Get()))
 	{
-		return ISFPlayerAvatarInterface::Execute_GetPortraitRenderTarget(
-			const_cast<AActor*>(static_cast<const AActor*>(PlayerCharacter.Get())));
+		return AvatarInterface->GetPortraitRenderTarget();
 	}
 	return nullptr;
 }

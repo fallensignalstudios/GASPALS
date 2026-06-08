@@ -305,9 +305,9 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 	// in world without being harmed). The projectile will still detonate per
 	// its normal lifecycle (radial impact + cleanup are handled by the caller).
 	bool bSuppressDamage = false;
-	if (OtherActor && OtherActor->Implements<USFCombatantInterface>())
+	if (ISFCombatantInterface* OtherCombatant = Cast<ISFCombatantInterface>(OtherActor))
 	{
-		if (ISFCombatantInterface::Execute_IsDead(OtherActor))
+		if (OtherCombatant->IsDead())
 		{
 			bSuppressDamage = true;
 #if !UE_BUILD_SHIPPING
@@ -399,9 +399,9 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 				// Attribute the kill to the shooter on ANY combatant we damage.
 				// Faction hostility was already verified above, so this is the
 				// right place to record attribution.
-				if (OtherActor && OtherActor->Implements<USFCombatantInterface>())
+				if (ISFCombatantInterface* OtherCombatantForAttribution = Cast<ISFCombatantInterface>(OtherActor))
 				{
-					ISFCombatantInterface::Execute_RegisterDamageInstigator(OtherActor, SourceActor);
+					OtherCombatantForAttribution->RegisterDamageInstigator(SourceActor);
 				}
 
 				SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);

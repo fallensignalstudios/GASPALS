@@ -36,12 +36,9 @@ public:
 
 	// GetDialogueComponent / GetDialogueCameraRoot / GetDialogueCamera /
 	// GetGameplayCamera / GetPortraitRenderTarget / ApplyRecoilKick are
-	// exposed via ISFPlayerAvatarInterface. UHT generates the BlueprintCallable
-	// wrappers from the interface; a redundant inline UFUNCTION here would
-	// trigger "function redefinition" (same pattern as Slice 1's IsDead and
-	// Slice 2's GetEquipmentComponent). Direct C++ callers still resolve
-	// through the UHT-generated virtual, and Blueprint nodes resolve to the
-	// same wrapper, so existing BP UI continues to work unchanged.
+	// exposed via ISFPlayerAvatarInterface as plain C++ pure-virtuals (NOT
+	// BlueprintNativeEvents -- see SFCombatantInterface.h for rationale).
+	// Overrides below dispatch through normal C++ virtuals.
 
 	UFUNCTION(BlueprintPure, Category = "Dialogue")
 	USFDialogueCameraComponent* GetDialogueCameraComponent() const { return DialogueCameraComponent; }
@@ -113,11 +110,11 @@ public:
 	// ISFPlayerAvatarInterface
 	// -------------------------------------------------------------------------
 
-	virtual USFDialogueComponent* GetDialogueComponent_Implementation() const override { return DialogueComponent; }
-	virtual USceneComponent* GetDialogueCameraRoot_Implementation() const override { return DialogueCameraRoot; }
-	virtual UCameraComponent* GetDialogueCamera_Implementation() const override { return DialogueCamera; }
-	virtual UCameraComponent* GetGameplayCamera_Implementation() const override;
-	virtual UTextureRenderTarget2D* GetPortraitRenderTarget_Implementation() const override { return PortraitRenderTarget; }
+	virtual USFDialogueComponent* GetDialogueComponent() const override { return DialogueComponent; }
+	virtual USceneComponent* GetDialogueCameraRoot() const override { return DialogueCameraRoot; }
+	virtual UCameraComponent* GetDialogueCamera() const override { return DialogueCamera; }
+	virtual UCameraComponent* GetGameplayCamera() const override;
+	virtual UTextureRenderTarget2D* GetPortraitRenderTarget() const override { return PortraitRenderTarget; }
 
 	/** Queue a smoothly-interpolated recoil kick. Call this from the WeaponFire ability
 	 *  once per shot — the character ticks the pitch/yaw offset over time so the camera
@@ -125,7 +122,7 @@ public:
 	 *  view UP (negative pitch in UE controller-space), YawDegrees may be positive or
 	 *  negative. InterpSpeed controls kick-on speed, RecoverySpeed controls return,
 	 *  RecoveryFraction is how much of the kick the return ultimately recovers. */
-	virtual void ApplyRecoilKick_Implementation(
+	virtual void ApplyRecoilKick(
 		float PitchDegrees,
 		float YawDegrees,
 		float InterpSpeed,

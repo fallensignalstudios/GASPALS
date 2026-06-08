@@ -644,7 +644,7 @@ void ASFCharacterBase::SetLastDamagingCharacter(ASFCharacterBase* InCharacter)
 // ISFCombatantInterface
 // -----------------------------------------------------------------------------
 
-FVector ASFCharacterBase::GetCombatLocation_Implementation() const
+FVector ASFCharacterBase::GetCombatLocation() const
 {
 	// Mid-capsule (center-of-mass) is a better aim target than actor origin (feet).
 	if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
@@ -654,7 +654,7 @@ FVector ASFCharacterBase::GetCombatLocation_Implementation() const
 	return GetActorLocation();
 }
 
-FTransform ASFCharacterBase::GetCombatSocketTransform_Implementation(FName SocketName) const
+FTransform ASFCharacterBase::GetCombatSocketTransform(FName SocketName) const
 {
 	if (const USkeletalMeshComponent* SkelMesh = GetMesh())
 	{
@@ -666,7 +666,7 @@ FTransform ASFCharacterBase::GetCombatSocketTransform_Implementation(FName Socke
 	return GetActorTransform();
 }
 
-void ASFCharacterBase::GetCombatStateTags_Implementation(FGameplayTagContainer& OutTags) const
+void ASFCharacterBase::GetCombatStateTags(FGameplayTagContainer& OutTags) const
 {
 	if (const USFAbilitySystemComponent* ASC = AbilitySystemComponent.Get())
 	{
@@ -674,7 +674,7 @@ void ASFCharacterBase::GetCombatStateTags_Implementation(FGameplayTagContainer& 
 	}
 }
 
-void ASFCharacterBase::RegisterDamageInstigator_Implementation(AActor* InInstigator)
+void ASFCharacterBase::RegisterDamageInstigator(AActor* InInstigator)
 {
 	// Only characters are tracked for XP/death attribution; non-character
 	// damage sources (turrets, traps) intentionally leave LastDamagingCharacter
@@ -944,7 +944,7 @@ void ASFCharacterBase::HandleBlockTagChanged(const FGameplayTag Tag, int32 NewCo
 	OnBlockTagChanged(bHasBlockTag);
 }
 
-FSFResolvedHit ASFCharacterBase::ResolveIncomingHit_Implementation(const FSFHitData& HitData)
+FSFResolvedHit ASFCharacterBase::ResolveIncomingHit(const FSFHitData& HitData)
 {
 	FSFResolvedHit Result;
 

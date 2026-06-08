@@ -173,10 +173,13 @@ float USFAutoAimComponent::ScoreCandidate(const AActor* Candidate, const FVector
 
 	// Dead combatants don't auto-aim. Routed through the interface so any future combatant type
 	// (vehicles, mechs, etc.) can supply its own death predicate without touching auto-aim.
-	// Execute_IsDead requires non-const AActor*; cast away const for the dispatch \u2014 we don't mutate.
-	if (ISFCombatantInterface::Execute_IsDead(const_cast<AActor*>(Candidate)))
+	// IsDead() is const on the interface, so we can dispatch through a const ISFCombatantInterface*.
+	if (const ISFCombatantInterface* CandidateCombatant = Cast<const ISFCombatantInterface>(Candidate))
 	{
-		return -1.0f;
+		if (CandidateCombatant->IsDead())
+		{
+			return -1.0f;
+		}
 	}
 
 	// Faction gate: must be hostile to self. If the faction system isn't wired up on either side,

@@ -71,7 +71,7 @@ public:
 	// ISFHitResolverInterface
 	// -------------------------------------------------------------------------
 
-	virtual FSFResolvedHit ResolveIncomingHit_Implementation(const FSFHitData& HitData) override;
+	virtual FSFResolvedHit ResolveIncomingHit(const FSFHitData& HitData) override;
 
 	// -------------------------------------------------------------------------
 	// Accessors
@@ -145,12 +145,12 @@ public:
 	// ISFCombatantInterface
 	// -------------------------------------------------------------------------
 
-	virtual bool IsDead_Implementation() const override { return bIsDead; }
-	virtual bool IsBlocking_Implementation() const override { return bAnimIsBlocking; }
-	virtual FVector GetCombatLocation_Implementation() const override;
-	virtual FTransform GetCombatSocketTransform_Implementation(FName SocketName) const override;
-	virtual void GetCombatStateTags_Implementation(FGameplayTagContainer& OutTags) const override;
-	virtual void RegisterDamageInstigator_Implementation(AActor* InInstigator) override;
+	virtual bool IsDead() const override { return bIsDead; }
+	virtual bool IsBlocking() const override { return bAnimIsBlocking; }
+	virtual FVector GetCombatLocation() const override;
+	virtual FTransform GetCombatSocketTransform(FName SocketName) const override;
+	virtual void GetCombatStateTags(FGameplayTagContainer& OutTags) const override;
+	virtual void RegisterDamageInstigator(AActor* InInstigator) override;
 
 	// -------------------------------------------------------------------------
 	// ISFWeaponHolderInterface

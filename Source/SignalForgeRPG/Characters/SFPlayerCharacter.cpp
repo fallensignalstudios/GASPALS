@@ -435,7 +435,7 @@ void ASFPlayerCharacter::Tick(float DeltaTime)
 	UpdateRecoil(DeltaTime);
 }
 
-void ASFPlayerCharacter::ApplyRecoilKick_Implementation(
+void ASFPlayerCharacter::ApplyRecoilKick(
 	float PitchDegrees,
 	float YawDegrees,
 	float InterpSpeed,
@@ -1110,7 +1110,7 @@ void ASFPlayerCharacter::SetTargetZoomDistance(float NewTargetDistance, bool bRe
 	TargetZoomDistance = NewTargetDistance;
 }
 
-UCameraComponent* ASFPlayerCharacter::GetGameplayCamera_Implementation() const
+UCameraComponent* ASFPlayerCharacter::GetGameplayCamera() const
 {
 	// Find the Blueprint camera named "GameplayCamera"
 	TArray<UCameraComponent*> Cameras;
