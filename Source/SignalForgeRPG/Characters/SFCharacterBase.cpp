@@ -1262,6 +1262,34 @@ FGameplayTag ASFCharacterBase::GetCharacterFormTag_Implementation() const
 	return FGameplayTag();
 }
 
+FVector ASFCharacterBase::GetHeadLookAtLocation_Implementation(bool& bOutValid) const
+{
+	// Default implementation: prefer the "head" socket on the skeletal mesh so
+	// AI / cameras / dialogue can aim at the character's face without each
+	// caller having to special-case sockets. Falls back to actor location +
+	// half-height (top-of-capsule) so something sensible always returns.
+	//
+	// Subclasses (or BPs that override the BlueprintNativeEvent) can swap in
+	// a bone, a scene component, or a runtime-computed point.
+	if (const USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		static const FName HeadSocketName(TEXT("head"));
+		if (MeshComp->DoesSocketExist(HeadSocketName))
+		{
+			bOutValid = true;
+			return MeshComp->GetSocketLocation(HeadSocketName);
+		}
+	}
+
+	bOutValid = false;
+	FVector FallbackLocation = GetActorLocation();
+	if (const UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		FallbackLocation.Z += Capsule->GetScaledCapsuleHalfHeight();
+	}
+	return FallbackLocation;
+}
+
 // =============================================================================
 // Gait (agnostic locomotion surface)
 //
