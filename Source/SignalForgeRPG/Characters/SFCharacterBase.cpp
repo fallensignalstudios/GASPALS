@@ -85,7 +85,6 @@ ASFCharacterBase::ASFCharacterBase()
 	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
 	{
 		Capsule->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-		Capsule->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Block);  // MeleeTrace
 	}
 }
 
@@ -276,6 +275,13 @@ void ASFCharacterBase::Tick(float DeltaTime)
 		const bool bGamePaused = GetWorld() && GetWorld()->IsPaused();
 		AbilitySystemComponent->ProcessAbilityInput(DeltaTime, bGamePaused);
 	}
+
+	// Per-tick locomotion brain. Runs BEFORE the CharacterMovementComponent
+	// ticks (Character's Tick runs ahead of CMC's component tick by default)
+	// so any speed / accel / friction change lands in this frame's movement.
+	// BlueprintNativeEvent: player BP overrides to keep its GASP curve graph;
+	// NPCs use the C++ default in UpdateMovement_PreCMC_Implementation.
+	UpdateMovement_PreCMC(DeltaTime);
 }
 
 void ASFCharacterBase::PossessedBy(AController* NewController)
@@ -1256,8 +1262,90 @@ FGameplayTag ASFCharacterBase::GetCharacterFormTag_Implementation() const
 	return FGameplayTag();
 }
 
-FVector ASFCharacterBase::GetHeadLookAtLocation_Implementation(bool& bIsValid) const
+// =============================================================================
+// Gait (agnostic locomotion surface)
+//
+// Lifted out of CBP_SandboxCharacter so ABP_Biped can drive locomotion through
+// USFAnimInstanceBase::Gait without casting to any specific BP class. NPCs use
+// the defaults below with zero per-class wiring; the player BP overrides
+// UpdateMovement_PreCMC to keep its GASP curve graph.
+// =============================================================================
+
+void ASFCharacterBase::SetCurrentGait(ESFGait NewGait)
 {
-	bIsValid = false;
-	return GetActorLocation() + FVector(0.f, 0.f, BaseEyeHeight);
+	if (CurrentGait == NewGait)
+	{
+		return;
+	}
+
+	const ESFGait PreviousGait = CurrentGait;
+	CurrentGait = NewGait;
+	OnGaitChanged.Broadcast(CurrentGait, PreviousGait);
+}
+
+float ASFCharacterBase::GetMaxSpeedForGait(ESFGait Gait) const
+{
+	switch (Gait)
+	{
+	case ESFGait::Walk:		return GaitProfile.WalkSpeed;
+	case ESFGait::Sprint:	return GaitProfile.SprintSpeed;
+	case ESFGait::Run:
+	default:				return GaitProfile.RunSpeed;
+	}
+}
+
+ESFGait ASFCharacterBase::GetDesiredGait_Implementation() const
+{
+	// Walk intent always wins -- player explicitly toggled walk.
+	if (bWantsToWalk)
+	{
+		return ESFGait::Walk;
+	}
+
+	// Sprint intent gated by CanSprint() (dead / falling / crouched lockouts).
+	if (bWantsToSprint && CanSprint())
+	{
+		return ESFGait::Sprint;
+	}
+
+	return ESFGait::Run;
+}
+
+bool ASFCharacterBase::CanSprint_Implementation() const
+{
+	if (bIsDead || bIsCrouched)
+	{
+		return false;
+	}
+
+	if (const UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		if (MoveComp->IsFalling())
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void ASFCharacterBase::UpdateMovement_PreCMC_Implementation(float /*DeltaTime*/)
+{
+	// 1. Resolve desired gait from intent + gates and publish it. SetCurrentGait
+	//    only broadcasts on transition, so this is cheap to call every frame.
+	SetCurrentGait(GetDesiredGait());
+
+	// 2. Push the active gait's tuning into the CharacterMovementComponent so
+	//    the same-frame movement update uses the right speed / accel / friction.
+	UCharacterMovementComponent* MoveComp = GetCharacterMovement();
+	if (!MoveComp)
+	{
+		return;
+	}
+
+	MoveComp->MaxWalkSpeed = GetMaxSpeedForGait(CurrentGait);
+	MoveComp->MaxWalkSpeedCrouched = GaitProfile.CrouchSpeed;
+	MoveComp->MaxAcceleration = GaitProfile.MaxAcceleration;
+	MoveComp->BrakingDecelerationWalking = GaitProfile.BrakingDeceleration;
+	MoveComp->GroundFriction = GaitProfile.GroundFriction;
 }

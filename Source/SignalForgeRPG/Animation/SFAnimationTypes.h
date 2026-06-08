@@ -16,6 +16,55 @@ enum class ESFLocomotionState : uint8
 	InAir	UMETA(DisplayName = "In Air")
 };
 
+/**
+ * Agnostic locomotion gait. Defined here (rather than in SFCharacterBase.h)
+ * because the anim instance needs to mirror it as a UPROPERTY and including
+ * SFCharacterBase.h from SFAnimInstanceBase.h would be circular.
+ *
+ * Drives ASFCharacterBase::UpdateMovement_PreCMC and is mirrored into
+ * USFAnimInstanceBase::Gait every tick so ABP_Biped can read it through the
+ * anim instance without casting to any specific character BP.
+ */
+UENUM(BlueprintType)
+enum class ESFGait : uint8
+{
+	Walk	UMETA(DisplayName = "Walk"),
+	Run		UMETA(DisplayName = "Run"),
+	Sprint	UMETA(DisplayName = "Sprint")
+};
+
+/**
+ * Per-character movement tuning bundle consumed by
+ * ASFCharacterBase::UpdateMovement_PreCMC. Replaces ad-hoc scalars on
+ * individual character blueprints so NPC AI works with zero BP wiring.
+ */
+USTRUCT(BlueprintType)
+struct FSFGaitSpeedProfile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gait", meta = (ClampMin = "0.0"))
+	float WalkSpeed = 175.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gait", meta = (ClampMin = "0.0"))
+	float RunSpeed = 375.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gait", meta = (ClampMin = "0.0"))
+	float SprintSpeed = 650.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gait", meta = (ClampMin = "0.0"))
+	float CrouchSpeed = 150.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gait", meta = (ClampMin = "0.0"))
+	float MaxAcceleration = 800.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gait", meta = (ClampMin = "0.0"))
+	float BrakingDeceleration = 1500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Gait", meta = (ClampMin = "0.0"))
+	float GroundFriction = 5.f;
+};
+
 UENUM(BlueprintType)
 enum class ESFOverlayMode : uint8
 {
