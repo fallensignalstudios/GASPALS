@@ -82,6 +82,10 @@ public:
 	FGameplayTag State_ParryCooldown;
 	FGameplayTag State_Invulnerable;
 	FGameplayTag State_Healing;
+	/** Applied as a loose tag at the top of HandleDeath(). Used as a BlockedTag on
+	 *  offensive abilities so corpses can't keep firing. Stays on the ASC for the
+	 *  remainder of the actor's lifespan. */
+	FGameplayTag State_Dead;
 
 	/** Cinematic / hit feedback */
 	FGameplayTag Cue_Hit_Impact;
@@ -91,6 +95,13 @@ public:
 	FGameplayTag Cue_Hit_Parry;
 	FGameplayTag Cue_Hit_GuardBreak;
 	FGameplayTag Cue_Hit_Finisher;
+
+	/** Shield feedback cues. Fired by the damage path when a hit is absorbed by
+	 *  shields (Impact) or fully depletes them (Break). Params.Location is the
+	 *  world-space hit point so the GameplayCueNotify can place a Niagara system
+	 *  exactly where the bullet landed. Params.Normal is the impact normal. */
+	FGameplayTag Cue_Shield_Impact;
+	FGameplayTag Cue_Shield_Break;
 
 	/** Hit reaction direction (relative to target's forward) */
 	FGameplayTag HitReact_Direction_Front;

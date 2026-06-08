@@ -244,6 +244,10 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 		FName("State.Invulnerable"),
 		TEXT("Character is fully invulnerable to incoming damage"));
 
+	GameplayTags.State_Dead = TagManager.AddNativeGameplayTag(
+		FName("State.Dead"),
+		TEXT("Character is dead. Applied as a loose tag at the top of HandleDeath() and used as a BlockedTag on offensive abilities so corpses can't keep firing."));
+
 	/** Cinematic / hit feedback cues */
 	GameplayTags.Cue_Hit_Impact = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Hit.Impact"),
@@ -272,6 +276,14 @@ void FSignalForgeGameplayTags::InitializeNativeGameplayTags()
 	GameplayTags.Cue_Hit_Finisher = TagManager.AddNativeGameplayTag(
 		FName("GameplayCue.Hit.Finisher"),
 		TEXT("Finisher / execution cinematic cue"));
+
+	GameplayTags.Cue_Shield_Impact = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Shield.Impact"),
+		TEXT("Bullet/projectile absorbed by shields. Params.Location = world hit point, Params.Normal = impact normal, Params.RawMagnitude = damage absorbed by shields."));
+
+	GameplayTags.Cue_Shield_Break = TagManager.AddNativeGameplayTag(
+		FName("GameplayCue.Shield.Break"),
+		TEXT("Shields just dropped to zero from a hit. Fires once per break cycle (re-arms when shields regen back above zero). Params.Location = the hit that broke them, Params.Normal = impact normal."));
 
 	/** Hit reaction direction */
 	GameplayTags.HitReact_Direction_Front = TagManager.AddNativeGameplayTag(

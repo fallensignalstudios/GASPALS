@@ -89,6 +89,20 @@ public:
 		return ActivationSFX;
 	}
 
+	/**
+	 * Dispatch shield-impact / shield-break gameplay cues on the target ASC based on the
+	 * shields delta around a damage application. Call BEFORE damage to capture
+	 * ShieldsBefore, then AFTER damage with the same TargetASC + the cached value.
+	 *
+	 * - If shields decreased at all -> fires Cue_Shield_Impact with the hit location.
+	 * - If shields went from >0 to 0 -> additionally fires Cue_Shield_Break and the
+	 *   ASFCharacterBase::BP_OnShieldBroken BlueprintImplementableEvent on the target.
+	 */
+	static void DispatchShieldHitCues(
+		class UAbilitySystemComponent* TargetASC,
+		float ShieldsBefore,
+		const FGameplayCueParameters& CueParams);
+
 protected:
 	virtual void OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;
 	virtual void OnRemoveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec) override;

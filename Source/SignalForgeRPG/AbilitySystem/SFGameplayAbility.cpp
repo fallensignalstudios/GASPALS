@@ -1,6 +1,9 @@
 #include "AbilitySystem/SFGameplayAbility.h"
 
 #include "AbilitySystemComponent.h"
+#include "Characters/SFCharacterBase.h"
+#include "Core/SFAttributeSetBase.h"
+#include "Core/SignalForgeGameplayTags.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
@@ -12,6 +15,56 @@
 USFGameplayAbility::USFGameplayAbility()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+
+	// Universal: nothing on a dead actor activates. This is set on the base so
+	// every SF ability (offensive, utility, AI-only) inherits the block; the
+	// matching State.Dead loose tag is applied at the top of
+	// ASFCharacterBase::HandleDeath() and stays for the corpse's lifespan.
+	// Derived ctors that build their own ActivationBlockedTags container should
+	// add the same tag back -- see the WeaponFire/Beam/Reload constructors.
+	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+	if (Tags.State_Dead.IsValid())
+	{
+		ActivationBlockedTags.AddTag(Tags.State_Dead);
+	}
+}
+
+void USFGameplayAbility::DispatchShieldHitCues(
+	UAbilitySystemComponent* TargetASC,
+	float ShieldsBefore,
+	const FGameplayCueParameters& CueParams)
+{
+	if (!TargetASC)
+	{
+		return;
+	}
+
+	const float ShieldsAfter = TargetASC->GetNumericAttribute(USFAttributeSetBase::GetShieldsAttribute());
+	const bool bShieldsDamaged = ShieldsAfter < ShieldsBefore;
+	if (!bShieldsDamaged)
+	{
+		return;
+	}
+
+	const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
+	if (Tags.Cue_Shield_Impact.IsValid())
+	{
+		TargetASC->ExecuteGameplayCue(Tags.Cue_Shield_Impact, CueParams);
+	}
+
+	const bool bShieldsBroke = ShieldsBefore > 0.0f && ShieldsAfter <= 0.0f;
+	if (bShieldsBroke)
+	{
+		if (Tags.Cue_Shield_Break.IsValid())
+		{
+			TargetASC->ExecuteGameplayCue(Tags.Cue_Shield_Break, CueParams);
+		}
+
+		if (ASFCharacterBase* TargetChar = Cast<ASFCharacterBase>(TargetASC->GetAvatarActor()))
+		{
+			TargetChar->BP_OnShieldBroken(CueParams.Location, CueParams.Normal);
+		}
+	}
 }
 
 void USFGameplayAbility::OnGiveAbility(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)

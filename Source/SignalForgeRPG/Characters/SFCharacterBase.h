@@ -250,6 +250,15 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "UI")
 	FOnSFAttributeChangedSignature OnShieldsChanged;
 
+	/**
+	 * Fired the moment shields go from >0 to 0 ("shield break"). Lets Blueprints
+	 * spawn a Niagara burst at the hit location, play break SFX, kick the
+	 * shield-bubble mesh, etc. Cue_Shield_Break is also broadcast on the ASC at
+	 * the same time for any GameplayCueNotify_Static FX wired to the cue tag.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Combat|Shield", meta = (DisplayName = "BP On Shield Broken"))
+	void BP_OnShieldBroken(const FVector& HitLocation, const FVector& HitNormal);
+
 	UPROPERTY(BlueprintAssignable, Category = "UI")
 	FOnSFAttributeChangedSignature OnStaminaChanged;
 

@@ -13,6 +13,7 @@
 #include "Combat/SFWeaponData.h"
 #include "Combat/SFWeaponInstanceTypes.h"
 #include "Components/SFEquipmentComponent.h"
+#include "Core/SFAttributeSetBase.h"
 #include "Core/SignalForgeGameplayTags.h"
 #include "Faction/SFFactionStatics.h"
 #include "Engine/World.h"
@@ -45,6 +46,7 @@ USFGameplayAbility_WeaponBeam::USFGameplayAbility_WeaponBeam()
 	FGameplayTagContainer BlockedTags;
 	BlockedTags.AddTag(Tags.State_Weapon_Switching);
 	BlockedTags.AddTag(Tags.State_Weapon_MeleeSwinging);
+	BlockedTags.AddTag(Tags.State_Dead);
 	ActivationBlockedTags = BlockedTags;
 
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -545,6 +547,12 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 
 	const float FinalDamage = BeamConfig.DamagePerTick * FalloffMult * HeadshotMult;
 
+	// Snapshot shields BEFORE per-tick damage so beam contact can fire shield
+	// impact/break cues at the beam's terminal point exactly when shields move.
+	const float ShieldsBefore = TargetASC
+		? TargetASC->GetNumericAttribute(USFAttributeSetBase::GetShieldsAttribute())
+		: 0.0f;
+
 	if (SourceASC && TargetASC && EffectClass && FinalDamage > 0.0f)
 	{
 		FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
@@ -600,6 +608,20 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 	if (TargetActor->Implements<USFCombatantInterface>())
 	{
 		ISFCombatantInterface::Execute_RegisterDamageInstigator(TargetActor, Character);
+	}
+
+	// Shield-impact / shield-break VFX at the beam terminal point. Helper no-ops
+	// if shields did not move this tick (no shields, or beam burned past them).
+	if (TargetASC)
+	{
+		FGameplayCueParameters CueParams;
+		CueParams.Instigator = Character;
+		CueParams.EffectCauser = Character;
+		CueParams.Location = Hit.ImpactPoint;
+		CueParams.Normal = Hit.ImpactNormal;
+		CueParams.PhysicalMaterial = Hit.PhysMaterial;
+		CueParams.RawMagnitude = FinalDamage;
+		DispatchShieldHitCues(TargetASC, ShieldsBefore, CueParams);
 	}
 }
 

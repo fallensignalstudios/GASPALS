@@ -33,6 +33,7 @@ USFGameplayAbility_Reload::USFGameplayAbility_Reload()
 	BlockedTags.AddTag(Tags.Ability_Weapon_MeleeHeavy);
 	BlockedTags.AddTag(Tags.State_Weapon_Switching);
 	BlockedTags.AddTag(Tags.State_Weapon_MeleeSwinging);
+	BlockedTags.AddTag(Tags.State_Dead);
 	ActivationBlockedTags = BlockedTags;
 
 	FGameplayTagContainer GrantedTags;
