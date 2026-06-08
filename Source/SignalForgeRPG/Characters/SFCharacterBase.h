@@ -83,13 +83,12 @@ public:
 	USFStatRegenComponent* GetStatRegenComponent()            const { return StatRegenComponent; }
 	USFProgressionComponent* GetProgressionComponent()        const { return ProgressionComponent; }
 
-	// GetEquipmentComponent / GetAmmoReserveComponent are now exposed via the
-	// ISFWeaponHolderInterface contract; UHT generates the BlueprintCallable
-	// wrappers from the interface declaration, so a redundant inline UFUNCTION
-	// here would trigger a "function redefinition" UHT error. The
-	// _Implementation overrides further below supply the bodies, and direct
-	// C++ callers (Char->GetEquipmentComponent()) still resolve through the
-	// virtual the interface emits.
+	// GetEquipmentComponent / GetAmmoReserveComponent / GetActiveMuzzleTransform
+	// are exposed via the ISFWeaponHolderInterface contract as plain C++
+	// pure-virtuals (see SFWeaponHolderInterface.h's note on call convention --
+	// they are intentionally NOT BlueprintNativeEvents). Overrides live below;
+	// direct C++ callers (Char->GetEquipmentComponent()) resolve through normal
+	// virtual dispatch.
 
 	UFUNCTION(BlueprintPure, Category = "Components")
 	USFInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
@@ -157,9 +156,9 @@ public:
 	// ISFWeaponHolderInterface
 	// -------------------------------------------------------------------------
 
-	virtual USFEquipmentComponent* GetEquipmentComponent_Implementation() const override { return EquipmentComponent; }
-	virtual USFAmmoReserveComponent* GetAmmoReserveComponent_Implementation() const override { return AmmoReserveComponent; }
-	virtual bool GetActiveMuzzleTransform_Implementation(FTransform& OutTransform) const override;
+	virtual USFEquipmentComponent* GetEquipmentComponent() const override { return EquipmentComponent; }
+	virtual USFAmmoReserveComponent* GetAmmoReserveComponent() const override { return AmmoReserveComponent; }
+	virtual bool GetActiveMuzzleTransform(FTransform& OutTransform) const override;
 
 	// -------------------------------------------------------------------------
 	// Movement
