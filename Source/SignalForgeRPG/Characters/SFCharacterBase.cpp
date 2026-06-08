@@ -738,10 +738,12 @@ void ASFCharacterBase::HandleDeath()
 	// firing weapons or swinging melee.
 	if (AbilitySystemComponent)
 	{
-		const FSignalForgeGameplayTags& Tags = FSignalForgeGameplayTags::Get();
-		if (Tags.State_Dead.IsValid())
+		// Renamed to SFTags to avoid shadowing AActor::Tags (TArray<FName>) under
+		// -WX (C4458). UBT promotes the shadow warning to a hard error on MSVC.
+		const FSignalForgeGameplayTags& SFTags = FSignalForgeGameplayTags::Get();
+		if (SFTags.State_Dead.IsValid())
 		{
-			AbilitySystemComponent->AddLooseGameplayTag(Tags.State_Dead);
+			AbilitySystemComponent->AddLooseGameplayTag(SFTags.State_Dead);
 		}
 
 		// Hard-stop any abilities currently mid-activation (fire bursts, beam
