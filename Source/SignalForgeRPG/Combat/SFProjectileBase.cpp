@@ -352,6 +352,18 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 		UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, Hit.ImpactPoint);
 	}
 
+	// Snapshot shields BEFORE damage so the cue block below (which runs even when
+	// damage is suppressed, but only fires shield cues if shields actually dropped)
+	// can spot the impact/break edge. Hoisted to function scope so it is visible
+	// across the damage block AND the later cue block.
+	float ShieldsBefore = 0.0f;
+	if (UAbilitySystemComponent* TargetASCForSnapshot =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor))
+	{
+		ShieldsBefore =
+			TargetASCForSnapshot->GetNumericAttribute(USFAttributeSetBase::GetShieldsAttribute());
+	}
+
 	// Damage attribution -- gated by friend-foe.
 	if (DamageEffectClass && SourceActor && OtherActor && !bSuppressDamage)
 	{
@@ -360,12 +372,6 @@ void ASFProjectileBase::HandleImpact(AActor* OtherActor, const FHitResult& Hit)
 
 		UAbilitySystemComponent* TargetASC =
 			UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OtherActor);
-
-		// Snapshot shields BEFORE damage so we can fire shield-impact/break cues
-		// from the projectile hit site once damage resolves.
-		const float ShieldsBefore = TargetASC
-			? TargetASC->GetNumericAttribute(USFAttributeSetBase::GetShieldsAttribute())
-			: 0.0f;
 
 		if (SourceASC && TargetASC)
 		{
