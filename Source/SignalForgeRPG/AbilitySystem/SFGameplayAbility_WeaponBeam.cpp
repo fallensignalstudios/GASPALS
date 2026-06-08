@@ -506,9 +506,9 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 	// Friend-foe gate: skip non-hostile / dead combatants unless the weapon opted into
 	// friendly fire via FSFRangedWeaponConfig::bAllowFriendlyFire. Beams tick frequently, so
 	// rejecting early keeps us from spamming GE specs into allied ASCs.
-	if (TargetActor->Implements<USFCombatantInterface>())
+	if (ISFCombatantInterface* TargetCombatant = Cast<ISFCombatantInterface>(TargetActor))
 	{
-		if (ISFCombatantInterface::Execute_IsDead(TargetActor))
+		if (TargetCombatant->IsDead())
 		{
 			return;
 		}
@@ -605,9 +605,9 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamHit(
 
 	// Last-damaging-character attribution -- generalized via combatant interface so XP/credit
 	// flows for any faction matchup, not just legacy enemy actors.
-	if (TargetActor->Implements<USFCombatantInterface>())
+	if (ISFCombatantInterface* TargetCombatant = Cast<ISFCombatantInterface>(TargetActor))
 	{
-		ISFCombatantInterface::Execute_RegisterDamageInstigator(TargetActor, Character);
+		TargetCombatant->RegisterDamageInstigator(Character);
 	}
 
 	// Shield-impact / shield-break VFX at the beam terminal point. Helper no-ops
@@ -645,7 +645,7 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamRecoilForTick(
 		? FMath::Max(0.0f, RangedConfig.AdsRecoilMultiplier)
 		: 1.0f;
 
-	if (Character->Implements<USFPlayerAvatarInterface>())
+	if (ISFPlayerAvatarInterface* AvatarInterface = Cast<ISFPlayerAvatarInterface>(Character))
 	{
 		const float PitchKick = FMath::Max(0.0f, RangedConfig.VerticalRecoil) * AdsScale * PerTickPitchScale;
 		float YawKick = 0.0f;
@@ -657,8 +657,7 @@ void USFGameplayAbility_WeaponBeam::ApplyBeamRecoilForTick(
 
 		if (PitchKick > 0.0f || !FMath::IsNearlyZero(YawKick))
 		{
-			ISFPlayerAvatarInterface::Execute_ApplyRecoilKick(
-				Character,
+			AvatarInterface->ApplyRecoilKick(
 				PitchKick,
 				YawKick,
 				RangedConfig.RecoilInterpSpeed,

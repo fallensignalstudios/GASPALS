@@ -10,12 +10,13 @@ void USFDialogueWidgetController::Initialize(AActor* InPlayerAvatar)
 	bIsDialogueActive = false;
 	CurrentDisplayData = FSFDialogueDisplayData();
 
-	if (!PlayerAvatar || !PlayerAvatar->Implements<USFPlayerAvatarInterface>())
+	ISFPlayerAvatarInterface* AvatarInterface = Cast<ISFPlayerAvatarInterface>(PlayerAvatar);
+	if (!AvatarInterface)
 	{
 		return;
 	}
 
-	DialogueComponent = ISFPlayerAvatarInterface::Execute_GetDialogueComponent(PlayerAvatar);
+	DialogueComponent = AvatarInterface->GetDialogueComponent();
 	if (!DialogueComponent)
 	{
 		return;

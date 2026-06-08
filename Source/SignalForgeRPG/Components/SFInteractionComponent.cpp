@@ -460,12 +460,13 @@ bool USFInteractionComponent::TryStartConversation(AActor* TargetActor)
 	// OwnerCharacter is ASFCharacterBase*; route dialogue access through the
 	// player-avatar interface so non-player owners (or a future 2nd protagonist)
 	// either supply a dialogue component or cleanly fail this gate.
-	if (!OwnerCharacter || !OwnerCharacter->Implements<USFPlayerAvatarInterface>())
+	ISFPlayerAvatarInterface* OwnerAvatar = Cast<ISFPlayerAvatarInterface>(OwnerCharacter);
+	if (!OwnerAvatar)
 	{
 		return false;
 	}
 
-	USFDialogueComponent* DialogueComponent = ISFPlayerAvatarInterface::Execute_GetDialogueComponent(OwnerCharacter);
+	USFDialogueComponent* DialogueComponent = OwnerAvatar->GetDialogueComponent();
 	if (!DialogueComponent || DialogueComponent->IsConversationActive())
 	{
 		return false;

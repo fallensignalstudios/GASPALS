@@ -574,9 +574,9 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 	// (Allies, civilians, and ourselves all flow through here.) Weapons can opt-in to friendly
 	// fire via FSFRangedWeaponConfig::bAllowFriendlyFire, in which case the hostility check is
 	// skipped (we still skip dead combatants so corpses don't soak shots).
-	if (TargetActor->Implements<USFCombatantInterface>())
+	if (ISFCombatantInterface* TargetCombatant = Cast<ISFCombatantInterface>(TargetActor))
 	{
-		if (ISFCombatantInterface::Execute_IsDead(TargetActor))
+		if (TargetCombatant->IsDead())
 		{
 			return;
 		}
@@ -675,9 +675,9 @@ void USFGameplayAbility_WeaponFire::ApplyHitscanDamage(
 	}
 
 	// Last-damaging-character attribution -- generalized via combatant interface.
-	if (TargetActor->Implements<USFCombatantInterface>())
+	if (ISFCombatantInterface* TargetCombatant = Cast<ISFCombatantInterface>(TargetActor))
 	{
-		ISFCombatantInterface::Execute_RegisterDamageInstigator(TargetActor, Character);
+		TargetCombatant->RegisterDamageInstigator(Character);
 	}
 
 	// Hit cue on target ASC so the cinematic combat layer reacts (sparks, blood, etc.).
@@ -764,7 +764,7 @@ void USFGameplayAbility_WeaponFire::ApplyRecoilAndShake(
 	// Route the per-shot kick through the avatar's smooth interpolator so the camera
 	// absorbs recoil over multiple frames instead of snapping. NPCs (no player-avatar
 	// interface) just skip the camera kick — they don't have a player camera to nudge.
-	if (Character->Implements<USFPlayerAvatarInterface>())
+	if (ISFPlayerAvatarInterface* AvatarInterface = Cast<ISFPlayerAvatarInterface>(Character))
 	{
 		const float PitchKick = FMath::Max(0.0f, Config.VerticalRecoil) * RecoilScale;
 		float YawKick = 0.0f;
@@ -776,8 +776,7 @@ void USFGameplayAbility_WeaponFire::ApplyRecoilAndShake(
 
 		if (PitchKick > 0.0f || !FMath::IsNearlyZero(YawKick))
 		{
-			ISFPlayerAvatarInterface::Execute_ApplyRecoilKick(
-				Character,
+			AvatarInterface->ApplyRecoilKick(
 				PitchKick,
 				YawKick,
 				Config.RecoilInterpSpeed,

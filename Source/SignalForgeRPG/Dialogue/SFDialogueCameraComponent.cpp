@@ -29,13 +29,10 @@ void USFDialogueCameraComponent::BeginPlay()
 
 	// Route through the player-avatar interface so both protagonists can supply
 	// the dialogue camera anchors without this component knowing the concrete class.
-	if (AActor* OwnerActor = GetOwner())
+	if (ISFPlayerAvatarInterface* OwnerAvatar = Cast<ISFPlayerAvatarInterface>(GetOwner()))
 	{
-		if (OwnerActor->Implements<USFPlayerAvatarInterface>())
-		{
-			DialogueCameraRoot = ISFPlayerAvatarInterface::Execute_GetDialogueCameraRoot(OwnerActor);
-			DialogueCamera = ISFPlayerAvatarInterface::Execute_GetDialogueCamera(OwnerActor);
-		}
+		DialogueCameraRoot = OwnerAvatar->GetDialogueCameraRoot();
+		DialogueCamera = OwnerAvatar->GetDialogueCamera();
 	}
 }
 
@@ -232,14 +229,11 @@ void USFDialogueCameraComponent::ApplyProceduralShot(const FSFDialogueCameraShot
 		return;
 	}
 
-	if (AActor* OwnerActor = GetOwner())
+	if (ISFPlayerAvatarInterface* OwnerAvatar = Cast<ISFPlayerAvatarInterface>(GetOwner()))
 	{
-		if (OwnerActor->Implements<USFPlayerAvatarInterface>())
+		if (UCameraComponent* GameplayCam = OwnerAvatar->GetGameplayCamera())
 		{
-			if (UCameraComponent* GameplayCam = ISFPlayerAvatarInterface::Execute_GetGameplayCamera(OwnerActor))
-			{
-				GameplayCam->Deactivate();
-			}
+			GameplayCam->Deactivate();
 		}
 	}
 
@@ -283,14 +277,11 @@ void USFDialogueCameraComponent::ApplyCameraActorShot(const FSFDialogueCameraSho
 		return;
 	}
 
-	if (AActor* OwnerActor = GetOwner())
+	if (ISFPlayerAvatarInterface* OwnerAvatar = Cast<ISFPlayerAvatarInterface>(GetOwner()))
 	{
-		if (OwnerActor->Implements<USFPlayerAvatarInterface>())
+		if (UCameraComponent* GameplayCam = OwnerAvatar->GetGameplayCamera())
 		{
-			if (UCameraComponent* GameplayCam = ISFPlayerAvatarInterface::Execute_GetGameplayCamera(OwnerActor))
-			{
-				GameplayCam->Deactivate();
-			}
+			GameplayCam->Deactivate();
 		}
 	}
 
@@ -329,14 +320,11 @@ void USFDialogueCameraComponent::ApplyLevelSequenceShot(const FSFDialogueCameraS
 
 	StopActiveSequence();
 
-	if (AActor* OwnerActor = GetOwner())
+	if (ISFPlayerAvatarInterface* OwnerAvatar = Cast<ISFPlayerAvatarInterface>(GetOwner()))
 	{
-		if (OwnerActor->Implements<USFPlayerAvatarInterface>())
+		if (UCameraComponent* GameplayCam = OwnerAvatar->GetGameplayCamera())
 		{
-			if (UCameraComponent* GameplayCam = ISFPlayerAvatarInterface::Execute_GetGameplayCamera(OwnerActor))
-			{
-				GameplayCam->Deactivate();
-			}
+			GameplayCam->Deactivate();
 		}
 	}
 
@@ -417,14 +405,11 @@ void USFDialogueCameraComponent::RestoreGameplayCamera()
 	CachePlayerController();
 	StopActiveSequence();
 
-	if (AActor* OwnerActor = GetOwner())
+	if (ISFPlayerAvatarInterface* OwnerAvatar = Cast<ISFPlayerAvatarInterface>(GetOwner()))
 	{
-		if (OwnerActor->Implements<USFPlayerAvatarInterface>())
+		if (UCameraComponent* GameplayCam = OwnerAvatar->GetGameplayCamera())
 		{
-			if (UCameraComponent* GameplayCam = ISFPlayerAvatarInterface::Execute_GetGameplayCamera(OwnerActor))
-			{
-				GameplayCam->Activate();
-			}
+			GameplayCam->Activate();
 		}
 	}
 

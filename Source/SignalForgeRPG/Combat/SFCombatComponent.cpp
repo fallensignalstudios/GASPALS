@@ -174,9 +174,9 @@ void USFCombatComponent::HandleAttackHitInternal(ESFAttackType AttackType)
 		}
 
 		// Skip dead combatants and non-hostile targets (friend-foe gate).
-		if (HitActor->Implements<USFCombatantInterface>())
+		if (ISFCombatantInterface* HitCombatant = Cast<ISFCombatantInterface>(HitActor))
 		{
-			if (ISFCombatantInterface::Execute_IsDead(HitActor))
+			if (HitCombatant->IsDead())
 			{
 				continue;
 			}
@@ -189,15 +189,15 @@ void USFCombatComponent::HandleAttackHitInternal(ESFAttackType AttackType)
 			}
 
 			// Attribute the eventual kill to OwnerCharacter so HandleDeath grants XP.
-			ISFCombatantInterface::Execute_RegisterDamageInstigator(HitActor, OwnerCharacter);
+			HitCombatant->RegisterDamageInstigator(OwnerCharacter);
 		}
 
 		FSFHitData HitData = BuildHitDataFromResult(HitActor, HitResult, AttackType);
 
 		FSFResolvedHit ResolvedHit;
-		if (HitActor->GetClass()->ImplementsInterface(USFHitResolverInterface::StaticClass()))
+		if (ISFHitResolverInterface* Resolver = Cast<ISFHitResolverInterface>(HitActor))
 		{
-			ResolvedHit = ISFHitResolverInterface::Execute_ResolveIncomingHit(HitActor, HitData);
+			ResolvedHit = Resolver->ResolveIncomingHit(HitData);
 		}
 		else
 		{

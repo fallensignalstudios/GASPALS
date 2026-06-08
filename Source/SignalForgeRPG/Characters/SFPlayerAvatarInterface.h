@@ -39,7 +39,7 @@ class USceneComponent;
 class UCameraComponent;
 class UTextureRenderTarget2D;
 
-UINTERFACE(MinimalAPI, Blueprintable)
+UINTERFACE(MinimalAPI)
 class USFPlayerAvatarInterface : public UInterface
 {
 	GENERATED_BODY()
@@ -50,34 +50,33 @@ class SIGNALFORGERPG_API ISFPlayerAvatarInterface
 	GENERATED_BODY()
 
 public:
+	// Plain C++ pure-virtuals, NOT BlueprintNativeEvents. See SFCombatantInterface.h
+	// for the rationale -- UHT event stubs assert when called from C++ without
+	// going through Execute_*. Dialogue / HUD / camera systems take ASFCharacterBase*
+	// or ISFPlayerAvatarInterface* and resolve through normal virtual dispatch.
+
 	/** Dialogue runtime component (line playback, choices, conversation state). */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Avatar|Dialogue")
-	USFDialogueComponent* GetDialogueComponent() const;
+	virtual USFDialogueComponent* GetDialogueComponent() const = 0;
 
 	/** Scene-component anchor the dialogue camera framing solver uses as its root pivot. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Avatar|Dialogue")
-	USceneComponent* GetDialogueCameraRoot() const;
+	virtual USceneComponent* GetDialogueCameraRoot() const = 0;
 
 	/** The dedicated dialogue camera (activated during conversations, deactivated otherwise). */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Avatar|Dialogue")
-	UCameraComponent* GetDialogueCamera() const;
+	virtual UCameraComponent* GetDialogueCamera() const = 0;
 
 	/** The standard gameplay camera (deactivated while the dialogue camera is live, reactivated afterward). */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Avatar|Camera")
-	UCameraComponent* GetGameplayCamera() const;
+	virtual UCameraComponent* GetGameplayCamera() const = 0;
 
 	/** Render target used by the HUD portrait widget. May be null on protagonists that don't render a portrait. */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Avatar|HUD")
-	UTextureRenderTarget2D* GetPortraitRenderTarget() const;
+	virtual UTextureRenderTarget2D* GetPortraitRenderTarget() const = 0;
 
 	/**
 	 * Apply a per-shot recoil kick to the avatar's view. NPCs that implement this interface
-	 * should leave the default impl (which does nothing) -- they have no player camera to nudge.
+	 * should provide a no-op impl -- they have no player camera to nudge.
 	 *
 	 * PitchDegrees pushes the view UP (positive value), YawDegrees may be positive or negative.
 	 * InterpSpeed controls kick-on rate; RecoverySpeed controls return rate; RecoveryFraction is
 	 * how much of the kick the return ultimately recovers (0..1).
 	 */
-	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Avatar|Feedback")
-	void ApplyRecoilKick(float PitchDegrees, float YawDegrees, float InterpSpeed, float RecoverySpeed, float RecoveryFraction);
+	virtual void ApplyRecoilKick(float PitchDegrees, float YawDegrees, float InterpSpeed, float RecoverySpeed, float RecoveryFraction) = 0;
 };

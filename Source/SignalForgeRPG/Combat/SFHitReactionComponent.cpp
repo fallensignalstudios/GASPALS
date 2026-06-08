@@ -253,10 +253,9 @@ USkeletalMeshComponent* USFHitReactionComponent::GetTargetMesh() const
 
 bool USFHitReactionComponent::IsOwnerDead() const
 {
-	AActor* Owner = GetOwner();
-	if (Owner && Owner->Implements<USFCombatantInterface>())
+	if (const ISFCombatantInterface* OwnerCombatant = Cast<ISFCombatantInterface>(GetOwner()))
 	{
-		return ISFCombatantInterface::Execute_IsDead(Owner);
+		return OwnerCombatant->IsDead();
 	}
 	return false;
 }

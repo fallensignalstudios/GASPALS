@@ -46,14 +46,15 @@ void USFDialoguePanelWidget::BindToLocalPlayerDialogueComponent()
 	}
 
 	APawn* Pawn = PC->GetPawn();
-	if (!Pawn || !Pawn->Implements<USFPlayerAvatarInterface>())
+	ISFPlayerAvatarInterface* AvatarInterface = Cast<ISFPlayerAvatarInterface>(Pawn);
+	if (!AvatarInterface)
 	{
 		UE_LOG(LogSFDialoguePanel, Verbose, TEXT("BindToLocalPlayerDialogueComponent: local pawn is not a player avatar (is '%s')."),
 			*GetNameSafe(Pawn));
 		return;
 	}
 
-	USFDialogueComponent* DialogueComp = ISFPlayerAvatarInterface::Execute_GetDialogueComponent(Pawn);
+	USFDialogueComponent* DialogueComp = AvatarInterface->GetDialogueComponent();
 	if (!DialogueComp)
 	{
 		UE_LOG(LogSFDialoguePanel, Warning, TEXT("BindToLocalPlayerDialogueComponent: player has no USFDialogueComponent."));
