@@ -692,7 +692,7 @@ void ASFCharacterBase::RegisterDamageInstigator_Implementation(AActor* InInstiga
 // ISFWeaponHolderInterface
 // -----------------------------------------------------------------------------
 
-bool ASFCharacterBase::GetActiveMuzzleTransform_Implementation(FTransform& OutTransform) const
+bool ASFCharacterBase::GetActiveMuzzleTransform(FTransform& OutTransform) const
 {
 	// Default impl walks: this -> EquipmentComponent -> equipped ASFWeaponActor -> muzzle socket.
 	// Non-character holders (turrets, mounted guns) can override to provide a muzzle transform

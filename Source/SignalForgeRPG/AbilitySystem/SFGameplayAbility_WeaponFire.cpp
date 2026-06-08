@@ -84,7 +84,8 @@ bool USFGameplayAbility_WeaponFire::CanActivateAbility(
 		return false;
 	}
 
-	USFEquipmentComponent* Equipment = ISFWeaponHolderInterface::Execute_GetEquipmentComponent(Avatar);
+	ISFWeaponHolderInterface* Holder = Cast<ISFWeaponHolderInterface>(Avatar);
+	USFEquipmentComponent* Equipment = Holder ? Holder->GetEquipmentComponent() : nullptr;
 	if (!Equipment)
 	{
 		return false;
